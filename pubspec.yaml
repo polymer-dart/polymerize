@@ -1,0 +1,8 @@
+name: b
+dependencies:
+ dev_compiler:
+  path: /home/vittorio/Tools/dev_compiler
+ analyzer: any
+ build:
+  git:
+   url: https://github.com/dart-lang/build.git
