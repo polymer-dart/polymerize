@@ -9,7 +9,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:stack_trace/stack_trace.dart';
 
-Future _buildAll(String rootPath, Directory dest) async {
+Future _buildAll(String rootPath, Directory dest,String mainModule) async {
   /*if (await dest.exists()) {
     await dest.delete(recursive:true);
   }*/
@@ -19,7 +19,33 @@ Future _buildAll(String rootPath, Directory dest) async {
   PackageGraph packageGraph = new PackageGraph.forPath(rootPath);
 
   // Build Packages in referse order
-  return _buildPackage(rootPath, packageGraph.root, {}, dest);
+
+  Map summaries = {};
+  await _buildPackage(rootPath, packageGraph.root, summaries, dest);
+
+  // Build index.html
+
+  File index = new File(path.join(dest.path,"index.html"));
+
+  return index.writeAsString(
+"""
+<html>
+<head>
+<script>
+'use strict';
+</script>
+<script src='/home/vittorio/Tools/dev_compiler/lib/runtime/dart_library.js'></script>
+<script src='/home/vittorio/Tools/dev_compiler/lib/runtime/dart_sdk.js'></script>
+${summaries.keys.map((PackageNode n) => '<script src=\''+n.name+'.js\'></script>').join('\n')}
+<script>
+	// Start the main in module 'a'
+	dart_library.start('${packageGraph.root.name}','${mainModule}');
+</script>
+</head>
+<body>
+</body>
+</html>
+""");
 }
 
 Future<List<String>> _buildPackage(String rootPath, PackageNode node,
@@ -130,12 +156,12 @@ String _moduleForLibrary(String moduleRoot, Source source) {
 }
 
 main(List<String> args) {
-  if (args == null || args.length != 2) {
-    print("USAGE : dart devc_builder main_source_package_path output_path");
+  if (args == null || args.length != 3) {
+    print("USAGE : dart devc_builder main_source_package_path output_path mainpackage_file_containing_main");
     return;
   }
   Chain.capture(() {
-    _buildAll(args[0], new Directory(args[1]));
+    _buildAll(args[0], new Directory(args[1]),args[2]);
   }, onError: (error, Chain chain) {
     if (error is BuildError) {
       print("BUILD ERROR : \n: ${error}");
