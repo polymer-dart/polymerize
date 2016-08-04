@@ -9,25 +9,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:stack_trace/stack_trace.dart';
 
-String _moduleForLibrary(String moduleRoot, Source source) {
-  if (source is InSummarySource) {
-    var summaryPath = source.summaryPath;
-    var ext = '.sum';
-    if (path.isWithin(moduleRoot, summaryPath) && summaryPath.endsWith(ext)) {
-      var buildUnitPath =
-          summaryPath.substring(0, summaryPath.length - ext.length);
-      return path.relative(buildUnitPath, from: moduleRoot);
-    }
-
-    throw 'Imported file ${source.uri} is not within the module root '
-        'directory $moduleRoot';
-  }
-
-  throw 'Imported file "${source.uri}" was not found as a summary or source '
-      'file. Please pass in either the summary or the source file '
-      'for this import.';
-}
-
 Future _buildAll(String rootPath, Directory dest) async {
   /*if (await dest.exists()) {
     await dest.delete(recursive:true);
@@ -129,7 +110,30 @@ Future _collectSources(
   }
 }
 
+String _moduleForLibrary(String moduleRoot, Source source) {
+  if (source is InSummarySource) {
+    var summaryPath = source.summaryPath;
+    var ext = '.sum';
+    if (path.isWithin(moduleRoot, summaryPath) && summaryPath.endsWith(ext)) {
+      var buildUnitPath =
+          summaryPath.substring(0, summaryPath.length - ext.length);
+      return path.relative(buildUnitPath, from: moduleRoot);
+    }
+
+    throw 'Imported file ${source.uri} is not within the module root '
+        'directory $moduleRoot';
+  }
+
+  throw 'Imported file "${source.uri}" was not found as a summary or source '
+      'file. Please pass in either the summary or the source file '
+      'for this import.';
+}
+
 main(List<String> args) {
+  if (args == null || args.length != 2) {
+    print("USAGE : dart devc_builder main_source_package_path output_path");
+    return;
+  }
   Chain.capture(() {
     _buildAll(args[0], new Directory(args[1]));
   }, onError: (error, Chain chain) {
