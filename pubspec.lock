@@ -88,9 +88,10 @@ packages:
     version: "0.13.2"
   dev_compiler:
     description:
-      path: "/home/vittorio/Tools/dev_compiler"
-      relative: false
-    source: path
+      ref: HEAD
+      resolved-ref: "057a9c8ad213fc51959093f31bfed3ca972a8eab"
+      url: "https://github.com/dart-lang/dev_compiler"
+    source: git
     version: "0.2.0"
   fixnum:
     description:
