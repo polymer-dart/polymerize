@@ -10,6 +10,23 @@ import 'dart:convert';
 import 'package:stack_trace/stack_trace.dart';
 import 'package:resource/resource.dart';
 
+const String DEFAULT_TEMPLATE = """
+<html>
+<head>
+<script>
+'use strict';
+</script>
+@IMPORT_SCRIPTS@
+<script>
+	// Start the main in module '@ENTRY_POINT@'
+	dart_library.start('@ROOT_PACKAGE_NAME@','@ENTRY_POINT@');
+</script>
+</head>
+<body>
+</body>
+</html>
+""";
+
 
 Future _buildAll(String rootPath, Directory dest,String mainModule) async {
   /*if (await dest.exists()) {
@@ -35,25 +52,30 @@ Future _buildAll(String rootPath, Directory dest,String mainModule) async {
   await _copyResource("package:dev_compiler/runtime/dart_sdk.js",path.join(dest.path,"dart_sdk.js"));
   await _copyResource("package:dev_compiler/runtime/dart_library.js",path.join(dest.path,"dart_library.js"));
 
-  return index.writeAsString(
-"""
-<html>
-<head>
-<script>
-'use strict';
-</script>
+  // If an index.html template exists use it
+
+  File templateFile = new File(path.join(rootPath,"index_template.html"));
+
+  String indexTemplate;
+  if (await templateFile.exists()) {
+    indexTemplate = await templateFile.readAsString();
+  } else {
+    indexTemplate = DEFAULT_TEMPLATE;
+  }
+
+  // Replace
+  indexTemplate = indexTemplate.replaceAllMapped(new RegExp("@([^@]+)@"), (Match m) => {
+    "ENTRY_POINT" : mainModule,
+    "IMPORT_SCRIPTS" : """
 <script src='dart_library.js'></script>
 <script src='dart_sdk.js'></script>
 ${scripts.join('\n')}
-<script>
-	// Start the main in module 'a'
-	dart_library.start('${packageGraph.root.name}','${mainModule}');
-</script>
-</head>
-<body>
-</body>
-</html>
-""");
+""",
+    "ROOT_PACKAGE_NAME" : packageGraph.root.name
+  }[m.group(1)]);
+
+  return index.writeAsString(indexTemplate);
+
 }
 
 Future _copyResource(String res, String dest) async {
