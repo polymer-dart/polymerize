@@ -8,6 +8,8 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:stack_trace/stack_trace.dart';
+import 'package:resource/resource.dart';
+
 
 Future _buildAll(String rootPath, Directory dest,String mainModule) async {
   /*if (await dest.exists()) {
@@ -27,6 +29,12 @@ Future _buildAll(String rootPath, Directory dest,String mainModule) async {
 
   File index = new File(path.join(dest.path,"index.html"));
 
+  // The order is irrelevant ---
+  List<String> scripts = summaries.keys.map((PackageNode n) => "<script src='${n.name}.js'></script>");
+
+  await _copyResource("package:dev_compiler/runtime/dart_sdk.js",path.join(dest.path,"dart_sdk.js"));
+  await _copyResource("package:dev_compiler/runtime/dart_library.js",path.join(dest.path,"dart_library.js"));
+
   return index.writeAsString(
 """
 <html>
@@ -34,9 +42,9 @@ Future _buildAll(String rootPath, Directory dest,String mainModule) async {
 <script>
 'use strict';
 </script>
-<script src='/home/vittorio/Tools/dev_compiler/lib/runtime/dart_library.js'></script>
-<script src='/home/vittorio/Tools/dev_compiler/lib/runtime/dart_sdk.js'></script>
-${summaries.keys.map((PackageNode n) => '<script src=\''+n.name+'.js\'></script>').join('\n')}
+<script src='dart_library.js'></script>
+<script src='dart_sdk.js'></script>
+${scripts.join('\n')}
 <script>
 	// Start the main in module 'a'
 	dart_library.start('${packageGraph.root.name}','${mainModule}');
@@ -46,6 +54,12 @@ ${summaries.keys.map((PackageNode n) => '<script src=\''+n.name+'.js\'></script>
 </body>
 </html>
 """);
+}
+
+Future _copyResource(String res, String dest) async {
+  Resource rsx =new Resource(res);
+  String content = await rsx.readAsString();
+  return new File(dest).writeAsString(content);
 }
 
 Future<List<String>> _buildPackage(String rootPath, PackageNode node,
@@ -77,7 +91,7 @@ Future<List<String>> _buildPackage(String rootPath, PackageNode node,
 
 Future<String> _buildOne(String rootPath, String packageName,
     Directory location, Directory dest,Directory summaryDest, List<String> summaries) async {
-  // Ottiene l'elenco di tutti i dart file di quel package
+  // Collect sources from filesystem
   List<String> sources = [];
 
   if (!await summaryDest.exists()) {
@@ -146,7 +160,7 @@ Future _collectSources(
 String _moduleForLibrary(String moduleRoot, Source source) {
   if (source is InSummarySource) {
 
-    print ("SOURCES : ${source.summaryPath} , ${source.fullName} , ${moduleRoot}");
+    //print ("SOURCES : ${source.summaryPath} , ${source.fullName} , ${moduleRoot}");
 
     RegExp re = new RegExp(r"^package:([^/]+).*$");
     Match m = re.matchAsPrefix(source.fullName);
@@ -155,19 +169,6 @@ String _moduleForLibrary(String moduleRoot, Source source) {
     }
 
     return m.group(1);
-
-    /*
-    var summaryPath = source.summaryPath;
-    var ext = '.sum';
-    if (path.isWithin(moduleRoot, summaryPath) && summaryPath.endsWith(ext)) {
-      var buildUnitPath =
-          summaryPath.substring(0, summaryPath.length - ext.length);
-      return path.relative(buildUnitPath, from: moduleRoot);
-    }
-
-    throw 'Imported file ${source.uri} is not within the module root '
-        'directory $moduleRoot';
-        */
   }
 
   throw 'Imported file "${source.uri}" was not found as a summary or source '

@@ -4,6 +4,7 @@ dependencies:
   path: /home/vittorio/Tools/dev_compiler
  analyzer: any
  stack_trace: any
+ resource: any
  build:
   git:
    url: https://github.com/dart-lang/build.git
