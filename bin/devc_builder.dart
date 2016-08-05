@@ -21,7 +21,7 @@ Future _buildAll(String rootPath, Directory dest,String mainModule) async {
   // Build Packages in referse order
 
   Map summaries = {};
-  await _buildPackage(rootPath, packageGraph.root, summaries, dest);
+  await _buildPackage(rootPath, packageGraph.root, summaries, dest,".summaries");
 
   // Build index.html
 
@@ -49,7 +49,7 @@ ${summaries.keys.map((PackageNode n) => '<script src=\''+n.name+'.js\'></script>
 }
 
 Future<List<String>> _buildPackage(String rootPath, PackageNode node,
-    Map<PackageNode, List<String>> summaries, Directory dest) async {
+    Map<PackageNode, List<String>> summaries, Directory dest,String summaryRepoPath) async {
   List<String> result;
 
   result = summaries[node];
@@ -59,23 +59,30 @@ Future<List<String>> _buildPackage(String rootPath, PackageNode node,
 
   // Build this package
 
-  result = [];
+  Set deps = new Set();
   for (PackageNode dep in node.dependencies) {
-    result.addAll(await _buildPackage(rootPath, dep, summaries, dest));
+    deps.addAll(await _buildPackage(rootPath, dep, summaries, dest,summaryRepoPath));
   }
 
   print("Building ${node.name}");
+
+  result = new List.from(deps);
   result.add(await _buildOne(
-      rootPath, node.name, new Directory.fromUri(node.location), dest, result));
+      rootPath, node.name, new Directory.fromUri(node.location), dest,new Directory(path.joinAll([summaryRepoPath,node.name,node.version!=null?node.version:""])), result));
+
   summaries[node] = result;
 
   return result;
 }
 
 Future<String> _buildOne(String rootPath, String packageName,
-    Directory location, Directory dest, List<String> summaries) async {
+    Directory location, Directory dest,Directory summaryDest, List<String> summaries) async {
   // Ottiene l'elenco di tutti i dart file di quel package
   List<String> sources = [];
+
+  if (!await summaryDest.exists()) {
+    await summaryDest.create(recursive: true);
+  }
 
   await _collectSources(
       packageName, new Directory(path.join(location.path, "lib")), sources);
@@ -104,7 +111,7 @@ Future<String> _buildOne(String rootPath, String packageName,
 
   // Write summary
 
-  File sum = new File(path.join(dest.path, "${packageName}.sum"));
+  File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
   await sum.writeAsBytes(res.summaryBytes);
 
   print("BUILT : ${sum.path}");
@@ -138,6 +145,18 @@ Future _collectSources(
 
 String _moduleForLibrary(String moduleRoot, Source source) {
   if (source is InSummarySource) {
+
+    print ("SOURCES : ${source.summaryPath} , ${source.fullName} , ${moduleRoot}");
+
+    RegExp re = new RegExp(r"^package:([^/]+).*$");
+    Match m = re.matchAsPrefix(source.fullName);
+    if (m==null) {
+      throw "Source should be in package format :${source.fullName}";
+    }
+
+    return m.group(1);
+
+    /*
     var summaryPath = source.summaryPath;
     var ext = '.sum';
     if (path.isWithin(moduleRoot, summaryPath) && summaryPath.endsWith(ext)) {
@@ -148,6 +167,7 @@ String _moduleForLibrary(String moduleRoot, Source source) {
 
     throw 'Imported file ${source.uri} is not within the module root '
         'directory $moduleRoot';
+        */
   }
 
   throw 'Imported file "${source.uri}" was not found as a summary or source '
