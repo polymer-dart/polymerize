@@ -19,6 +19,12 @@ where
   -  `output_directory` guess what it is ?
   -  `main_file_path` is the relative path inside the main package where your `main()` function resides
 
+example:
+
+    devc_builder my_app out index
+
+will build the app inside `my_app` folder (that should be already "pub getted") in folder `out` using the file `my_app/lib/index.dart` as entry point.
+
 ## Output
 
 This tool will transitively examine the main package dependencies and produce a single `js` module for each. 
