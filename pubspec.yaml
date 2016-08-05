@@ -1,4 +1,7 @@
-name: b
+name: devc_builder
+author: Vittorio Ballestra <vittorio.ballestra@gmail.com>
+homepage: https://github.com/dam0vm3nt
+version: 1.0
 dependencies:
  dev_compiler:
   path: /home/vittorio/Tools/dev_compiler
