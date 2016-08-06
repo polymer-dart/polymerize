@@ -17,10 +17,7 @@ const String DEFAULT_TEMPLATE = """
 'use strict';
 </script>
 @IMPORT_SCRIPTS@
-<script>
-	// Start the main in module '@ENTRY_POINT@'
-	dart_library.start('@ROOT_PACKAGE_NAME@','@ENTRY_POINT@');
-</script>
+@BOOTSTRAP@
 </head>
 <body>
 </body>
@@ -66,12 +63,16 @@ Future _buildAll(String rootPath, Directory dest,String mainModule) async {
   // Replace
   indexTemplate = indexTemplate.replaceAllMapped(new RegExp("@([^@]+)@"), (Match m) => {
     "ENTRY_POINT" : mainModule,
-    "IMPORT_SCRIPTS" : """
-<script src='dart_library.js'></script>
+    "IMPORT_SCRIPTS" :
+"""<script src='dart_library.js'></script>
 <script src='dart_sdk.js'></script>
-${scripts.join('\n')}
-""",
-    "ROOT_PACKAGE_NAME" : packageGraph.root.name
+${scripts.join('\n')}""",
+    "ROOT_PACKAGE_NAME" : packageGraph.root.name,
+    "BOOTSTRAP" :
+"""<script>
+	// Start the main in module '${mainModule}'
+	dart_library.start('${packageGraph.root.name}','${mainModule}');
+</script>"""
   }[m.group(1)]);
 
   return index.writeAsString(indexTemplate);
@@ -121,7 +122,7 @@ Future<String> _buildOne(String rootPath, String packageName,
   }
 
   await _collectSources(
-      packageName, new Directory(path.join(location.path, "lib")), sources);
+      packageName, new Directory(path.join(location.path, "lib")), sources,dest);
   print("  Collected : ${sources}");
   print("  Summaries : ${summaries}");
 
@@ -164,7 +165,7 @@ class BuildError {
 }
 
 Future _collectSources(
-    String packageName, Directory dir, List<String> sources) async {
+    String packageName, Directory dir, List<String> sources,Directory dest) async {
   if (!await dir.exists()) {
     return [];
   }
@@ -174,6 +175,13 @@ Future _collectSources(
     if (e is File) {
       if (path.extension(e.path) == '.dart') {
         sources.add("package:${packageName}/${rel}");
+      } else {
+        String destPath = path.join(dest.path,rel);
+        Directory p = new Directory(path.dirname(destPath));
+        if (! await p.exists()) {
+          await p.create(recursive: true);
+        }
+        e.copy(destPath);
       }
     }
   }
