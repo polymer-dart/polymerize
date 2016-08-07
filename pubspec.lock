@@ -6,7 +6,7 @@ packages:
       name: analyzer
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "0.27.4"
+    version: "0.27.5-alpha.0"
   args:
     description:
       name: args
@@ -89,7 +89,7 @@ packages:
   dev_compiler:
     description:
       ref: HEAD
-      resolved-ref: "057a9c8ad213fc51959093f31bfed3ca972a8eab"
+      resolved-ref: fa084164b620ea75cd2008c9dc317655a045ad6d
       url: "https://github.com/dart-lang/dev_compiler"
     source: git
     version: "0.2.0"

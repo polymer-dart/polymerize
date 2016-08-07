@@ -8,7 +8,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:stack_trace/stack_trace.dart';
-import 'package:resource/resource.dart';
+import 'package:resource/resource.dart' as res;
 
 const String DEFAULT_TEMPLATE = """
 <html>
@@ -53,7 +53,7 @@ Future _buildAll(String rootPath, Directory dest, String mainModule) async {
 
   // If an index.html template exists use it
 
-  File templateFile = new File(path.join(rootPath,"web", "index.html"));
+  File templateFile = new File(path.join(rootPath, "web", "index.html"));
 
   String indexTemplate;
   if (await templateFile.exists()) {
@@ -80,8 +80,8 @@ ${scripts.join('\n')}""",
   return index.writeAsString(indexTemplate);
 }
 
-Future _copyResource(String res, String dest) async {
-  Resource rsx = new Resource(res);
+Future _copyResource(String resx, String dest) async {
+  res.Resource rsx = new res.Resource(resx);
   String content = await rsx.readAsString();
   return new File(dest).writeAsString(content);
 }
@@ -144,7 +144,6 @@ Future<String> _buildOne(
 
   File js = new File(path.join(dest.path, "${packageName}.js"));
 
-
   // Collect sources from filesystem
   List<String> sources = [];
 
@@ -185,7 +184,7 @@ Future<String> _buildOne(
 
   // Write source map
 
-  await smap.writeAsString(JSON.encode(res.placeSourceMap(smap.path)));
+  await smap.writeAsString(JSON.encode(res.placeSourceMap(path.absolute(dest.path))));
   await smap.copy(repo_smap.path);
 
   // Write summary
@@ -206,8 +205,8 @@ class BuildError {
   toString() => messages.join("\n");
 }
 
-Future _collectSourcesAndCopyResources(String packageName, Directory dir, List<String> sources,
-    Directory dest) async {
+Future _collectSourcesAndCopyResources(String packageName, Directory dir,
+    List<String> sources, Directory dest) async {
   if (!await dir.exists()) {
     return [];
   }
@@ -258,7 +257,7 @@ main(List<String> args) {
     _buildAll(args[0], new Directory(args[1]), args[2]);
   }, onError: (error, Chain chain) {
     if (error is BuildError) {
-      print("BUILD ERROR : \n: ${error}");
+      print("BUILD ERROR : \n${error}");
     } else {
       print("ERROR: ${error}\n AT: ${chain.terse}");
     }
