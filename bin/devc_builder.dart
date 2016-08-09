@@ -167,7 +167,7 @@ Future<String> _buildOne(
 
   ModuleCompiler moduleCompiler = new ModuleCompiler(new AnalyzerOptions(
       packageRoot: path.join(rootPath, "packages"), summaryPaths: summaries));
-  CompilerOptions compilerOptions = new CompilerOptions(hoistInstanceCreation: false,hoistSignatureTypes: false,hoistTypeTests: false,closure: true);
+  CompilerOptions compilerOptions = new CompilerOptions();
 
   BuildUnit bu = new BuildUnit(packageName, ".", sources,
       (source) => _moduleForLibrary(dest.path, source));
