@@ -59,5 +59,6 @@ You can test the results using a recent `chrome` or translate it with `babelJS`.
 
 ## TODO:
 
+ - use args processing lib
  - execute `babelJS` / `vulcanize` / etc. etc.
  - try using `build` (can it be done ? how to handle group of sources?)
