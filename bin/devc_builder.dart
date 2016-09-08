@@ -1,9 +1,10 @@
 import 'package:dev_compiler/src/analyzer/context.dart';
 import 'package:dev_compiler/src/compiler/compiler.dart';
 import 'package:analyzer/src/summary/package_bundle_reader.dart';
+import 'package:dev_compiler/src/compiler/module_builder.dart';
 import 'package:path/path.dart' as path;
 import 'package:analyzer/src/generated/source.dart';
-import 'package:build/src/package_graph/package_graph.dart';
+import 'package:devc_builder/package_graph.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
@@ -178,13 +179,12 @@ Future<String> _buildOne(
   }
 
   // Write outputs
-
-  await js.writeAsString(res.code);
+  JSModuleCode code = res.getCode(ModuleFormat.legacy, "file://boh", path.absolute(dest.path));
+  await js.writeAsString(code.code);
   await js.copy(repo_js.path);
 
   // Write source map
-
-  await smap.writeAsString(JSON.encode(res.placeSourceMap(path.absolute(dest.path))));
+  await smap.writeAsString(JSON.encode(code.sourceMap));
   await smap.copy(repo_smap.path);
 
   // Write summary

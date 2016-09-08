@@ -6,7 +6,7 @@ packages:
       name: analyzer
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "0.27.5-alpha.0"
+    version: "0.28.1"
   args:
     description:
       name: args
@@ -19,12 +19,6 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "1.11.1"
-  barback:
-    description:
-      name: barback
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "0.15.2+8"
   bazel_worker:
     description:
       name: bazel_worker
@@ -37,13 +31,6 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.10.0+2"
-  build:
-    description:
-      ref: HEAD
-      resolved-ref: d63a5c82489dc18e69d44bb80a11cf0c2465bd3e
-      url: "https://github.com/dart-lang/build.git"
-    source: git
-    version: "0.3.0+6"
   charcode:
     description:
       name: charcode
@@ -56,12 +43,6 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.0.1+2"
-  code_transformers:
-    description:
-      name: code_transformers
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "0.4.2+2"
   collection:
     description:
       name: collection
@@ -89,7 +70,7 @@ packages:
   dev_compiler:
     description:
       ref: HEAD
-      resolved-ref: fa084164b620ea75cd2008c9dc317655a045ad6d
+      resolved-ref: "8c859df667179724be1ca0bd6f9f82e6f7f0c66c"
       url: "https://github.com/dart-lang/dev_compiler"
     source: git
     version: "0.2.0"
@@ -117,12 +98,6 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.12.2+2"
-  http_parser:
-    description:
-      name: http_parser
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "3.0.2"
   isolate:
     description:
       name: isolate
@@ -141,12 +116,12 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.11.3+1"
-  mime:
+  meta:
     description:
-      name: mime
+      name: meta
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "0.9.3"
+    version: "1.0.2"
   package_config:
     description:
       name: package_config
@@ -165,12 +140,6 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.2.0"
-  pool:
-    description:
-      name: pool
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "1.2.4"
   protobuf:
     description:
       name: protobuf
@@ -189,18 +158,6 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "1.1.0"
-  shelf:
-    description:
-      name: shelf
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "0.6.5+2"
-  shelf_static:
-    description:
-      name: shelf_static
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "0.2.4"
   source_maps:
     description:
       name: source_maps
@@ -219,12 +176,6 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "1.6.6"
-  stream_channel:
-    description:
-      name: stream_channel
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "1.5.0"
   string_scanner:
     description:
       name: string_scanner
@@ -267,4 +218,5 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "2.1.10"
-sdk: ">=1.17.0-dev.6.2 <2.0.0"
+sdks:
+  dart: ">=1.17.0-dev.6.2 <2.0.0"
