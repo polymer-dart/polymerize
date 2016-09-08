@@ -47,9 +47,9 @@ Future _buildAll(String rootPath, Directory dest, String mainModule) async {
   List<String> scripts = summaries.keys
       .map((PackageNode n) => "<script src='${n.name}.js'></script>");
 
-  await _copyResource("package:dev_compiler/runtime/dart_sdk.js",
+  await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js",
       path.join(dest.path, "dart_sdk.js"));
-  await _copyResource("package:dev_compiler/runtime/dart_library.js",
+  await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
       path.join(dest.path, "dart_library.js"));
 
   // If an index.html template exists use it
