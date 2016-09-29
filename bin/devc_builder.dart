@@ -25,7 +25,8 @@ const String DEFAULT_TEMPLATE = """
 </html>
 """;
 
-Future _buildAll(String rootPath, Directory dest, String mainModule) async {
+Future _buildAll(String rootPath, Directory dest, String mainModule,
+    ModuleFormat format) async {
   /*if (await dest.exists()) {
     await dest.delete(recursive:true);
   }*/
@@ -37,7 +38,8 @@ Future _buildAll(String rootPath, Directory dest, String mainModule) async {
   // Build Packages in referse order
 
   Map summaries = {};
-  await _buildPackage(rootPath, packageGraph.root, summaries, dest, ".repo");
+  await _buildPackage(
+      rootPath, packageGraph.root, summaries, dest, ".repo", format);
 
   // Build index.html
 
@@ -47,11 +49,18 @@ Future _buildAll(String rootPath, Directory dest, String mainModule) async {
   List<String> scripts = summaries.keys
       .map((PackageNode n) => "<script src='${n.name}.js'></script>");
 
-  await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js",
-      path.join(dest.path, "dart_sdk.js"));
-  await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
-      path.join(dest.path, "dart_library.js"));
-
+  if (format == ModuleFormat.legacy) {
+    await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js",
+        path.join(dest.path, "dart_sdk.js"));
+    await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
+        path.join(dest.path, "dart_library.js"));
+  } else if (format == ModuleFormat.es6) {
+    await _copyResource("package:dev_compiler/js/es6/dart_sdk.js",
+        path.join(dest.path, "dart_sdk.js"));
+  }else if (format == ModuleFormat.amd) {
+    await _copyResource("package:dev_compiler/js/amd/dart_sdk.js",
+        path.join(dest.path, "dart_sdk.js"));
+  }
   // If an index.html template exists use it
 
   File templateFile = new File(path.join(rootPath, "web", "index.html"));
@@ -92,7 +101,8 @@ Future<List<String>> _buildPackage(
     PackageNode node,
     Map<PackageNode, List<String>> summaries,
     Directory dest,
-    String summaryRepoPath) async {
+    String summaryRepoPath,
+    ModuleFormat format) async {
   List<String> result;
 
   result = summaries[node];
@@ -104,8 +114,8 @@ Future<List<String>> _buildPackage(
 
   Set deps = new Set();
   for (PackageNode dep in node.dependencies) {
-    deps.addAll(
-        await _buildPackage(rootPath, dep, summaries, dest, summaryRepoPath));
+    deps.addAll(await _buildPackage(
+        rootPath, dep, summaries, dest, summaryRepoPath, format));
   }
 
   print("Building ${node.name}");
@@ -122,7 +132,8 @@ Future<List<String>> _buildPackage(
         node.version != null ? node.version : ""
       ])),
       result,
-      node.dependencyType == PackageDependencyType.pub));
+      node.dependencyType == PackageDependencyType.pub,
+      format));
 
   summaries[node] = result;
 
@@ -136,7 +147,8 @@ Future<String> _buildOne(
     Directory dest,
     Directory summaryDest,
     List<String> summaries,
-    bool useRepo) async {
+    bool useRepo,
+    ModuleFormat format) async {
   File repo_smap =
       new File(path.join(summaryDest.path, "${packageName}.js.map"));
   File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
@@ -179,7 +191,8 @@ Future<String> _buildOne(
   }
 
   // Write outputs
-  JSModuleCode code = res.getCode(ModuleFormat.legacy, "file://boh", path.absolute(dest.path));
+  JSModuleCode code =
+      res.getCode(format, false, path.absolute(dest.path),path.absolute(dest.path));
   await js.writeAsString(code.code);
   await js.copy(repo_js.path);
 
@@ -254,7 +267,7 @@ main(List<String> args) {
     return;
   }
   Chain.capture(() {
-    _buildAll(args[0], new Directory(args[1]), args[2]);
+    _buildAll(args[0], new Directory(args[1]), args[2], ModuleFormat.amd);
   }, onError: (error, Chain chain) {
     if (error is BuildError) {
       print("BUILD ERROR : \n${error}");

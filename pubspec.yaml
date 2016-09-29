@@ -2,11 +2,12 @@ name: devc_builder
 author: Vittorio Ballestra <vittorio.ballestra@gmail.com>
 homepage: https://github.com/dam0vm3nt
 description: A minimal build tool for the `dev_compiler`
-version: 0.1.2+2
+version: 0.1.2+3
 dependencies:
  dev_compiler:
-  git:
-   url: https://github.com/dart-lang/dev_compiler
+  path: ../sdk/pkg/dev_compiler
+#  git:
+#   url: https://github.com/dart-lang/dev_compiler
  analyzer: any
  stack_trace: any
  resource: any
