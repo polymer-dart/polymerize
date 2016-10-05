@@ -48,7 +48,7 @@ Future _buildAll(String rootPath, Directory dest, ModuleFormat format) async {
         path.join(dest.path, "dart_sdk.js"));
 
     await _copyResource(
-        "package:devc_builder/require.js", path.join(dest.path, "require.js"));
+        "package:polymerize/require.js", path.join(dest.path, "require.js"));
   }
 
   // If an index.html template exists use it
