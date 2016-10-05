@@ -8,7 +8,7 @@ import 'package:analyzer/src/summary/package_bundle_reader.dart';
 import 'package:dev_compiler/src/compiler/module_builder.dart';
 import 'package:path/path.dart' as path;
 import 'package:analyzer/src/generated/source.dart';
-import 'package:devc_builder/package_graph.dart';
+import 'package:polymerize/package_graph.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';

@@ -1,11 +1,15 @@
-name: devc_builder
+name: polymerize
 author: Vittorio Ballestra <vittorio.ballestra@gmail.com>
 homepage: https://github.com/dam0vm3nt
 description: A minimal build tool for the `dev_compiler`
-version: 0.1.2+3
+version: 0.2.0
 dependencies:
  dev_compiler:
-  path: ../sdk/pkg/dev_compiler
+  hosted:
+   name: dev_compiler
+   url: "http://pub.drafintech.it:5001"
+  version: 0.2.0-unofficial.0
+#  path: ../sdk/pkg/dev_compiler
 #  git:
 #   url: https://github.com/dart-lang/dev_compiler
  analyzer: any
@@ -15,4 +19,4 @@ dependencies:
 #  git:
 #   url: https://github.com/dart-lang/build.git
 executables:
- devc_builder: devc_builder
+ polymerize: polymerize
