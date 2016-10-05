@@ -1,3 +1,6 @@
+import 'package:analyzer/dart/constant/value.dart';
+import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:dev_compiler/src/analyzer/context.dart';
 import 'package:dev_compiler/src/compiler/compiler.dart';
 import 'package:analyzer/src/summary/package_bundle_reader.dart';
@@ -174,13 +177,17 @@ Future<String> _buildOne(
   if (!await summaryDest.exists()) {
     await summaryDest.create(recursive: true);
   }
-
+  String libPath = path.join(location.path, "lib");
   await _collectSourcesAndCopyResources(packageName,
-      new Directory(path.join(location.path, "lib")), sources, dest);
+      new Directory(libPath), sources, dest);
   print("  Collected : ${sources}");
   print("  Summaries : ${summaries}");
 
   // If use repo (after collect and copy)
+  // TODO : Spostare questa logica sotto
+  // 1) buildare sempre dentro il repo
+  // 2) a poi copiare sempre dal repo verso la dest
+
   if (useRepo && await repo_js.exists() && await repo_smap.exists()) {
     // Use it, do not build it again
     await repo_js.copy(js.path);
@@ -188,6 +195,8 @@ Future<String> _buildOne(
     print("CACHED : ${sum.path}");
     return sum.path;
   }
+
+
 
   ModuleCompiler moduleCompiler = new ModuleCompiler(new AnalyzerOptions(
       packageRoot: path.join(rootPath, "packages"), summaryPaths: summaries));
@@ -201,9 +210,66 @@ Future<String> _buildOne(
     throw new BuildError(res.errors);
   }
 
+
+
+  // Analizzo il modulo
+
+  moduleCompiler.context.librarySources.forEach((Source src) {
+    if (src.isInSystemLibrary) {
+      return;
+    }
+    if (src.uri.scheme!='package') {
+      return;
+    }
+    if (src.uri.pathSegments.first!=packageName) {
+      return;
+    }
+
+
+
+    LibraryElement le = moduleCompiler.context.getLibraryElement(src);
+    le?.units?.forEach((CompilationUnitElement e) {
+      print("Unit : ${e.name}");
+      e.types.forEach((ClassElement ce) {
+
+        DartObject reg = ce.metadata.map((ElementAnnotation an) => an.constantValue).firstWhere((DartObject val) => val.type.name=='PolymerRegister',orElse:()=>null);
+
+        if (reg == null) {
+          return;
+        }
+
+        String name = e.name;
+        if (name.endsWith(".dart")) {
+          name = name.substring(0,name.length-5);
+        }
+
+        String tag = reg.getField('tagName').toStringValue();
+        String template = reg.getField('template').toStringValue();
+        print("${ce.name} -> Found Tag  : ${tag} [${template}]");
+
+        // Trovo il file relativo all'element
+        String templatePath = path.join(path.dirname(e.source.fullName),template);
+
+        String rel = path.relative(templatePath,from:libPath);
+
+        String destTemplate = path.join(dest.path,packageName,rel);
+        String renameTo = "${destTemplate.substring(0,destTemplate.length-5)}_orig.html";
+
+        if (new File(templatePath).existsSync()) {
+          print("found ${templatePath} -> ${destTemplate}");
+
+          new File(templatePath).copySync(renameTo);
+          new File(destTemplate).writeAsStringSync(htmlImportTemplate(template:template,packageName:packageName,name:name,className:ce.name));
+        }
+
+
+      });
+    });
+  });
+
   // Write outputs
   JSModuleCode code = res.getCode(
-      format, false, path.absolute(dest.path), path.absolute(dest.path));
+      format, false, "${packageName}.js", "");
   await js.writeAsString(code.code);
   await js.copy(repo_js.path);
 
@@ -219,6 +285,24 @@ Future<String> _buildOne(
   print("BUILT : ${sum.path}");
 
   return sum.path;
+}
+
+String htmlImportTemplate({String template,String packageName,String name,String className}) =>
+"""
+<link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'>
+
+<script>
+  require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
+  polymerize(pkg.${name}.${className});
+});
+</script>
+""";
+
+DartType metadataType(ElementAnnotation meta) {
+  if(meta is ConstructorElement) {
+    return (meta as ConstructorElement).returnType;
+  }
+  return null;
 }
 
 class BuildError {
