@@ -12,12 +12,12 @@ The benefits of this approach compared to the `dart2js` standard `polymer-1.x` a
  - possibility to distribute **ONLY** the build result to thirdy party users and devs
  - simplified API
    - automatic getter and setter (no explicit notify for first level properties)
-   - ** NO ** Annotations for exposed properties
-   - ** NO ** Annotations for exposed methods
+   - **NO** Annotations required to expose properties
+   - **NO** Annotations required to expose methods
 
 ## Disclaimer
 
-Although very promising this package is based on the **EXPERIMENTAL DEV COMPILER** and therefore this
+Too good to be true ? Well the bad news is that although very promising this package is based on the **EXPERIMENTAL DEV COMPILER** and therefore this
 is to be considered **HIGHLY UNSTABLE** and not ready for production.
 
 Nevertheless it can be though as a POC to demostrate the extremely high potential of this approach for Dart.
@@ -70,11 +70,15 @@ This is a sample component definition:
       }
     }
 
+The Html template is just the usual `dom-module`  template **without** any JS code and with `<link>` to import other polymer dependencies (like polymer2 itself and
+  any used component).
+The `index.html` should preload `requirejs`, `webcomponents` polyfill and `polymer.html` (see the demo).
+
 ## Output
 
 The build tool will operate in this way :
 
- - Every dependency of the main package will be build and will produce a separate loadable module in the output Directory
+ - Every dependency of the main package will be processed and will produce a separate loadable module in the output Directory
  - For every polymer component a new `html` file will be produced that will load the original template and will load the corresponding dart class
 
 Every file with ".dart" extension *inside* the `lib` folder of a dependency will be considered in the build of the corresponding module.
