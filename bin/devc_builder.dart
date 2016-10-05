@@ -1,6 +1,7 @@
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:analyzer/src/generated/engine.dart';
 import 'package:dev_compiler/src/analyzer/context.dart';
 import 'package:dev_compiler/src/compiler/compiler.dart';
 import 'package:analyzer/src/summary/package_bundle_reader.dart';
@@ -14,22 +15,7 @@ import 'dart:convert';
 import 'package:stack_trace/stack_trace.dart';
 import 'package:resource/resource.dart' as res;
 
-const String DEFAULT_TEMPLATE = """
-<html>
-<head>
-<script>
-'use strict';
-</script>
-@IMPORT_SCRIPTS@
-@BOOTSTRAP@
-</head>
-<body>
-</body>
-</html>
-""";
-
-Future _buildAll(String rootPath, Directory dest, String mainModule,
-    ModuleFormat format) async {
+Future _buildAll(String rootPath, Directory dest, ModuleFormat format) async {
   /*if (await dest.exists()) {
     await dest.delete(recursive:true);
   }*/
@@ -49,9 +35,6 @@ Future _buildAll(String rootPath, Directory dest, String mainModule,
   File index = new File(path.join(dest.path, "index.html"));
 
   // The order is irrelevant ---
-  List<String> scripts = summaries.keys
-      .map((PackageNode n) => "<script src='${n.name}.js'></script>");
-
   if (format == ModuleFormat.legacy) {
     await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js",
         path.join(dest.path, "dart_sdk.js"));
@@ -64,8 +47,8 @@ Future _buildAll(String rootPath, Directory dest, String mainModule,
     await _copyResource("package:dev_compiler/js/amd/dart_sdk.js",
         path.join(dest.path, "dart_sdk.js"));
 
-    await _copyResource("package:devc_builder/require.js",
-        path.join(dest.path, "require.js"));
+    await _copyResource(
+        "package:devc_builder/require.js", path.join(dest.path, "require.js"));
   }
 
   // If an index.html template exists use it
@@ -75,26 +58,9 @@ Future _buildAll(String rootPath, Directory dest, String mainModule,
   String indexTemplate;
   if (await templateFile.exists()) {
     indexTemplate = await templateFile.readAsString();
-  } else {
-    indexTemplate = DEFAULT_TEMPLATE;
+
+    return index.writeAsString(indexTemplate);
   }
-
-  // Replace
-  indexTemplate = indexTemplate.replaceAllMapped(
-      new RegExp("@([^@]+)@"),
-      (Match m) => {
-            "ENTRY_POINT": mainModule,
-            "IMPORT_SCRIPTS": """<script src='dart_library.js'></script>
-<script src='dart_sdk.js'></script>
-${scripts.join('\n')}""",
-            "ROOT_PACKAGE_NAME": packageGraph.root.name,
-            "BOOTSTRAP": """<script>
-	// Start the main in module '${mainModule}'
-	dart_library.start('${packageGraph.root.name}','${mainModule}');
-</script>"""
-          }[m.group(1)]);
-
-  return index.writeAsString(indexTemplate);
 }
 
 Future _copyResource(String resx, String dest) async {
@@ -178,8 +144,8 @@ Future<String> _buildOne(
     await summaryDest.create(recursive: true);
   }
   String libPath = path.join(location.path, "lib");
-  await _collectSourcesAndCopyResources(packageName,
-      new Directory(libPath), sources, dest);
+  await _collectSourcesAndCopyResources(
+      packageName, new Directory(libPath), sources, dest);
   print("  Collected : ${sources}");
   print("  Summaries : ${summaries}");
 
@@ -196,8 +162,6 @@ Future<String> _buildOne(
     return sum.path;
   }
 
-
-
   ModuleCompiler moduleCompiler = new ModuleCompiler(new AnalyzerOptions(
       packageRoot: path.join(rootPath, "packages"), summaryPaths: summaries));
   CompilerOptions compilerOptions = new CompilerOptions();
@@ -210,66 +174,65 @@ Future<String> _buildOne(
     throw new BuildError(res.errors);
   }
 
-
-
   // Analizzo il modulo
 
   moduleCompiler.context.librarySources.forEach((Source src) {
     if (src.isInSystemLibrary) {
       return;
     }
-    if (src.uri.scheme!='package') {
+    if (src.uri.scheme != 'package') {
       return;
     }
-    if (src.uri.pathSegments.first!=packageName) {
+    if (src.uri.pathSegments.first != packageName) {
       return;
     }
-
-
 
     LibraryElement le = moduleCompiler.context.getLibraryElement(src);
-    le?.units?.forEach((CompilationUnitElement e) {
-      print("Unit : ${e.name}");
+
+    le?.units?.forEach((CompilationUnitElement e) async {
+      //print("Unit : ${e.name}");
       e.types.forEach((ClassElement ce) {
-
-        DartObject reg = ce.metadata.map((ElementAnnotation an) => an.constantValue).firstWhere((DartObject val) => val.type.name=='PolymerRegister',orElse:()=>null);
-
+        DartObject reg = getAnnotation(ce.metadata, isPolymerRegister);
         if (reg == null) {
           return;
         }
 
-        String name = e.name;
-        if (name.endsWith(".dart")) {
-          name = name.substring(0,name.length-5);
-        }
+        Map config = collectConfig(moduleCompiler.context, ce);
+
+        String name = path.basenameWithoutExtension(e.name);
 
         String tag = reg.getField('tagName').toStringValue();
         String template = reg.getField('template').toStringValue();
-        print("${ce.name} -> Found Tag  : ${tag} [${template}]");
+        //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
 
         // Trovo il file relativo all'element
-        String templatePath = path.join(path.dirname(e.source.fullName),template);
+        String templatePath =
+            path.join(path.dirname(e.source.fullName), template);
 
-        String rel = path.relative(templatePath,from:libPath);
+        String rel = path.relative(templatePath, from: libPath);
 
-        String destTemplate = path.join(dest.path,packageName,rel);
-        String renameTo = "${destTemplate.substring(0,destTemplate.length-5)}_orig.html";
+        String destTemplate = path.join(dest.path, packageName, rel);
+        String renameTo =
+            "${destTemplate.substring(0,destTemplate.length-5)}_orig.html";
 
         if (new File(templatePath).existsSync()) {
-          print("found ${templatePath} -> ${destTemplate}");
+          //print("found ${templatePath} -> ${destTemplate}");
 
           new File(templatePath).copySync(renameTo);
-          new File(destTemplate).writeAsStringSync(htmlImportTemplate(template:template,packageName:packageName,name:name,className:ce.name,tagName:tag));
+          new File(destTemplate).writeAsStringSync(htmlImportTemplate(
+              template: template,
+              packageName: packageName,
+              name: name,
+              className: ce.name,
+              tagName: tag,
+              config: config));
         }
-
-
       });
     });
   });
 
   // Write outputs
-  JSModuleCode code = res.getCode(
-      format, false, "${packageName}.js", "");
+  JSModuleCode code = res.getCode(format, false, "${packageName}.js", "");
   await js.writeAsString(code.code);
   await js.copy(repo_js.path);
 
@@ -287,19 +250,68 @@ Future<String> _buildOne(
   return sum.path;
 }
 
-String htmlImportTemplate({String template,String packageName,String name,String className,String tagName}) =>
-"""
+Map collectConfig(AnalysisContext context, ClassElement ce) {
+  List<String> observers = [];
+
+  ce.methods.forEach((MethodElement me) {
+    DartObject obs = getAnnotation(me.metadata, isObserve);
+    if (obs == null) {
+      return;
+    }
+
+    String params = obs.getField('observed').toStringValue();
+
+    observers.add("${me.name}(${params})");
+  });
+
+  return {'observers': observers};
+}
+
+final Uri POLYMER_REGISTER_URI =
+    Uri.parse('package:polymer_element/polymer_element.dart');
+
+bool isPolymerRegister(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'PolymerRegister');
+
+bool isObserve(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'Observe');
+
+DartObject getAnnotation(
+        Iterable<ElementAnnotation> metadata, //
+        bool matches(DartObject)) =>
+    metadata
+        .map((ElementAnnotation an) => an.constantValue)
+        .firstWhere(matches, orElse: () => null);
+
+String htmlImportTemplate(
+        {String template,
+        String packageName,
+        String name,
+        String className,
+        String tagName,
+        Map config}) =>
+    """
 <link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'>
 
 <script>
   require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
-  polymerize(pkg.${name}.${className},'${tagName}');
+  polymerize(pkg.${name}.${className},'${tagName}',${configTemplate(config)});
 });
 </script>
 """;
 
+String configTemplate(Map config) => (config == null || config.isEmpty)
+    ? "null"
+    : """
+  {
+    observers:[${config['observers'].map((x) => '"${x}"').join(',')}]
+  }
+""";
+
 DartType metadataType(ElementAnnotation meta) {
-  if(meta is ConstructorElement) {
+  if (meta is ConstructorElement) {
     return (meta as ConstructorElement).returnType;
   }
   return null;
@@ -357,13 +369,12 @@ String _moduleForLibrary(String moduleRoot, Source source) {
 }
 
 main(List<String> args) {
-  if (args == null || args.length != 3) {
-    print(
-        "USAGE : dart devc_builder main_source_package_path output_path mainpackage_file_containing_main");
+  if (args == null || args.length != 2) {
+    print("USAGE : dart devc_builder main_source_package_path output_path");
     return;
   }
   Chain.capture(() {
-    _buildAll(args[0], new Directory(args[1]), args[2], ModuleFormat.amd);
+    _buildAll(args[0], new Directory(args[1]), ModuleFormat.amd);
   }, onError: (error, Chain chain) {
     if (error is BuildError) {
       print("BUILD ERROR : \n${error}");
