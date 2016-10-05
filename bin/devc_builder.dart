@@ -259,7 +259,7 @@ Future<String> _buildOne(
           print("found ${templatePath} -> ${destTemplate}");
 
           new File(templatePath).copySync(renameTo);
-          new File(destTemplate).writeAsStringSync(htmlImportTemplate(template:template,packageName:packageName,name:name,className:ce.name));
+          new File(destTemplate).writeAsStringSync(htmlImportTemplate(template:template,packageName:packageName,name:name,className:ce.name,tagName:tag));
         }
 
 
@@ -287,13 +287,13 @@ Future<String> _buildOne(
   return sum.path;
 }
 
-String htmlImportTemplate({String template,String packageName,String name,String className}) =>
+String htmlImportTemplate({String template,String packageName,String name,String className,String tagName}) =>
 """
 <link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'>
 
 <script>
   require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
-  polymerize(pkg.${name}.${className});
+  polymerize(pkg.${name}.${className},'${tagName}');
 });
 </script>
 """;
