@@ -1,15 +1,15 @@
-# POLYMERIZE
+# Poylmerize - Polymer 2.0 Dart experimental support
 
-This package is a command line tool to build ** Polymer 2 ** components with ** DDC ** from Dart.
+This package is a command line tool to build **Polymer 2** components with ** DDC ** from Dart.
 
 The benefits of this approach compared to the `dart2js` standard `polymer-1.x` are :
 
  - support for `polymer 2.0-preview` (web components 1.0)
  - using DDC to generate `ES6` output code
- - ** dynamic load ** of polymer components definitions through `requirejs`
- - ** interoperability ** with other JS frameworks
- - ** Incremental ** build (dependencies are built only once)
- - possibility to distribute ** ONLY ** the build result to thirdy party users and devs
+ - **dynamic load** of polymer components definitions through `requirejs`
+ - **interoperability** with other JS frameworks
+ - **Incremental** build (dependencies are built only once)
+ - possibility to distribute **ONLY** the build result to thirdy party users and devs
  - simplified API
    - automatic getter and setter (no explicit notify for first level properties)
    - ** NO ** Annotations for exposed properties
@@ -17,10 +17,12 @@ The benefits of this approach compared to the `dart2js` standard `polymer-1.x` a
 
 ## Disclaimer
 
-Although very promising this package is based on the ** EXPERIMENTAL DEV COMPILER ** and therefore this
-is to be considered ** HIGHLY UNSTABLE ** and not ready for production.
+Although very promising this package is based on the **EXPERIMENTAL DEV COMPILER** and therefore this
+is to be considered **HIGHLY UNSTABLE** and not ready for production.
 
 Nevertheless it can be though as a POC to demostrate the extremely high potential of this approach for Dart.
+
+This tool is tested *ONLY* on Linux. Should work on other unix based system. Probably will not work on windows.
 
 ## Install
 
@@ -61,7 +63,7 @@ This is a sample component definition:
         print("HELLO THERE !")
       }
 
-      factory MyTag.tag() => Element.tag('my-tag'); // <- If you want to create it programmatically use this 
+      factory MyTag.tag() => Element.tag('my-tag'); // <- If you want to create it programmatically use this
 
       connectedCallback() {
         super.connectedCallback(); // <- MUST BE CALLED !!!!
