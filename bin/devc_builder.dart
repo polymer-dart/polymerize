@@ -137,115 +137,122 @@ Future<String> _buildOne(
 
   await new Directory(path.join(dest.path, packageName)).create();
 
-  // Collect sources from filesystem
-  List<String> sources = [];
+
 
   if (!await summaryDest.exists()) {
     await summaryDest.create(recursive: true);
   }
   String libPath = path.join(location.path, "lib");
-  await _collectSourcesAndCopyResources(
-      packageName, new Directory(libPath), sources, dest);
-  print("  Collected : ${sources}");
-  print("  Summaries : ${summaries}");
+
+
 
   // If use repo (after collect and copy)
   // TODO : Spostare questa logica sotto
   // 1) buildare sempre dentro il repo
   // 2) a poi copiare sempre dal repo verso la dest
+  Directory assetDir = new Directory(path.join(summaryDest.path,"assets"));
 
-  if (useRepo && await repo_js.exists() && await repo_smap.exists()) {
-    // Use it, do not build it again
-    await repo_js.copy(js.path);
-    await repo_smap.copy(smap.path);
-    print("CACHED : ${sum.path}");
-    return sum.path;
-  }
-
-  ModuleCompiler moduleCompiler = new ModuleCompiler(new AnalyzerOptions(
-      packageRoot: path.join(rootPath, "packages"), summaryPaths: summaries));
-  CompilerOptions compilerOptions = new CompilerOptions();
-
-  BuildUnit bu = new BuildUnit(packageName, ".", sources,
-      (source) => _moduleForLibrary(dest.path, source));
-
-  JSModuleFile res = moduleCompiler.compile(bu, compilerOptions);
-  if (!res.isValid) {
-    throw new BuildError(res.errors);
-  }
-
-  // Analizzo il modulo
-
-  moduleCompiler.context.librarySources.forEach((Source src) {
-    if (src.isInSystemLibrary) {
-      return;
+  if (!useRepo || !(repo_js.existsSync()) || !repo_smap.existsSync()) {
+    // Collect sources from filesystem
+    List<String> sources = [];
+    if (!assetDir.existsSync()) {
+      assetDir.createSync();
     }
-    if (src.uri.scheme != 'package') {
-      return;
-    }
-    if (src.uri.pathSegments.first != packageName) {
-      return;
+    await _collectSourcesAndCopyResources(
+        packageName, new Directory(libPath), sources, assetDir);
+    print("  Collected : ${sources}");
+    print("  Summaries : ${summaries}");
+
+    ModuleCompiler moduleCompiler = new ModuleCompiler(new AnalyzerOptions(
+        packageRoot: path.join(rootPath, "packages"), summaryPaths: summaries));
+    CompilerOptions compilerOptions = new CompilerOptions();
+
+    BuildUnit bu = new BuildUnit(packageName, ".", sources,
+        (source) => _moduleForLibrary(dest.path, source));
+
+    JSModuleFile res = moduleCompiler.compile(bu, compilerOptions);
+    if (!res.isValid) {
+      throw new BuildError(res.errors);
     }
 
-    LibraryElement le = moduleCompiler.context.getLibraryElement(src);
+    // Analizzo il modulo
 
-    le?.units?.forEach((CompilationUnitElement e) async {
-      //print("Unit : ${e.name}");
-      e.types.forEach((ClassElement ce) {
-        DartObject reg = getAnnotation(ce.metadata, isPolymerRegister);
-        if (reg == null) {
-          return;
-        }
+    moduleCompiler.context.librarySources.forEach((Source src) {
+      if (src.isInSystemLibrary) {
+        return;
+      }
+      if (src.uri.scheme != 'package') {
+        return;
+      }
+      if (src.uri.pathSegments.first != packageName) {
+        return;
+      }
 
-        Map config = collectConfig(moduleCompiler.context, ce);
+      LibraryElement le = moduleCompiler.context.getLibraryElement(src);
 
-        String name = path.basenameWithoutExtension(e.name);
+      le?.units?.forEach((CompilationUnitElement e) async {
+        //print("Unit : ${e.name}");
+        e.types.forEach((ClassElement ce) {
+          DartObject reg = getAnnotation(ce.metadata, isPolymerRegister);
+          if (reg == null) {
+            return;
+          }
 
-        String tag = reg.getField('tagName').toStringValue();
-        String template = reg.getField('template').toStringValue();
-        //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
+          Map config = collectConfig(moduleCompiler.context, ce);
 
-        // Trovo il file relativo all'element
-        String templatePath =
-            path.join(path.dirname(e.source.fullName), template);
+          String name = path.basenameWithoutExtension(e.name);
 
-        String rel = path.relative(templatePath, from: libPath);
+          String tag = reg.getField('tagName').toStringValue();
+          String template = reg.getField('template').toStringValue();
+          //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
 
-        String destTemplate = path.join(dest.path, packageName, rel);
-        String renameTo =
-            "${destTemplate.substring(0,destTemplate.length-5)}_orig.html";
+          // Trovo il file relativo all'element
+          String templatePath =
+              path.join(path.dirname(e.source.fullName), template);
 
-        if (new File(templatePath).existsSync()) {
-          //print("found ${templatePath} -> ${destTemplate}");
+          String rel = path.relative(templatePath, from: libPath);
 
-          new File(templatePath).copySync(renameTo);
-          new File(destTemplate).writeAsStringSync(htmlImportTemplate(
-              template: template,
-              packageName: packageName,
-              name: name,
-              className: ce.name,
-              tagName: tag,
-              config: config));
-        }
+          String destTemplate = path.join(assetDir.path, rel);
+          String renameTo =
+              "${destTemplate.substring(0,destTemplate.length-5)}_orig.html";
+
+          if (new File(templatePath).existsSync()) {
+            //print("found ${templatePath} -> ${destTemplate}");
+
+            new File(templatePath).copySync(renameTo);
+            new File(destTemplate).writeAsStringSync(htmlImportTemplate(
+                template: template,
+                packageName: packageName,
+                name: name,
+                className: ce.name,
+                tagName: tag,
+                config: config));
+          }
+        });
       });
     });
-  });
 
-  // Write outputs
-  JSModuleCode code = res.getCode(format, false, "${packageName}.js", "");
-  await js.writeAsString(code.code);
-  await js.copy(repo_js.path);
+    // Write outputs
+    JSModuleCode code = res.getCode(format, false, "${packageName}.js", "");
+    await repo_js.writeAsString(code.code);
 
-  // Write source map
-  await smap.writeAsString(JSON.encode(code.sourceMap));
-  await smap.copy(repo_smap.path);
+    // Write source map
+    await repo_smap.writeAsString(JSON.encode(code.sourceMap));
 
-  // Write summary
+    // Write summary
 
-  //File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
-  await sum.writeAsBytes(res.summaryBytes);
+    //File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
+    await sum.writeAsBytes(res.summaryBytes);
 
-  print("BUILT : ${sum.path}");
+    print("BUILT : ${sum.path}");
+  } else {
+    print("CACHED :  ${sum.path}");
+  }
+
+  // Copy From Build Repo
+  await repo_js.copy(js.path);
+  await repo_smap.copy(smap.path);
+  await _copyDir(assetDir, new Directory(path.join(dest.path, packageName)));
 
   return sum.path;
 }
@@ -307,8 +314,7 @@ String configTemplate(Map config) => (config == null || config.isEmpty)
     : """
   {
     observers:[${config['observers'].map((x) => '"${x}"').join(',')}]
-  }
-""";
+  }""";
 
 DartType metadataType(ElementAnnotation meta) {
   if (meta is ConstructorElement) {
@@ -330,7 +336,7 @@ Future _collectSourcesAndCopyResources(String packageName, Directory dir,
   if (!await dir.exists()) {
     return [];
   }
-  dest = new Directory(path.join(dest.path, packageName));
+  //dest = new Directory(path.join(dest.path, packageName));
   await for (FileSystemEntity e in dir.list(recursive: true)) {
     String rel = path.relative(e.path, from: dir.path);
 
@@ -346,6 +352,24 @@ Future _collectSourcesAndCopyResources(String packageName, Directory dir,
         }
         e.copy(destPath);
       }
+    }
+  }
+}
+
+Future _copyDir(Directory srcDir, Directory dest) async {
+
+  await for (FileSystemEntity e in srcDir.list(recursive: true)) {
+    String rel = path.relative(e.path, from: srcDir.path);
+
+    if (e is File) {
+
+        String destPath = path.join(dest.path, rel);
+        Directory p = new Directory(path.dirname(destPath));
+        if (!await p.exists()) {
+          await p.create(recursive: true);
+        }
+        e.copy(destPath);
+
     }
   }
 }
