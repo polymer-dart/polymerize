@@ -1,64 +1,94 @@
-# Minimal build system for dev_compiler
+# POLYMERIZE
 
-This is a minimal build system to help people experiment with `dev_compiler`.
+This package is a command line tool to build ** Polymer 2 ** components with ** DDC ** from Dart.
+
+The benefits of this approach compared to the `dart2js` standard `polymer-1.x` are :
+
+ - support for `polymer 2.0-preview` (web components 1.0)
+ - using DDC to generate `ES6` output code
+ - ** dynamic load ** of polymer components definitions through `requirejs`
+ - ** interoperability ** with other JS frameworks
+ - ** Incremental ** build (dependencies are built only once)
+ - possibility to distribute ** ONLY ** the build result to thirdy party users and devs
+ - simplified API
+   - automatic getter and setter (no explicit notify for first level properties)
+   - ** NO ** Annotations for exposed properties
+   - ** NO ** Annotations for exposed methods
+
+## Disclaimer
+
+Although very promising this package is based on the ** EXPERIMENTAL DEV COMPILER ** and therefore this
+is to be considered ** HIGHLY UNSTABLE ** and not ready for production.
+
+Nevertheless it can be though as a POC to demostrate the extremely high potential of this approach for Dart.
 
 ## Install
 
-Install with `pub global activate devc_builder`.
-
+Install with `pub global activate polymerize`.
 
 ## Usage
 
+A sample project demostrating how to build `polymer-2` components using `polymerize` can be found here :
+ - https://github.com/dam0vm3nt/polymer_dcc
+
+See the [README](https://github.com/dam0vm3nt/polymer_dcc/blob/master/README.md) for more information.
+
 Launch the build with the following command:
 
-    devc_builder main_package_path output_directory main_file_path
+ - `polymerize <main_package_directory> <output_directory>`
 
-where
+### Component definition
 
-  -  `main_package_path` is the path to the main package to build
-  -  `output_directory` guess what it is ?
-  -  `main_file_path` is the relative path of the file (without the extension) inside the main package where your `main()` function resides
+This is a sample component definition:
 
-example:
+    import 'package:polymer_element/polymer_element.dart'
 
-    devc_builder my_app out index
+    @PolymerRegister('my-tag',template:'my-tag.html')
+    class MyTag extends PolymerElement {
 
-will build the app inside `my_app` folder (that should be already "pub getted") in folder `out` using the file `my_app/lib/index.dart` as entry point.
+      int count = 0;  // <- no need to annotate this !!!
+
+      onClickIt(Event ev,details) {  // <- NO need to annotate this!!!!
+        count = count + 1;    // <- no need to call `set` API , magical setter in action here
+      }
+
+      @Observe('count')
+      void countChanged(val) {
+        print("Count has changed : ${count}");
+      }
+
+      MyTag() { // <- Use a simple constructor for created callback !!!
+        print("HELLO THERE !")
+      }
+
+      factory MyTag.tag() => Element.tag('my-tag'); // <- If you want to create it programmatically use this 
+
+      connectedCallback() {
+        super.connectedCallback(); // <- MUST BE CALLED !!!!
+      }
+    }
 
 ## Output
 
-This tool will transitively examine the main package dependencies and produce a single `js` module for each. All the `.dart` file inside any package
-will be considered for compilation, all the other files copied to the output.
+The build tool will operate in this way :
 
-Compilation for `hosted` packages will be cached inside the folder `.repo` and reused for the next build.
+ - Every dependency of the main package will be build and will produce a separate loadable module in the output Directory
+ - For every polymer component a new `html` file will be produced that will load the original template and will load the corresponding dart class
 
-Then it will create an `index.html` that will load all the dependencies and execute the `main` function in the `main_file_path`.
+Every file with ".dart" extension *inside* the `lib` folder of a dependency will be considered in the build of the corresponding module.
 
-The `index.html` will be created with this template: 
+Every other file in the `lib` folder will be considered an `asset` and compied to the final build destination folder.
 
-```
-<html>
-<head>
-<script>
-'use strict';
-</script>
-@IMPORT_SCRIPTS@
-@BOOTSTRAP@
-</head>
-<body>
-</body>
-</html>
-```
+No other folder will be considered in the build. The only exception is the `web/index.html` file in the `main package` that must exist and is copied
+to the final build destination folder.
 
-You can provide your own template in `web/index.html`:
-
- - **@IMPORT_SCRIPTS@** will be replaced with all the import script from the dependencies and the SDK.
- - **@BOOTSTRAP@** will be replaced with the bootstrap code needed to execute the `main` function in the main file
-
-You can test the results using a recent `chrome` or translate it with `babelJS`.
+Compilation for `hosted` packages will be cached inside the folder `.repo` (inside the current directory) and reused without rebuilding it for the next build.
 
 ## TODO:
 
- - use args processing lib
- - execute `babelJS` / `vulcanize` / etc. etc.
- - try using `build` (can it be done ? how to handle group of sources?)
+ - more polymer APIs
+ - better convert to/from JS
+ - annotations for properties (computed props, etc.)
+ - support for mixins
+ - support for external element wrappers
+ - support for auto gen HTML imports
