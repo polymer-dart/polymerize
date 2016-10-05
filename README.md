@@ -31,7 +31,7 @@ Install with `pub global activate polymerize`.
 ## Usage
 
 A sample project demostrating how to build `polymer-2` components using `polymerize` can be found here :
- - https://github.com/dam0vm3nt/polymer_dcc
+ - [https://github.com/dam0vm3nt/polymer_dcc](https://github.com/dam0vm3nt/polymer_dcc)
 
 See the [README](https://github.com/dam0vm3nt/polymer_dcc/blob/master/README.md) for more information.
 
