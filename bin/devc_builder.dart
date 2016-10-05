@@ -57,10 +57,14 @@ Future _buildAll(String rootPath, Directory dest, String mainModule,
   } else if (format == ModuleFormat.es6) {
     await _copyResource("package:dev_compiler/js/es6/dart_sdk.js",
         path.join(dest.path, "dart_sdk.js"));
-  }else if (format == ModuleFormat.amd) {
+  } else if (format == ModuleFormat.amd) {
     await _copyResource("package:dev_compiler/js/amd/dart_sdk.js",
         path.join(dest.path, "dart_sdk.js"));
+
+    await _copyResource("package:devc_builder/require.js",
+        path.join(dest.path, "require.js"));
   }
+
   // If an index.html template exists use it
 
   File templateFile = new File(path.join(rootPath, "web", "index.html"));
@@ -113,10 +117,14 @@ Future<List<String>> _buildPackage(
   // Build this package
 
   Set deps = new Set();
-  for (PackageNode dep in node.dependencies) {
+  /*for (PackageNode dep in node.dependencies) {
     deps.addAll(await _buildPackage(
         rootPath, dep, summaries, dest, summaryRepoPath, format));
-  }
+  }*/
+
+  (await Future.wait(node.dependencies.map((PackageNode dep) => _buildPackage(
+          rootPath, dep, summaries, dest, summaryRepoPath, format))))
+      .forEach((List<String> sum) => deps.addAll(sum));
 
   print("Building ${node.name}");
 
@@ -153,9 +161,12 @@ Future<String> _buildOne(
       new File(path.join(summaryDest.path, "${packageName}.js.map"));
   File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
   File repo_js = new File(path.join(summaryDest.path, "${packageName}.js"));
-  File smap = new File(path.join(dest.path, "${packageName}.js.map"));
 
-  File js = new File(path.join(dest.path, "${packageName}.js"));
+  File smap =
+      new File(path.join(dest.path, packageName, "${packageName}.js.map"));
+  File js = new File(path.join(dest.path, packageName, "${packageName}.js"));
+
+  await new Directory(path.join(dest.path, packageName)).create();
 
   // Collect sources from filesystem
   List<String> sources = [];
@@ -191,8 +202,8 @@ Future<String> _buildOne(
   }
 
   // Write outputs
-  JSModuleCode code =
-      res.getCode(format, false, path.absolute(dest.path),path.absolute(dest.path));
+  JSModuleCode code = res.getCode(
+      format, false, path.absolute(dest.path), path.absolute(dest.path));
   await js.writeAsString(code.code);
   await js.copy(repo_js.path);
 
@@ -223,6 +234,7 @@ Future _collectSourcesAndCopyResources(String packageName, Directory dir,
   if (!await dir.exists()) {
     return [];
   }
+  dest = new Directory(path.join(dest.path, packageName));
   await for (FileSystemEntity e in dir.list(recursive: true)) {
     String rel = path.relative(e.path, from: dir.path);
 
@@ -252,7 +264,7 @@ String _moduleForLibrary(String moduleRoot, Source source) {
       throw "Source should be in package format :${source.fullName}";
     }
 
-    return m.group(1);
+    return "${m.group(1)}/${m.group(1)}";
   }
 
   throw 'Imported file "${source.uri}" was not found as a summary or source '
