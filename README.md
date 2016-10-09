@@ -1,6 +1,6 @@
 # Poylmerize - Polymer 2.0 Dart experimental support
 
-This package is a command line tool to build **Polymer 2** components with ** DDC ** from Dart.
+This package is a command line tool to build **Polymer 2** components with **DDC** from Dart.
 
 The benefits of this approach compared to the `dart2js` standard `polymer-1.x` are :
 
@@ -24,6 +24,8 @@ Nevertheless it can be though as a POC to demostrate the extremely high potentia
 
 This tool is tested *ONLY* on Linux. Should work on other unix based system. Probably will not work on windows.
 
+See [NOTES.md](docs/NOTES.md) for details.
+
 ## Install
 
 Install with `pub global activate polymerize`.
@@ -35,9 +37,11 @@ A sample project demostrating how to build `polymer-2` components using `polymer
 
 See the [README](https://github.com/dam0vm3nt/polymer_dcc/blob/master/README.md) for more information.
 
-Launch the build with the following command:
+Launch the build with the following command in the main package dir:
 
- - `polymerize <main_package_directory> <output_directory>`
+ - `polymerize`
+
+(use `polymerize -h` for more options).
 
 ### Component definition
 
@@ -85,10 +89,10 @@ Every file with ".dart" extension *inside* the `lib` folder of a dependency will
 
 Every other file in the `lib` folder will be considered an `asset` and compied to the final build destination folder.
 
-No other folder will be considered in the build. The only exception is the `web/index.html` file in the `main package` that must exist and is copied
+No other folder will be considered in the build. The only exception is the `web` folder in the `main package` that will be copied
 to the final build destination folder.
 
-Compilation for `hosted` packages will be cached inside the folder `.repo` (inside the current directory) and reused without rebuilding it for the next build.
+Compilation for `hosted` packages will be cached inside the folder `$HOME/.polymerize` (inside the current directory) and reused without rebuilding it for the next build.
 
 ## TODO:
 

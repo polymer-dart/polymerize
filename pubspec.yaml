@@ -2,7 +2,7 @@ name: polymerize
 author: Vittorio Ballestra <vittorio.ballestra@gmail.com>
 homepage: https://github.com/dam0vm3nt
 description: An experimental Polymer 2 support with DDC
-version: 0.2.0+1
+version: 0.2.1
 dependencies:
  dev_compiler:
   hosted:
@@ -13,8 +13,10 @@ dependencies:
 #  git:
 #   url: https://github.com/dart-lang/dev_compiler
  analyzer: any
+ args: any
  stack_trace: any
  resource: any
+ homedir: any
 # build:
 #  git:
 #   url: https://github.com/dart-lang/build.git

@@ -14,13 +14,32 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:stack_trace/stack_trace.dart';
 import 'package:resource/resource.dart' as res;
+import 'package:args/args.dart';
+import 'package:homedir/homedir.dart' as user;
 
-Future _buildAll(String rootPath, Directory dest, ModuleFormat format) async {
+const Map<ModuleFormat, String> _formatToString = const {
+  ModuleFormat.amd: 'amd',
+  ModuleFormat.es6: 'es6',
+  ModuleFormat.common: 'common',
+  ModuleFormat.legacy: 'legacy'
+};
+
+const Map<String, ModuleFormat> _stringToFormat = const {
+  'amd': ModuleFormat.amd,
+  'es6': ModuleFormat.es6,
+  'common': ModuleFormat.common,
+  'legacy': ModuleFormat.legacy
+};
+
+Future _buildAll(String rootPath, Directory dest, ModuleFormat format,
+    String repoPath) async {
   /*if (await dest.exists()) {
     await dest.delete(recursive:true);
   }*/
 
-  if (!await dest.exists()) await dest.create(recursive: true);
+  if (dest != null && !await dest.exists()) await dest.create(recursive: true);
+
+  repoPath = path.join(repoPath,_formatToString[format]);
 
   PackageGraph packageGraph = new PackageGraph.forPath(rootPath);
 
@@ -28,11 +47,11 @@ Future _buildAll(String rootPath, Directory dest, ModuleFormat format) async {
 
   Map summaries = {};
   await _buildPackage(
-      rootPath, packageGraph.root, summaries, dest, ".repo", format);
+      rootPath, packageGraph.root, summaries, dest, repoPath, format);
 
-  // Build index.html
-
-  File index = new File(path.join(dest.path, "index.html"));
+  if (dest == null) {
+    return;
+  }
 
   // The order is irrelevant ---
   if (format == ModuleFormat.legacy) {
@@ -53,13 +72,10 @@ Future _buildAll(String rootPath, Directory dest, ModuleFormat format) async {
 
   // If an index.html template exists use it
 
-  File templateFile = new File(path.join(rootPath, "web", "index.html"));
-
-  String indexTemplate;
-  if (await templateFile.exists()) {
-    indexTemplate = await templateFile.readAsString();
-
-    return index.writeAsString(indexTemplate);
+  // Copy everything
+  Directory webDir = new Directory(path.join(rootPath, "web"));
+  if (webDir.existsSync()) {
+    _copyDir(webDir, dest);
   }
 }
 
@@ -131,26 +147,16 @@ Future<String> _buildOne(
   File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
   File repo_js = new File(path.join(summaryDest.path, "${packageName}.js"));
 
-  File smap =
-      new File(path.join(dest.path, packageName, "${packageName}.js.map"));
-  File js = new File(path.join(dest.path, packageName, "${packageName}.js"));
-
-  await new Directory(path.join(dest.path, packageName)).create();
-
-
-
   if (!await summaryDest.exists()) {
     await summaryDest.create(recursive: true);
   }
   String libPath = path.join(location.path, "lib");
 
-
-
   // If use repo (after collect and copy)
   // TODO : Spostare questa logica sotto
   // 1) buildare sempre dentro il repo
   // 2) a poi copiare sempre dal repo verso la dest
-  Directory assetDir = new Directory(path.join(summaryDest.path,"assets"));
+  Directory assetDir = new Directory(path.join(summaryDest.path, "assets"));
 
   if (!useRepo || !(repo_js.existsSync()) || !repo_smap.existsSync()) {
     // Collect sources from filesystem
@@ -167,8 +173,8 @@ Future<String> _buildOne(
         packageRoot: path.join(rootPath, "packages"), summaryPaths: summaries));
     CompilerOptions compilerOptions = new CompilerOptions();
 
-    BuildUnit bu = new BuildUnit(packageName, ".", sources,
-        (source) => _moduleForLibrary(dest.path, source));
+    BuildUnit bu = new BuildUnit(
+        packageName, ".", sources, (source) => _moduleForLibrary(source));
 
     JSModuleFile res = moduleCompiler.compile(bu, compilerOptions);
     if (!res.isValid) {
@@ -249,11 +255,18 @@ Future<String> _buildOne(
     print("CACHED :  ${sum.path}");
   }
 
-  // Copy From Build Repo
-  await repo_js.copy(js.path);
-  await repo_smap.copy(smap.path);
-  await _copyDir(assetDir, new Directory(path.join(dest.path, packageName)));
+  if (dest != null) {
+    File smap =
+        new File(path.join(dest.path, packageName, "${packageName}.js.map"));
+    File js = new File(path.join(dest.path, packageName, "${packageName}.js"));
 
+    await new Directory(path.join(dest.path, packageName)).create();
+
+    // Copy From Build Repo
+    await repo_js.copy(js.path);
+    await repo_smap.copy(smap.path);
+    await _copyDir(assetDir, new Directory(path.join(dest.path, packageName)));
+  }
   return sum.path;
 }
 
@@ -357,24 +370,21 @@ Future _collectSourcesAndCopyResources(String packageName, Directory dir,
 }
 
 Future _copyDir(Directory srcDir, Directory dest) async {
-
   await for (FileSystemEntity e in srcDir.list(recursive: true)) {
     String rel = path.relative(e.path, from: srcDir.path);
 
     if (e is File) {
-
-        String destPath = path.join(dest.path, rel);
-        Directory p = new Directory(path.dirname(destPath));
-        if (!await p.exists()) {
-          await p.create(recursive: true);
-        }
-        e.copy(destPath);
-
+      String destPath = path.join(dest.path, rel);
+      Directory p = new Directory(path.dirname(destPath));
+      if (!await p.exists()) {
+        await p.create(recursive: true);
+      }
+      e.copy(destPath);
     }
   }
 }
 
-String _moduleForLibrary(String moduleRoot, Source source) {
+String _moduleForLibrary(Source source) {
   if (source is InSummarySource) {
     //print ("SOURCES : ${source.summaryPath} , ${source.fullName} , ${moduleRoot}");
 
@@ -393,12 +403,55 @@ String _moduleForLibrary(String moduleRoot, Source source) {
 }
 
 main(List<String> args) {
-  if (args == null || args.length != 2) {
-    print("USAGE : dart devc_builder main_source_package_path output_path");
+  ArgParser parser = new ArgParser()
+    ..addFlag('emit-output',
+        abbr: 'e',
+        negatable: true,
+        defaultsTo: true,
+        help: 'Should emit output')
+    ..addOption('output',
+        abbr: 'o', defaultsTo: 'out', help: 'output directory')
+    ..addOption('repo', help: 'Repository path (defaults to "\$HOME/.polymerize")')
+    ..addOption('source',
+        abbr: 's', help: 'source package path (defaults to current dir)')
+    ..addOption('module-format',
+        abbr: 'm',
+        allowed: ModuleFormat.values.map((ModuleFormat x) => _formatToString[x]),
+        defaultsTo: _formatToString[ModuleFormat.amd],
+        help: 'module format')
+    ..addFlag('help', abbr: 'h', help: 'showHelp');
+
+  var results = parser.parse(args);
+
+  if (results['help']) {
+    print(parser.usage);
     return;
   }
+
+  String sourcePath = results['source'];
+  if (sourcePath == null) {
+    sourcePath = Directory.current.path;
+  }
+
+  String destPath = results['output'];
+  if (destPath == null) {
+    destPath = "out";
+  }
+
+  if (false == results['emit-output']) {
+    destPath = null;
+  }
+
+  String repoPath = results['repo'];
+  if (repoPath == null) {
+    repoPath = path.join(user.homeDirPath, '.polymerize');
+  }
+
+  ModuleFormat fmt = _stringToFormat[results['module-format']];
+
   Chain.capture(() {
-    _buildAll(args[0], new Directory(args[1]), ModuleFormat.amd);
+    _buildAll(sourcePath, destPath == null ? null : new Directory(destPath),
+        fmt, repoPath);
   }, onError: (error, Chain chain) {
     if (error is BuildError) {
       print("BUILD ERROR : \n${error}");
