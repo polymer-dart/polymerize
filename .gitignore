@@ -4,5 +4,5 @@
 bin/packages
 packages/
 .repo
-pubspec.lock
+#pubspec.lock
 
