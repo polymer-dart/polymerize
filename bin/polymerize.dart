@@ -16,6 +16,7 @@ import 'package:stack_trace/stack_trace.dart';
 import 'package:resource/resource.dart' as res;
 import 'package:args/args.dart';
 import 'package:homedir/homedir.dart' as user;
+import 'package:logging/logging.dart' as log;
 
 const Map<ModuleFormat, String> _formatToString = const {
   ModuleFormat.amd: 'amd',
@@ -31,6 +32,8 @@ const Map<String, ModuleFormat> _stringToFormat = const {
   'legacy': ModuleFormat.legacy
 };
 
+log.Logger logger = new log.Logger("polymerize");
+
 Future _buildAll(String rootPath, Directory dest, ModuleFormat format,
     String repoPath) async {
   /*if (await dest.exists()) {
@@ -39,7 +42,7 @@ Future _buildAll(String rootPath, Directory dest, ModuleFormat format,
 
   if (dest != null && !await dest.exists()) await dest.create(recursive: true);
 
-  repoPath = path.join(repoPath,_formatToString[format]);
+  repoPath = path.join(repoPath, _formatToString[format]);
 
   PackageGraph packageGraph = new PackageGraph.forPath(rootPath);
 
@@ -102,16 +105,18 @@ Future<List<String>> _buildPackage(
   // Build this package
 
   Set deps = new Set();
-  /*for (PackageNode dep in node.dependencies) {
+  for (PackageNode dep in node.dependencies) {
     deps.addAll(await _buildPackage(
         rootPath, dep, summaries, dest, summaryRepoPath, format));
-  }*/
+  }
 
+  /*
   (await Future.wait(node.dependencies.map((PackageNode dep) => _buildPackage(
           rootPath, dep, summaries, dest, summaryRepoPath, format))))
       .forEach((List<String> sum) => deps.addAll(sum));
+*/
 
-  print("Building ${node.name}");
+  logger.fine("Building ${node.name}");
 
   result = new List.from(deps);
   result.add(await _buildOne(
@@ -166,8 +171,8 @@ Future<String> _buildOne(
     }
     await _collectSourcesAndCopyResources(
         packageName, new Directory(libPath), sources, assetDir);
-    print("  Collected : ${sources}");
-    print("  Summaries : ${summaries}");
+    // print("  Collected : ${sources}");
+    // print("  Summaries : ${summaries}");
 
     ModuleCompiler moduleCompiler = new ModuleCompiler(new AnalyzerOptions(
         packageRoot: path.join(rootPath, "packages"), summaryPaths: summaries));
@@ -250,9 +255,9 @@ Future<String> _buildOne(
     //File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
     await sum.writeAsBytes(res.summaryBytes);
 
-    print("BUILT : ${sum.path}");
+    logger.info(" - ${sum.path}");
   } else {
-    print("CACHED :  ${sum.path}");
+    // print("CACHED :  ${sum.path}");
   }
 
   if (dest != null) {
@@ -272,6 +277,7 @@ Future<String> _buildOne(
 
 Map collectConfig(AnalysisContext context, ClassElement ce) {
   List<String> observers = [];
+  Map<String, Map> properties = {};
 
   ce.methods.forEach((MethodElement me) {
     DartObject obs = getAnnotation(me.metadata, isObserve);
@@ -284,7 +290,12 @@ Map collectConfig(AnalysisContext context, ClassElement ce) {
     observers.add("${me.name}(${params})");
   });
 
-  return {'observers': observers};
+  ce.fields.forEach((FieldElement fe) {
+    DartObject not = getAnnotation(fe.metadata, isNotify);
+    properties[fe.name] = {'notify': not != null};
+  });
+
+  return {'observers': observers, 'properties': properties};
 }
 
 final Uri POLYMER_REGISTER_URI =
@@ -297,6 +308,10 @@ bool isPolymerRegister(DartObject o) =>
 bool isObserve(DartObject o) =>
     (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
     (o.type.name == 'Observe');
+
+bool isNotify(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'Notify');
 
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //
@@ -326,8 +341,16 @@ String configTemplate(Map config) => (config == null || config.isEmpty)
     ? "null"
     : """
   {
-    observers:[${config['observers'].map((x) => '"${x}"').join(',')}]
+    observers:[${config['observers'].map((x) => '"${x}"').join(',')}],
+    properties: {
+      ${configPropsTemplate(config['properties'])}
+    }
   }""";
+
+String configPropsTemplate(Map properties) => properties.keys
+    .map((String propName) =>
+        "${propName} : { notify: ${properties[propName]['notify']}}")
+    .join(',\n      ');
 
 DartType metadataType(ElementAnnotation meta) {
   if (meta is ConstructorElement) {
@@ -411,15 +434,26 @@ main(List<String> args) {
         help: 'Should emit output')
     ..addOption('output',
         abbr: 'o', defaultsTo: 'out', help: 'output directory')
-    ..addOption('repo', help: 'Repository path (defaults to "\$HOME/.polymerize")')
+    ..addOption('repo',
+        defaultsTo: path.join(user.homeDirPath, '.polymerize'),
+        help: 'Repository path (defaults to "\$HOME/.polymerize")')
     ..addOption('source',
-        abbr: 's', help: 'source package path (defaults to current dir)')
+        abbr: 's',
+        defaultsTo: Directory.current.path,
+        help: 'source package path')
     ..addOption('module-format',
         abbr: 'm',
-        allowed: ModuleFormat.values.map((ModuleFormat x) => _formatToString[x]),
+        allowed:
+            ModuleFormat.values.map((ModuleFormat x) => _formatToString[x]),
         defaultsTo: _formatToString[ModuleFormat.amd],
         help: 'module format')
-    ..addFlag('help', abbr: 'h', help: 'showHelp');
+    ..addFlag('help', abbr: 'h', negatable: false, help: 'showHelp');
+
+  // Configure logger
+  log.Logger.root.onRecord.listen((log.LogRecord rec) {
+    print("${rec.message}");
+  });
+  log.Logger.root.level =log.Level.INFO;
 
   var results = parser.parse(args);
 
@@ -429,23 +463,14 @@ main(List<String> args) {
   }
 
   String sourcePath = results['source'];
-  if (sourcePath == null) {
-    sourcePath = Directory.current.path;
-  }
 
   String destPath = results['output'];
-  if (destPath == null) {
-    destPath = "out";
-  }
 
   if (false == results['emit-output']) {
     destPath = null;
   }
 
   String repoPath = results['repo'];
-  if (repoPath == null) {
-    repoPath = path.join(user.homeDirPath, '.polymerize');
-  }
 
   ModuleFormat fmt = _stringToFormat[results['module-format']];
 
@@ -454,9 +479,9 @@ main(List<String> args) {
         fmt, repoPath);
   }, onError: (error, Chain chain) {
     if (error is BuildError) {
-      print("BUILD ERROR : \n${error}");
+      logger.severe("BUILD ERROR : \n${error}",error);
     } else {
-      print("ERROR: ${error}\n AT: ${chain.terse}");
+      logger.severe("ERROR: ${error}\n AT: ${chain.terse}",error);
     }
   });
 }

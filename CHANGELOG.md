@@ -1,3 +1,6 @@
+# 0.2.2
+ - Rudimental support for custom events
+
 # 0.2.1
 
  - changed name to `polymerize`
