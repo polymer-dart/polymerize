@@ -33,7 +33,7 @@ Install with `pub global activate polymerize`.
 ## Usage
 
 A sample project demostrating how to build `polymer-2` components using `polymerize` can be found here :
- - [https://github.com/dam0vm3nt/polymer_dcc](https://github.com/dam0vm3nt/polymer_dcc)
+ - [Sample mini todo APP for Polymer2-Dart-DDC Project](https://github.com/dam0vm3nt/todo_ddc)
 
 See the [README](https://github.com/dam0vm3nt/polymer_dcc/blob/master/README.md) for more information.
 
