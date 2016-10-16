@@ -213,6 +213,8 @@ Future<String> _buildOne(
 
           String name = path.basenameWithoutExtension(e.name);
 
+          bool native = reg.getField('native').toBoolValue();
+
           String tag = reg.getField('tagName').toStringValue();
           String template = reg.getField('template').toStringValue();
           //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
@@ -237,7 +239,7 @@ Future<String> _buildOne(
                 name: name,
                 className: ce.name,
                 tagName: tag,
-                config: config));
+                config: config,native: native));
           }
         });
       });
@@ -326,13 +328,13 @@ String htmlImportTemplate(
         String name,
         String className,
         String tagName,
-        Map config}) =>
+        Map config,bool native}) =>
     """
 <link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'>
 
 <script>
   require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
-  polymerize(pkg.${name}.${className},'${tagName}',${configTemplate(config)});
+  polymerize(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
 });
 </script>
 """;
