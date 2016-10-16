@@ -1,3 +1,9 @@
+# 0.2.3
+ - Adding support for wrapping external elements (see `paper_dialog.dart`)
+ - Adding support for dynamic load of dart packages
+ - Adding support for **OBSERVABLE** proxy (see todo demo)
+ - Cleanups and improvments
+
 # 0.2.2
  - Rudimental support for custom events
 
