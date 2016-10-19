@@ -1,3 +1,7 @@
+# 0.2.4
+ - Added support for vanilla WebComponents
+ - Fixed for `.packages` (dart 1.20)
+
 # 0.2.3
  - Adding support for wrapping external elements (see `paper_dialog.dart`)
  - Adding support for dynamic load of dart packages

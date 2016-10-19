@@ -175,7 +175,8 @@ Future<String> _buildOne(
     // print("  Summaries : ${summaries}");
 
     ModuleCompiler moduleCompiler = new ModuleCompiler(new AnalyzerOptions(
-        packageRoot: path.join(rootPath, "packages"), summaryPaths: summaries));
+        /*  packageRoot: path.join(rootPath, "packages"),*/ summaryPaths:
+            summaries));
     CompilerOptions compilerOptions = new CompilerOptions();
 
     BuildUnit bu = new BuildUnit(
@@ -205,41 +206,57 @@ Future<String> _buildOne(
         //print("Unit : ${e.name}");
         e.types.forEach((ClassElement ce) {
           DartObject reg = getAnnotation(ce.metadata, isPolymerRegister);
-          if (reg == null) {
-            return;
-          }
+          if (reg != null) {
+            Map config = collectConfig(moduleCompiler.context, ce);
 
-          Map config = collectConfig(moduleCompiler.context, ce);
+            String name = path.basenameWithoutExtension(e.name);
 
-          String name = path.basenameWithoutExtension(e.name);
+            bool native = reg.getField('native').toBoolValue();
 
-          bool native = reg.getField('native').toBoolValue();
+            String tag = reg.getField('tagName').toStringValue();
+            String template = reg.getField('template').toStringValue();
+            //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
 
-          String tag = reg.getField('tagName').toStringValue();
-          String template = reg.getField('template').toStringValue();
-          //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
+            // Trovo il file relativo all'element
+            String templatePath =
+                path.join(path.dirname(e.source.fullName), template);
 
-          // Trovo il file relativo all'element
-          String templatePath =
-              path.join(path.dirname(e.source.fullName), template);
+            String rel = path.relative(templatePath, from: libPath);
 
-          String rel = path.relative(templatePath, from: libPath);
+            String destTemplate = path.join(assetDir.path, rel);
+            String renameTo =
+                "${destTemplate.substring(0,destTemplate.length-5)}_orig.html";
 
-          String destTemplate = path.join(assetDir.path, rel);
-          String renameTo =
-              "${destTemplate.substring(0,destTemplate.length-5)}_orig.html";
+            if (new File(templatePath).existsSync()) {
+              //print("found ${templatePath} -> ${destTemplate}");
 
-          if (new File(templatePath).existsSync()) {
-            //print("found ${templatePath} -> ${destTemplate}");
+              new File(templatePath).copySync(renameTo);
+              new File(destTemplate).writeAsStringSync(htmlImportTemplate(
+                  template: template,
+                  packageName: packageName,
+                  name: name,
+                  className: ce.name,
+                  tagName: tag,
+                  config: config,
+                  native: native));
+            }
+          } else if ((reg = getAnnotation(ce.metadata, isDefine)) != null) {
+            String tag = reg.getField('tagName').toStringValue();
+            String htmlFile = reg.getField('htmlFile').toStringValue();
 
-            new File(templatePath).copySync(renameTo);
-            new File(destTemplate).writeAsStringSync(htmlImportTemplate(
-                template: template,
+            String name = path.basenameWithoutExtension(e.name);
+
+            String templatePath =
+                path.join(path.dirname(e.source.fullName), htmlFile);
+
+            String rel = path.relative(templatePath, from: libPath);
+
+            String destTemplate = path.join(assetDir.path, rel);
+            new File(destTemplate).writeAsStringSync(webComponentTemplate(
                 packageName: packageName,
                 name: name,
                 className: ce.name,
-                tagName: tag,
-                config: config,native: native));
+                tagName: tag));
           }
         });
       });
@@ -307,6 +324,10 @@ bool isPolymerRegister(DartObject o) =>
     (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
     (o.type.name == 'PolymerRegister');
 
+bool isDefine(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'Define');
+
 bool isObserve(DartObject o) =>
     (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
     (o.type.name == 'Observe');
@@ -322,19 +343,34 @@ DartObject getAnnotation(
         .map((ElementAnnotation an) => an.constantValue)
         .firstWhere(matches, orElse: () => null);
 
+String webComponentTemplate(
+        {String template,
+        String packageName,
+        String name,
+        String className,
+        String tagName}) =>
+    """
+<script>
+  require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
+  polymerize.define('${tagName}',pkg.${name}.${className});
+});
+</script>
+""";
+
 String htmlImportTemplate(
         {String template,
         String packageName,
         String name,
         String className,
         String tagName,
-        Map config,bool native}) =>
+        Map config,
+        bool native}) =>
     """
 <link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'>
 
 <script>
   require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
-  polymerize(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
+  polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
 });
 </script>
 """;
@@ -455,7 +491,7 @@ main(List<String> args) {
   log.Logger.root.onRecord.listen((log.LogRecord rec) {
     print("${rec.message}");
   });
-  log.Logger.root.level =log.Level.INFO;
+  log.Logger.root.level = log.Level.INFO;
 
   var results = parser.parse(args);
 
@@ -481,9 +517,9 @@ main(List<String> args) {
         fmt, repoPath);
   }, onError: (error, Chain chain) {
     if (error is BuildError) {
-      logger.severe("BUILD ERROR : \n${error}",error);
+      logger.severe("BUILD ERROR : \n${error}", error);
     } else {
-      logger.severe("ERROR: ${error}\n AT: ${chain.terse}",error);
+      logger.severe("ERROR: ${error}\n AT: ${chain.terse}", error);
     }
   });
 }
