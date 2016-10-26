@@ -367,11 +367,19 @@ String htmlImportTemplate(
         bool native}) =>
     """
 <link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'>
-
+${native?nativePreloadScript(tagName,['PolymerElements',className]):""}
 <script>
   require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
 });
+</script>
+""";
+
+String nativePreloadScript(String tagName,List<String> classPath) =>"""
+<script>
+ require(['polymer_element/native_import'],function(util) {
+   util.importNative('${tagName}',${classPath.map((s) => '\'${s}\'').join(',')});
+ });
 </script>
 """;
 
