@@ -1,3 +1,6 @@
+# 0.2.5
+ - Updated libs
+ 
 # 0.2.4
  - Added support for vanilla WebComponents
  - Fixed for `.packages` (dart 1.20)
