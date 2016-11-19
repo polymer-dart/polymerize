@@ -146,11 +146,16 @@ Future<String> _buildOne(
     Directory summaryDest,
     List<String> summaries,
     bool useRepo,
-    ModuleFormat format) async {
+    ModuleFormat format,
+    {ArgResults bazelModeArgs}) async {
   File repo_smap =
       new File(path.join(summaryDest.path, "${packageName}.js.map"));
   File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
   File repo_js = new File(path.join(summaryDest.path, "${packageName}.js"));
+
+  if (!await dest.exists()) {
+    await dest.create(recursive: true);
+  }
 
   if (!await summaryDest.exists()) {
     await summaryDest.create(recursive: true);
@@ -163,24 +168,52 @@ Future<String> _buildOne(
   // 2) a poi copiare sempre dal repo verso la dest
   Directory assetDir = new Directory(path.join(summaryDest.path, "assets"));
 
+  Map<String, String> maps = null;
   if (!useRepo || !(repo_js.existsSync()) || !repo_smap.existsSync()) {
     // Collect sources from filesystem
     List<String> sources = [];
     if (!assetDir.existsSync()) {
       assetDir.createSync();
     }
-    await _collectSourcesAndCopyResources(
-        packageName, new Directory(libPath), sources, assetDir);
-    // print("  Collected : ${sources}");
-    // print("  Summaries : ${summaries}");
+    if (bazelModeArgs == null) {
+      await _collectSourcesAndCopyResources(
+          packageName, new Directory(libPath), sources, assetDir);
+    } else {
+      sources = bazelModeArgs['source'];
+      summaries =
+          bazelModeArgs['summary'].map((x) => path.absolute(x)).toList();
+      if (!summaries.every((x) => new File(x).existsSync())) {
+        throw "SOME SUMMARY DO NOT EXISTS!";
+      }
+      //print("IT's OKKKKKK!");
 
-    ModuleCompiler moduleCompiler = new ModuleCompiler(new AnalyzerOptions(
-        /*  packageRoot: path.join(rootPath, "packages"),*/ summaryPaths:
-            summaries));
+      // Build library map
+      //print("LIUB: ${libPath}");
+      maps = new Map.fromIterable(sources,
+          key: (x) => "package:${packageName}/${path.relative(x,from:libPath)}",
+          value: (x) => path.absolute(x));
+
+      sources = maps.keys.toList();
+      //print("URL MAP : ${maps}");
+    }
+    // print("  Collected : ${sources}");
+    //print("  Summaries : ${summaries}");
+
+    //SummaryDataStore summaryDataStore = new SummaryDataStore(summaries);
+    //print("SUM 1 ");
+    //summaryDataStore.bundles.forEach((b) => print(b.linkedLibraryUris));
+    //print("SUM 2 ");
+    AnalyzerOptions opts = new AnalyzerOptions(
+        dartSdkPath: '/usr/lib/dart',
+        customUrlMappings: maps,
+        /*  packageRoot: path.join(rootPath, "packages"),*/
+        summaryPaths: summaries);
+
+    ModuleCompiler moduleCompiler = new ModuleCompiler(opts);
     CompilerOptions compilerOptions = new CompilerOptions();
 
-    BuildUnit bu = new BuildUnit(
-        packageName, ".", sources, (source) => _moduleForLibrary(source));
+    BuildUnit bu = new BuildUnit(packageName, path.absolute(location.path),
+        sources, (source) => _moduleForLibrary(source));
 
     JSModuleFile res = moduleCompiler.compile(bu, compilerOptions);
     if (!res.isValid) {
@@ -189,6 +222,7 @@ Future<String> _buildOne(
 
     // Analizzo il modulo
 
+    if (bazelModeArgs==null)
     moduleCompiler.context.librarySources.forEach((Source src) {
       if (src.isInSystemLibrary) {
         return;
@@ -274,21 +308,31 @@ Future<String> _buildOne(
     //File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
     await sum.writeAsBytes(res.summaryBytes);
 
-    logger.info(" - ${sum.path}");
+    logger.fine(" - ${sum.path}");
   } else {
     // print("CACHED :  ${sum.path}");
   }
 
   if (dest != null) {
-    File smap =
-        new File(path.join(dest.path, packageName, "${packageName}.js.map"));
-    File js = new File(path.join(dest.path, packageName, "${packageName}.js"));
+    File smap;
+    File js;
+
+    if (bazelModeArgs == null) {
+      js = new File(path.join(dest.path, packageName, "${packageName}.js"));
+      smap =
+          new File(path.join(dest.path, packageName, "${packageName}.js.map"));
+    } else {
+      js = new File(bazelModeArgs['output']);
+      await sum.copy(bazelModeArgs['output_summary']);
+      //print("BZLBUILD Out       :${bazelModeArgs['output']}");
+      //print("BZLBUILD Sum. Out  :${bazelModeArgs['output_summary']}");
+    }
 
     await new Directory(path.join(dest.path, packageName)).create();
 
     // Copy From Build Repo
     await repo_js.copy(js.path);
-    await repo_smap.copy(smap.path);
+    if (smap != null) await repo_smap.copy(smap.path);
     await _copyDir(assetDir, new Directory(path.join(dest.path, packageName)));
   }
   return sum.path;
@@ -375,7 +419,7 @@ ${native?nativePreloadScript(tagName,['PolymerElements',className]):""}
 </script>
 """;
 
-String nativePreloadScript(String tagName,List<String> classPath) =>"""
+String nativePreloadScript(String tagName, List<String> classPath) => """
 <script>
  require(['polymer_element/native_import'],function(util) {
    util.importNative('${tagName}',${classPath.map((s) => '\'${s}\'').join(',')});
@@ -454,6 +498,7 @@ Future _copyDir(Directory srcDir, Directory dest) async {
 }
 
 String _moduleForLibrary(Source source) {
+  //print("MODULE FOR ${source}");
   if (source is InSummarySource) {
     //print ("SOURCES : ${source.summaryPath} , ${source.fullName} , ${moduleRoot}");
 
@@ -472,6 +517,11 @@ String _moduleForLibrary(Source source) {
 }
 
 main(List<String> args) {
+  String homePath = user.homeDirPath;
+  if (homePath == null) {
+    homePath = "/tmp";
+  }
+
   ArgParser parser = new ArgParser()
     ..addFlag('emit-output',
         abbr: 'e',
@@ -481,7 +531,7 @@ main(List<String> args) {
     ..addOption('output',
         abbr: 'o', defaultsTo: 'out', help: 'output directory')
     ..addOption('repo',
-        defaultsTo: path.join(user.homeDirPath, '.polymerize'),
+        defaultsTo: path.join(homePath, '.polymerize'),
         help: 'Repository path (defaults to "\$HOME/.polymerize")')
     ..addOption('source',
         abbr: 's',
@@ -493,7 +543,20 @@ main(List<String> args) {
             ModuleFormat.values.map((ModuleFormat x) => _formatToString[x]),
         defaultsTo: _formatToString[ModuleFormat.amd],
         help: 'module format')
-    ..addFlag('help', abbr: 'h', negatable: false, help: 'showHelp');
+    ..addFlag('help', abbr: 'h', negatable: false, help: 'showHelp')
+    ..addCommand(
+        'bazel',
+        new ArgParser()
+          ..addOption('base_path', abbr: 'b', help: 'base package path')
+          ..addOption('source',
+              abbr: 's', allowMultiple: true, help: 'dart source file')
+          ..addOption('summary',
+              abbr: 'm', allowMultiple: true, help: 'dart summary file')
+          ..addOption('output', abbr: 'o', help: 'output file')
+          ..addOption('output_summary', abbr: 'x', help: 'output summary file')
+          ..addOption('package_name', abbr: 'p', help: 'the package name')
+          ..addOption('package_version',
+              abbr: 'v', help: 'the package version'));
 
   // Configure logger
   log.Logger.root.onRecord.listen((log.LogRecord rec) {
@@ -501,7 +564,7 @@ main(List<String> args) {
   });
   log.Logger.root.level = log.Level.INFO;
 
-  var results = parser.parse(args);
+  ArgResults results = parser.parse(args);
 
   if (results['help']) {
     print(parser.usage);
@@ -520,6 +583,11 @@ main(List<String> args) {
 
   ModuleFormat fmt = _stringToFormat[results['module-format']];
 
+  if (results.command?.name == 'bazel') {
+    runInBazelMode(sourcePath, destPath, repoPath, fmt, results.command);
+    return;
+  }
+
   Chain.capture(() {
     _buildAll(sourcePath, destPath == null ? null : new Directory(destPath),
         fmt, repoPath);
@@ -530,4 +598,38 @@ main(List<String> args) {
       logger.severe("ERROR: ${error}\n AT: ${chain.terse}", error);
     }
   });
+}
+
+Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,
+    ModuleFormat fmt, ArgResults params) async {
+  String packageName = params['package_name'];
+  String packageVersion = params['package_version'];
+
+  //print("BZLBUILD Sources   :${params['source']}");
+  //print("BZLBUILD Summaries :${params['summary']}");
+
+  String basePath = params['base_path'];
+
+  if (basePath == null) {
+    Directory tmp = new Directory(path.dirname(params['source'].first));
+    while (path.basename(tmp.path) != 'lib' && tmp != null) {
+      tmp = tmp.parent;
+    }
+    basePath = tmp.parent.path;
+  }
+
+  await _buildOne(
+      rootPath,
+      packageName,
+      new Directory(basePath),
+      new Directory(destPath),
+      new Directory(path.joinAll([
+        summaryRepoPath,
+        packageName,
+        packageVersion != null ? packageVersion : ""
+      ])),
+      [],
+      params['summary'],
+      fmt,
+      bazelModeArgs: params);
 }
