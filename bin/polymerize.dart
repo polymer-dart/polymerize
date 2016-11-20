@@ -567,6 +567,9 @@ String _moduleForLibrary(Source source, {Map<String, String> mapping}) {
 
 String _moduleForPackage(String package, {Map<String, String> mapping}) {
   //print("MODULE FOR ${source}");
+  if (package == 'polymer_element') {
+    return "external/polymer_element/polymer_element";
+  }
 
   String res = mapping[package];
   if (res != null) {
@@ -608,6 +611,8 @@ main(List<String> args) {
         'bazel',
         new ArgParser()
           ..addOption('base_path', abbr: 'b', help: 'base package path')
+          ..addOption('export-sdk',help:'do export sdk')
+          ..addOption('export-requirejs',help:'do export requirejs')
           ..addOption('source',
               abbr: 's', allowMultiple: true, help: 'dart source file')
           ..addOption('mapping',
@@ -694,4 +699,33 @@ Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,
       params['summary'],
       fmt,
       bazelModeArgs: params);
+
+  if (params['export-sdk']!=null) {
+    await _exportSDK(params['export-sdk'],fmt);
+  }
+
+  if (params['export-requirejs']!=null) {
+    await _exportRequireJs(params['export-requirejs']);
+  }
+}
+
+
+Future _exportSDK(String dest,[ModuleFormat format = ModuleFormat.amd]) async {
+  if (format == ModuleFormat.legacy) {
+    await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js",
+        dest);
+    //await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
+    //    path.join(dest.path, "dart_library.js"));
+  } else if (format == ModuleFormat.es6) {
+    await _copyResource("package:dev_compiler/js/es6/dart_sdk.js",
+        dest);
+  } else if (format == ModuleFormat.amd) {
+    await _copyResource("package:dev_compiler/js/amd/dart_sdk.js",
+        dest);
+  }
+}
+
+Future _exportRequireJs(String dest) async {
+  return _copyResource(
+      "package:polymerize/require.js", dest);
 }
