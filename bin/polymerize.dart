@@ -212,17 +212,43 @@ Future<String> _buildOne(
     ModuleCompiler moduleCompiler = new ModuleCompiler(opts);
     CompilerOptions compilerOptions = new CompilerOptions();
 
+    Map<String, String> mapping = new Map.fromIterable(
+        bazelModeArgs['mapping'].map((x) => x.split('=')),
+        key: (x) => x[0],
+        value: (x) => x[1]);
+
     BuildUnit bu = new BuildUnit(packageName, path.absolute(location.path),
-        sources, (source) => _moduleForLibrary(source));
+        sources, (source) => _moduleForLibrary(source, mapping: mapping));
 
     JSModuleFile res = moduleCompiler.compile(bu, compilerOptions);
     if (!res.isValid) {
       throw new BuildError(res.errors);
     }
 
+    // Leggo il file delle regole per creare una mappa tra ingressi ed uscite
+    List<String> lines =
+        (await new File(bazelModeArgs['template_out']).readAsLines());
+    Map<String, String> in_out_html = {};
+    Map<String, String> html_templates = {};
+    for (int i = 0; i < lines.length; i += 2) {
+      in_out_html[lines[i]] = lines[i + 1];
+      html_templates[path.relative(lines[i], from: libPath)] = lines[i];
+    }
+
+    // Copy files
+    await Future.wait(in_out_html.keys
+        .map((source) => new File(source).copy(in_out_html[source])));
+
+    // Costruisco l'elenco dei file html
+    //Map html_templates = new Map.fromIterable(bazelModeArgs['template'],
+    //  key: (x) => path.relative(x,from:libPath),
+    //  value : (x) => path.absolute(x));
+
+    //  print("TEMPL : ${html_templates}");
+
     // Analizzo il modulo
 
-    if (bazelModeArgs==null)
+    //if (bazelModeArgs==null)
     moduleCompiler.context.librarySources.forEach((Source src) {
       if (src.isInSystemLibrary) {
         return;
@@ -233,6 +259,8 @@ Future<String> _buildOne(
       if (src.uri.pathSegments.first != packageName) {
         return;
       }
+
+      print("OUT: ${bazelModeArgs['template_out']}");
 
       LibraryElement le = moduleCompiler.context.getLibraryElement(src);
 
@@ -261,18 +289,32 @@ Future<String> _buildOne(
             String renameTo =
                 "${destTemplate.substring(0,destTemplate.length-5)}_orig.html";
 
+            // adjust
+            templatePath = html_templates[rel];
+            String finalDest = in_out_html[html_templates[rel]];
+            print("ADJUSTED TEMPLATE : ${templatePath} -> ${finalDest}");
+
             if (new File(templatePath).existsSync()) {
               //print("found ${templatePath} -> ${destTemplate}");
 
+              Directory tempDest = new Directory(path.dirname(renameTo));
+              if (!tempDest.existsSync()) {
+                tempDest.createSync(recursive: true);
+              }
+
               new File(templatePath).copySync(renameTo);
-              new File(destTemplate).writeAsStringSync(htmlImportTemplate(
+              String htmlTemplate = htmlImportTemplate(
                   template: template,
                   packageName: packageName,
                   name: name,
                   className: ce.name,
                   tagName: tag,
                   config: config,
-                  native: native));
+                  native: native,
+                  mapping: mapping);
+              new File(finalDest)
+                  .writeAsStringSync(htmlTemplate, mode: FileMode.APPEND);
+              new File(destTemplate).writeAsStringSync(htmlTemplate);
             }
           } else if ((reg = getAnnotation(ce.metadata, isDefine)) != null) {
             String tag = reg.getField('tagName').toStringValue();
@@ -401,6 +443,10 @@ String webComponentTemplate(
 </script>
 """;
 
+String polymerElementPath(Map<String, String> mapping) =>
+    ((String path) => path.substring(0, path.lastIndexOf("/")))(
+        _moduleForPackage('polymer_element', mapping: mapping));
+
 String htmlImportTemplate(
         {String template,
         String packageName,
@@ -408,20 +454,23 @@ String htmlImportTemplate(
         String className,
         String tagName,
         Map config,
-        bool native}) =>
+        bool native,
+        Map<String, String> mapping}) =>
     """
-<link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'>
-${native?nativePreloadScript(tagName,['PolymerElements',className]):""}
+<!--link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'-->
+${native?nativePreloadScript(tagName,['PolymerElements',className],polymerElementPath(mapping)):""}
 <script>
-  require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
+  require(['${_moduleForPackage(packageName,mapping:mapping)}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
 });
 </script>
 """;
 
-String nativePreloadScript(String tagName, List<String> classPath) => """
+String nativePreloadScript(
+        String tagName, List<String> classPath, String polymerElementPath) =>
+    """
 <script>
- require(['polymer_element/native_import'],function(util) {
+ require(['${polymerElementPath}/native_import'],function(util) {
    util.importNative('${tagName}',${classPath.map((s) => '\'${s}\'').join(',')});
  });
 </script>
@@ -497,7 +546,7 @@ Future _copyDir(Directory srcDir, Directory dest) async {
   }
 }
 
-String _moduleForLibrary(Source source) {
+String _moduleForLibrary(Source source, {Map<String, String> mapping}) {
   //print("MODULE FOR ${source}");
   if (source is InSummarySource) {
     //print ("SOURCES : ${source.summaryPath} , ${source.fullName} , ${moduleRoot}");
@@ -508,12 +557,23 @@ String _moduleForLibrary(Source source) {
       throw "Source should be in package format :${source.fullName}";
     }
 
-    return "${m.group(1)}/${m.group(1)}";
+    return _moduleForPackage(m.group(1), mapping: mapping);
   }
 
   throw 'Imported file "${source.uri}" was not found as a summary or source '
       'file. Please pass in either the summary or the source file '
       'for this import.';
+}
+
+String _moduleForPackage(String package, {Map<String, String> mapping}) {
+  //print("MODULE FOR ${source}");
+
+  String res = mapping[package];
+  if (res != null) {
+    return res;
+  }
+
+  return "${package}/${package}";
 }
 
 main(List<String> args) {
@@ -550,6 +610,9 @@ main(List<String> args) {
           ..addOption('base_path', abbr: 'b', help: 'base package path')
           ..addOption('source',
               abbr: 's', allowMultiple: true, help: 'dart source file')
+          ..addOption('mapping',
+              abbr: 'M', allowMultiple: true, help: 'external package mapping')
+          ..addOption('template_out', abbr: 'T', help: 'html templates rule')
           ..addOption('summary',
               abbr: 'm', allowMultiple: true, help: 'dart summary file')
           ..addOption('output', abbr: 'o', help: 'output file')
@@ -605,17 +668,16 @@ Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,
   String packageName = params['package_name'];
   String packageVersion = params['package_version'];
 
-  //print("BZLBUILD Sources   :${params['source']}");
+  print("BZLBUILD Sources   :${params['source']}");
   //print("BZLBUILD Summaries :${params['summary']}");
 
   String basePath = params['base_path'];
+  print("BASE PATH : ${basePath}");
 
   if (basePath == null) {
-    Directory tmp = new Directory(path.dirname(params['source'].first));
-    while (path.basename(tmp.path) != 'lib' && tmp != null) {
-      tmp = tmp.parent;
-    }
-    basePath = tmp.parent.path;
+    basePath = path.absolute(".");
+  } else {
+    basePath = new Directory(basePath).parent.path;
   }
 
   await _buildOne(
