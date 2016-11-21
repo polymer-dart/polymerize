@@ -260,7 +260,7 @@ Future<String> _buildOne(
         return;
       }
 
-      print("OUT: ${bazelModeArgs['template_out']}");
+      //print("OUT: ${bazelModeArgs['template_out']}");
 
       LibraryElement le = moduleCompiler.context.getLibraryElement(src);
 
@@ -292,7 +292,7 @@ Future<String> _buildOne(
             // adjust
             templatePath = html_templates[rel];
             String finalDest = in_out_html[html_templates[rel]];
-            print("ADJUSTED TEMPLATE : ${templatePath} -> ${finalDest}");
+            //print("ADJUSTED TEMPLATE : ${templatePath} -> ${finalDest}");
 
             if (new File(templatePath).existsSync()) {
               //print("found ${templatePath} -> ${destTemplate}");
@@ -673,11 +673,11 @@ Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,
   String packageName = params['package_name'];
   String packageVersion = params['package_version'];
 
-  print("BZLBUILD Sources   :${params['source']}");
+  //print("BZLBUILD Sources   :${params['source']}");
   //print("BZLBUILD Summaries :${params['summary']}");
 
   String basePath = params['base_path'];
-  print("BASE PATH : ${basePath}");
+  //print("BASE PATH : ${basePath}");
 
   if (basePath == null) {
     basePath = path.absolute(".");
