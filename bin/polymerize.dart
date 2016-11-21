@@ -279,6 +279,50 @@ Future<String> _buildOne(
             String template = reg.getField('template').toStringValue();
             //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
 
+            List<DartObject> uses = reg.getField('uses').toListValue();
+            String pathThis = path.join(
+              _moduleForUri(ce.source.uri,mapping:mapping),
+              template
+            );
+            pathThis = path.dirname(pathThis);
+
+            List<String> toImport = [];
+
+            if (uses != null) {
+              print("USES : ${uses}");
+              uses.forEach((DartObject obj) {
+                DartType dartType = obj.toTypeValue();
+                print("TYPE : ${dartType.element}");
+                ClassElement ce2 = dartType.element;
+                print("META : ${ce2.metadata}");
+                if (ce2 != null) {
+                  DartObject reg2 =
+                      getAnnotation(ce2.metadata, isPolymerRegister);
+                  if (reg2 != null) {
+                    String template2 =
+                        reg2.getField('template').toStringValue();
+                    print(
+                        "Template : ${template2} , ${ce2.library.identifier} ,${ce2.source.uri}");
+                    // Calc root path or this template
+
+                    String path2 = path.joinAll([
+                      _moduleForUri(ce2.source.uri,mapping: mapping),
+                      template2
+                    ]);
+
+                    String relPath2 = path.relative(path2,from : pathThis);
+                    print("PATH ${path2} from ${pathThis}");
+                    print("Path relative : ${relPath2}");
+                    toImport.add(relPath2);
+                  }
+
+
+                }
+                // Lookup for an annotation
+                //DartObject anno2 = getAnnotation(obj.toCl, matches)
+              });
+            }
+
             // Trovo il file relativo all'element
             String templatePath =
                 path.join(path.dirname(e.source.fullName), template);
@@ -312,8 +356,11 @@ Future<String> _buildOne(
                   config: config,
                   native: native,
                   mapping: mapping);
+              List<String> _tmp = new File(finalDest).readAsLinesSync();
+              _tmp = toImport.map((x) => "<link rel='import' href='${x}'>").toList()
+                ..addAll(_tmp);
               new File(finalDest)
-                  .writeAsStringSync(htmlTemplate, mode: FileMode.APPEND);
+                  .writeAsStringSync(_tmp.join("\n")+htmlTemplate, /*mode: FileMode.APPEND*/);
               new File(destTemplate).writeAsStringSync(htmlTemplate);
             }
           } else if ((reg = getAnnotation(ce.metadata, isDefine)) != null) {
@@ -426,7 +473,7 @@ DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //
         bool matches(DartObject)) =>
     metadata
-        .map((ElementAnnotation an) => an.constantValue)
+        .map((ElementAnnotation an) => an.computeConstantValue())
         .firstWhere(matches, orElse: () => null);
 
 String webComponentTemplate(
@@ -444,8 +491,7 @@ String webComponentTemplate(
 """;
 
 String polymerElementPath(Map<String, String> mapping) =>
-    ((String path) => path.substring(0, path.lastIndexOf("/")))(
-        _moduleForPackage('polymer_element', mapping: mapping));
+        _moduleForPackage('polymer_element', mapping: mapping);
 
 String htmlImportTemplate(
         {String template,
@@ -460,7 +506,7 @@ String htmlImportTemplate(
 <!--link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'-->
 ${native?nativePreloadScript(tagName,['PolymerElements',className],polymerElementPath(mapping)):""}
 <script>
-  require(['${_moduleForPackage(packageName,mapping:mapping)}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
+  require(['${_moduleForPackage(packageName,mapping:mapping)}/${packageName}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
 });
 </script>
@@ -557,7 +603,7 @@ String _moduleForLibrary(Source source, {Map<String, String> mapping}) {
       throw "Source should be in package format :${source.fullName}";
     }
 
-    return _moduleForPackage(m.group(1), mapping: mapping);
+    return "${_moduleForPackage(m.group(1), mapping: mapping)}/${m.group(1)}";
   }
 
   throw 'Imported file "${source.uri}" was not found as a summary or source '
@@ -568,7 +614,7 @@ String _moduleForLibrary(Source source, {Map<String, String> mapping}) {
 String _moduleForPackage(String package, {Map<String, String> mapping}) {
   //print("MODULE FOR ${source}");
   if (package == 'polymer_element') {
-    return "external/polymer_element/polymer_element";
+    return "external/polymer_element";
   }
 
   String res = mapping[package];
@@ -576,7 +622,17 @@ String _moduleForPackage(String package, {Map<String, String> mapping}) {
     return res;
   }
 
-  return "${package}/${package}";
+  return "${package}";
+}
+
+String _moduleForUri(Uri uri, {Map<String, String> mapping}) {
+  RegExp re = new RegExp(r"^package:([^/]+).*$");
+  Match m = re.matchAsPrefix(uri.toString());
+  if (m == null) {
+    throw "Source should be in package format :${uri}";
+  }
+
+   return _moduleForPackage(m.group(1), mapping: mapping);
 }
 
 main(List<String> args) {
@@ -611,8 +667,8 @@ main(List<String> args) {
         'bazel',
         new ArgParser()
           ..addOption('base_path', abbr: 'b', help: 'base package path')
-          ..addOption('export-sdk',help:'do export sdk')
-          ..addOption('export-requirejs',help:'do export requirejs')
+          ..addOption('export-sdk', help: 'do export sdk')
+          ..addOption('export-requirejs', help: 'do export requirejs')
           ..addOption('source',
               abbr: 's', allowMultiple: true, help: 'dart source file')
           ..addOption('mapping',
@@ -700,32 +756,27 @@ Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,
       fmt,
       bazelModeArgs: params);
 
-  if (params['export-sdk']!=null) {
-    await _exportSDK(params['export-sdk'],fmt);
+  if (params['export-sdk'] != null) {
+    await _exportSDK(params['export-sdk'], fmt);
   }
 
-  if (params['export-requirejs']!=null) {
+  if (params['export-requirejs'] != null) {
     await _exportRequireJs(params['export-requirejs']);
   }
 }
 
-
-Future _exportSDK(String dest,[ModuleFormat format = ModuleFormat.amd]) async {
+Future _exportSDK(String dest, [ModuleFormat format = ModuleFormat.amd]) async {
   if (format == ModuleFormat.legacy) {
-    await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js",
-        dest);
+    await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js", dest);
     //await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
     //    path.join(dest.path, "dart_library.js"));
   } else if (format == ModuleFormat.es6) {
-    await _copyResource("package:dev_compiler/js/es6/dart_sdk.js",
-        dest);
+    await _copyResource("package:dev_compiler/js/es6/dart_sdk.js", dest);
   } else if (format == ModuleFormat.amd) {
-    await _copyResource("package:dev_compiler/js/amd/dart_sdk.js",
-        dest);
+    await _copyResource("package:dev_compiler/js/amd/dart_sdk.js", dest);
   }
 }
 
 Future _exportRequireJs(String dest) async {
-  return _copyResource(
-      "package:polymerize/require.js", dest);
+  return _copyResource("package:polymerize/require.js", dest);
 }
