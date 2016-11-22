@@ -17,6 +17,9 @@ dependencies:
  stack_trace: any
  resource: any
  homedir: any
+# pub_cache: any
+ pub_client: any
+# dartson: '0.2.6'
 # build:
 #  git:
 #   url: https://github.com/dart-lang/build.git

@@ -680,7 +680,11 @@ main(List<String> args) {
           ..addOption('output_summary', abbr: 'x', help: 'output summary file')
           ..addOption('package_name', abbr: 'p', help: 'the package name')
           ..addOption('package_version',
-              abbr: 'v', help: 'the package version'));
+              abbr: 'v', help: 'the package version'))
+      ..addCommand('pub',new ArgParser()
+          ..addOption('package',abbr:'p',help:'package name')
+          ..addOption('version',abbr:'v',help:'package version')
+          ..addOption('dest',abbr:'d',help:'destination'));
 
   // Configure logger
   log.Logger.root.onRecord.listen((log.LogRecord rec) {
@@ -712,6 +716,11 @@ main(List<String> args) {
     return;
   }
 
+  if (results.command?.name == 'pub') {
+    runPubMode(results.command);
+    return;
+  }
+
   Chain.capture(() {
     _buildAll(sourcePath, destPath == null ? null : new Directory(destPath),
         fmt, repoPath);
@@ -722,6 +731,11 @@ main(List<String> args) {
       logger.severe("ERROR: ${error}\n AT: ${chain.terse}", error);
     }
   });
+}
+
+Future runPubMode(ArgResults params) async {
+  // Ask pub to download
+
 }
 
 Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,
