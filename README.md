@@ -1,5 +1,7 @@
 # Poylmerize - Polymer 2.0 Dart experimental support
 
+[![Join the chat at https://gitter.im/devc_builder/Lobby](https://badges.gitter.im/devc_builder/Lobby.svg)](https://gitter.im/devc_builder/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 This package is a command line tool to build **Polymer 2** components with **DDC** from Dart.
 
 The benefits of this approach compared to the `dart2js` standard `polymer-1.x` are :
