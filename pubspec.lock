@@ -7,6 +7,12 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.30.0-alpha.0"
+  archive:
+    description:
+      name: archive
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "1.0.27"
   args:
     description:
       name: args
@@ -103,18 +109,6 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.13.0"
-  http:
-    description:
-      name: http
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "0.11.3+9"
-  http_parser:
-    description:
-      name: http_parser
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "3.0.3"
   isolate:
     description:
       name: isolate
@@ -127,12 +121,6 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.6.1"
-  jsonx:
-    description:
-      name: jsonx
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "2.0.2"
   logging:
     description:
       name: logging
@@ -169,18 +157,12 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.5.3"
-  pub_client:
-    description:
-      name: pub_client
-      url: "http://pub.drafintech.it:5001"
-    source: hosted
-    version: "1.0.0"
   pub_semver:
     description:
       name: pub_semver
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "1.3.1"
+    version: "1.3.2"
   resource:
     description:
       name: resource

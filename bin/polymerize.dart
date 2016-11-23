@@ -17,6 +17,7 @@ import 'package:resource/resource.dart' as res;
 import 'package:args/args.dart';
 import 'package:homedir/homedir.dart' as user;
 import 'package:logging/logging.dart' as log;
+import 'package:archive/archive.dart';
 
 const Map<ModuleFormat, String> _formatToString = const {
   ModuleFormat.amd: 'amd',
@@ -281,42 +282,38 @@ Future<String> _buildOne(
 
             List<DartObject> uses = reg.getField('uses').toListValue();
             String pathThis = path.join(
-              _moduleForUri(ce.source.uri,mapping:mapping),
-              template
-            );
+                _moduleForUri(ce.source.uri, mapping: mapping), template);
             pathThis = path.dirname(pathThis);
 
             List<String> toImport = [];
 
             if (uses != null) {
-              print("USES : ${uses}");
+              // print("USES : ${uses}");
               uses.forEach((DartObject obj) {
                 DartType dartType = obj.toTypeValue();
-                print("TYPE : ${dartType.element}");
+                // print("TYPE : ${dartType.element}");
                 ClassElement ce2 = dartType.element;
-                print("META : ${ce2.metadata}");
+                // print("META : ${ce2.metadata}");
                 if (ce2 != null) {
                   DartObject reg2 =
                       getAnnotation(ce2.metadata, isPolymerRegister);
                   if (reg2 != null) {
                     String template2 =
                         reg2.getField('template').toStringValue();
-                    print(
-                        "Template : ${template2} , ${ce2.library.identifier} ,${ce2.source.uri}");
+                    // print(
+                    //    "Template : ${template2} , ${ce2.library.identifier} ,${ce2.source.uri}");
                     // Calc root path or this template
 
                     String path2 = path.joinAll([
-                      _moduleForUri(ce2.source.uri,mapping: mapping),
+                      _moduleForUri(ce2.source.uri, mapping: mapping),
                       template2
                     ]);
 
-                    String relPath2 = path.relative(path2,from : pathThis);
-                    print("PATH ${path2} from ${pathThis}");
-                    print("Path relative : ${relPath2}");
+                    String relPath2 = path.relative(path2, from: pathThis);
+                    // print("PATH ${path2} from ${pathThis}");
+                    // print("Path relative : ${relPath2}");
                     toImport.add(relPath2);
                   }
-
-
                 }
                 // Lookup for an annotation
                 //DartObject anno2 = getAnnotation(obj.toCl, matches)
@@ -357,10 +354,12 @@ Future<String> _buildOne(
                   native: native,
                   mapping: mapping);
               List<String> _tmp = new File(finalDest).readAsLinesSync();
-              _tmp = toImport.map((x) => "<link rel='import' href='${x}'>").toList()
-                ..addAll(_tmp);
-              new File(finalDest)
-                  .writeAsStringSync(_tmp.join("\n")+htmlTemplate, /*mode: FileMode.APPEND*/);
+              _tmp = toImport
+                  .map((x) => "<link rel='import' href='${x}'>")
+                  .toList()..addAll(_tmp);
+              new File(finalDest).writeAsStringSync(
+                _tmp.join("\n") + htmlTemplate, /*mode: FileMode.APPEND*/
+              );
               new File(destTemplate).writeAsStringSync(htmlTemplate);
             }
           } else if ((reg = getAnnotation(ce.metadata, isDefine)) != null) {
@@ -491,7 +490,7 @@ String webComponentTemplate(
 """;
 
 String polymerElementPath(Map<String, String> mapping) =>
-        _moduleForPackage('polymer_element', mapping: mapping);
+    _moduleForPackage('polymer_element', mapping: mapping);
 
 String htmlImportTemplate(
         {String template,
@@ -632,7 +631,7 @@ String _moduleForUri(Uri uri, {Map<String, String> mapping}) {
     throw "Source should be in package format :${uri}";
   }
 
-   return _moduleForPackage(m.group(1), mapping: mapping);
+  return _moduleForPackage(m.group(1), mapping: mapping);
 }
 
 main(List<String> args) {
@@ -681,10 +680,13 @@ main(List<String> args) {
           ..addOption('package_name', abbr: 'p', help: 'the package name')
           ..addOption('package_version',
               abbr: 'v', help: 'the package version'))
-      ..addCommand('pub',new ArgParser()
-          ..addOption('package',abbr:'p',help:'package name')
-          ..addOption('version',abbr:'v',help:'package version')
-          ..addOption('dest',abbr:'d',help:'destination'));
+    ..addCommand(
+        'pub',
+        new ArgParser()
+          ..addOption('package', abbr: 'p', help: 'package name')
+          ..addOption('version', abbr: 'v', help: 'package version')
+          ..addOption('dest', abbr: 'd', help: 'destination')
+          ..addOption('pub-host', abbr: 'H', help: 'pub host url'));
 
   // Configure logger
   log.Logger.root.onRecord.listen((log.LogRecord rec) {
@@ -733,9 +735,46 @@ main(List<String> args) {
   });
 }
 
+const Map _HEADERS = const {"Content-Type": "application/json"};
+
 Future runPubMode(ArgResults params) async {
   // Ask pub to download
+  var baseApiUrl = params['pub-host'] ?? "https://pub.dartlang.org/api";
+  var url = "$baseApiUrl/packages/${params['package']}";
+  HttpClient client = new HttpClient();
+  HttpClientRequest req = await client.getUrl(Uri.parse(url));
+  req.headers.contentType = new ContentType('application', 'json');
+  HttpClientResponse response = await req.close();
+  if (response.statusCode >= 300) {
+    throw "error resp";
+  }
 
+  String body =
+      await response.transform(UTF8.decoder).fold("", (a, b) => a + b);
+
+  Map res = JSON.decode(body);
+
+  Map ver =
+      res['versions'].firstWhere((Map x) => x['version'] == params['version']);
+
+  String archive_url = ver['archive_url'];
+
+  // print("RES: ${archive_url}");
+
+  req = await client.getUrl(Uri.parse(archive_url));
+  response = await req.close();
+  List<int> allBytes = [];
+  await response.transform(GZIP.decoder).forEach((x) => allBytes.addAll(x));
+
+  Archive a = new TarDecoder().decodeBytes(allBytes);
+
+  a.files.forEach((f) {
+    new File(path.join(params['dest'], f.name))
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(f.content);
+  });
+
+  client.close();
 }
 
 Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,

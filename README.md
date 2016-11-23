@@ -6,6 +6,7 @@ The benefits of this approach compared to the `dart2js` standard `polymer-1.x` a
 
  - support for `polymer 2.0-preview` (web components 1.0)
  - using DDC to generate `ES6` output code
+ - using [bazel](http://bazel.io) as build system
  - **dynamic load** of polymer components definitions through `requirejs`
  - **interoperability** with other JS frameworks
  - **Incremental** build (dependencies are built only once)
