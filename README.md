@@ -6,7 +6,7 @@ The benefits of this approach compared to the `dart2js` standard `polymer-1.x` a
 
  - support for `polymer 2.0-preview` (web components 1.0)
  - using DDC to generate `ES6` output code
- - using [bazel](http://bazel.io) as build system
+ - using [bazel](http://bazel.io) as build system (see also [rules](https://github.com/dam0vm3nt/bazel_polymerize_rules)
  - **dynamic load** of polymer components definitions through `requirejs`
  - **interoperability** with other JS frameworks
  - **Incremental** build (dependencies are built only once)
@@ -18,18 +18,17 @@ The benefits of this approach compared to the `dart2js` standard `polymer-1.x` a
 
 ## Disclaimer
 
-Too good to be true ? Well the bad news is that although very promising this package is based on the **EXPERIMENTAL DEV COMPILER** and therefore this
-is to be considered **HIGHLY UNSTABLE** and not ready for production.
+Actually this tool will now work only for Linux. To be used on macosx should be only a matter of changing some 
+builtin path and this will be fixed very soon.
 
-Nevertheless it can be though as a POC to demostrate the extremely high potential of this approach for Dart.
-
-This tool is tested *ONLY* on Linux. Should work on other unix based system. Probably will not work on windows.
-
-See [NOTES.md](docs/NOTES.md) for details.
+Bazel doesn't work on windows system for now (it depends too much un `bash` to be able to work there) so... sorry guys.
 
 ## Install
 
-Install with `pub global activate polymerize`.
+This tool is actually used internally by bazel rules so you don't need to install it (bazel will do that for you).
+All you have to do is start using bazel rules and enjoy. 
+
+If you want to learn more, check out the sample project (see below).
 
 ## Usage
 
@@ -38,19 +37,15 @@ A sample project demostrating how to build `polymer-2` components using `polymer
 
 See the [README](https://github.com/dam0vm3nt/polymer_dcc/blob/master/README.md) for more information.
 
-Launch the build with the following command in the main package dir:
-
- - `polymerize`
-
-(use `polymerize -h` for more options).
 
 ### Component definition
 
 This is a sample component definition:
 
-    import 'package:polymer_element/polymer_element.dart'
+    import 'package:polymer_element/polymer_element.dart';
+    import 'package:my_component/other_component.dart' show OtherComponent;
 
-    @PolymerRegister('my-tag',template:'my-tag.html')
+    @PolymerRegister('my-tag',template:'my-tag.html',uses=[OtherComponent])
     class MyTag extends PolymerElement {
 
       int count = 0;  // <- no need to annotate this !!!
@@ -75,25 +70,14 @@ This is a sample component definition:
       }
     }
 
-The Html template is just the usual `dom-module`  template **without** any JS code and with `<link>` to import other polymer dependencies (like polymer2 itself and
-  any used component).
+The Html template is just the usual `dom-module`  template **without** any JS code. `Link` tags will be automatically generated based on the `uses` attribute of the  `@PolymerRegister` annotation (BTW : this fixes
+also the annoying *unused import* problem with `polymer-dart`, and also the IDE will help you adding the right import).
 The `index.html` should preload `requirejs`, `webcomponents` polyfill and `polymer.html` (see the demo).
 
 ## Output
 
-The build tool will operate in this way :
+After complilation everything will be found in the bazel output folder, ready to be used
 
- - Every dependency of the main package will be processed and will produce a separate loadable module in the output Directory
- - For every polymer component a new `html` file will be produced that will load the original template and will load the corresponding dart class
-
-Every file with ".dart" extension *inside* the `lib` folder of a dependency will be considered in the build of the corresponding module.
-
-Every other file in the `lib` folder will be considered an `asset` and compied to the final build destination folder.
-
-No other folder will be considered in the build. The only exception is the `web` folder in the `main package` that will be copied
-to the final build destination folder.
-
-Compilation for `hosted` packages will be cached inside the folder `$HOME/.polymerize` (inside the current directory) and reused without rebuilding it for the next build.
 
 ## TODO:
 
@@ -101,5 +85,5 @@ Compilation for `hosted` packages will be cached inside the folder `$HOME/.polym
  - better convert to/from JS
  - annotations for properties (computed props, etc.)
  - support for mixins
- - support for external element wrappers
- - support for auto gen HTML imports
+ - ~~support for external element wrappers~~
+ - ~~support for auto gen HTML imports~~
