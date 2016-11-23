@@ -2,7 +2,7 @@ name: polymerize
 author: Vittorio Ballestra <vittorio.ballestra@gmail.com>
 homepage: https://github.com/dam0vm3nt/devc_builder
 description: An experimental Polymer 2 support with DDC
-version: 0.2.9
+version: 0.2.10
 dependencies:
  dev_compiler:
   hosted:
