@@ -109,6 +109,18 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.13.0"
+  http:
+    description:
+      name: http
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.11.3+9"
+  http_parser:
+    description:
+      name: http_parser
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "3.0.3"
   isolate:
     description:
       name: isolate
@@ -139,6 +151,12 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "1.0.0"
+  package_resolver:
+    description:
+      name: package_resolver
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "1.0.2"
   path:
     description:
       name: path

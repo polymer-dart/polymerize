@@ -20,6 +20,7 @@ dependencies:
 # pub_cache: any
 # pub_client: any
  archive: any
+ package_resolver: any
 # dartson: '0.2.6'
 # build:
 #  git:
