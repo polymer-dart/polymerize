@@ -19,7 +19,7 @@ runGenerateWrapper(ArgResults params) async {
   var result = JSON.decode(res.stdout);
 
   generate_elements("src/${relPath}",result);
-
+  generate_behaviors("src/${relPath}",result);
   //print("RES = ${result}");
 
 }
@@ -34,6 +34,16 @@ generate_elements(relPath,result) {
   });
 }
 
+generate_behaviors(relPath,result) {
+  Map<String,Map> elements = result['behaviors'];
+  if (elements==null)
+    return;
+  elements.forEach((name,descr){
+    String res = generate_behavior(relPath,name,descr);
+    print(res);
+  });
+}
+
 generate_element(String relPath,String name,Map descr) {
   return """
 @JS('PolymerElements')
@@ -41,6 +51,7 @@ library ${name};
 import 'dart:html';
 import 'package:js/js.dart';
 import 'package:polymer_element/polymer_element.dart';
+${importBehaviors(relPath,name,descr)}
 
 ${generateComment(descr['description'])}
 
@@ -57,6 +68,25 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
 """;
 }
 
+generate_behavior(String relPath,String name,Map descr) {
+  return """
+@JS('PolymerElements')
+library ${name};
+import 'dart:html';
+import 'package:js/js.dart';
+import 'package:polymer_element/polymer_element.dart';
+${importBehaviors(relPath,name,descr)}
+
+${generateComment(descr['description'])}
+
+@PolymerRegister('${descr['name']}',template:'${relPath}',native:true,behavior:true)
+abstract class ${name}  ${withBehaviors(relPath,name,descr)} {
+${generateProperties(relPath,name,descr,descr['properties'])}
+}
+
+""";
+}
+
 withBehaviors(String relPath,String name,Map descr) {
   List behaviors = descr['behaviors'];
   if (behaviors == null) {
@@ -68,8 +98,11 @@ withBehaviors(String relPath,String name,Map descr) {
 
 withBehavior(String relPath,String name,Map descr,Map behavior) => behavior['name'];
 
+indents(int i,String s) => ((p,s) => s.split("\n").map((x) => p+x).join("\n"))(UTF8.decode(new List.filled(i, UTF8.encode(" ").first)),s);
 
-generateComment(String comment) => "/**\n * "+comment.split(new RegExp("\n+")).join("\n * ")+"\n **/";
+generateComment(String comment,{int indent:0}) => indents(indent,"/**\n * "+comment.split(new RegExp("\n+")).join("\n * ")+"\n */");
+
+importBehaviors(String relPath,String name,Map descr) => descr['behaviors'].map((b)=>'import \'package:polymer_elements/${b['name']}/${b['name']}\';').join('\n');
 
 generateProperties(String relPath,String name,Map descr,Map properties) {
   if (properties == null) {
@@ -80,7 +113,7 @@ generateProperties(String relPath,String name,Map descr,Map properties) {
 }
 
 generateProperty(String relPath,String name,Map descr,Map prop) => """
-  ${generateComment(prop['description'])}
+${generateComment(prop['description'],indent:2)}
   ${prop['type']} get ${prop['name']}();
   void set ${prop['name']}(${prop['type']} value);
 """;
