@@ -18,7 +18,7 @@ import 'package:args/args.dart';
 import 'package:homedir/homedir.dart' as user;
 import 'package:logging/logging.dart' as log;
 import 'package:archive/archive.dart';
-import 'package:package_resolver/package_resolver.dart';
+import 'package:polymerize/wrapper_generator.dart';
 
 const Map<ModuleFormat, String> _formatToString = const {
   ModuleFormat.amd: 'amd',
@@ -843,20 +843,4 @@ Future _exportSDK(String dest, [ModuleFormat format = ModuleFormat.amd]) async {
 
 Future _exportRequireJs(String dest) async {
   return _copyResource("package:polymerize/require.js", dest);
-}
-
-runGenerateWrapper(ArgResults params) async {
-  PackageResolver resolver = PackageResolver.current;
-  //new res.Resource('package:polymerize/src/js/analyze.js');
-
-  ProcessResult res = await Process.run('node', [
-    (await resolver.resolveUri('package:polymerize/src/js/analyze.js')).toFilePath(),
-    params['base-dir'],
-    path.relative(params['file-path'],from:params['base-dir'])
-  ],stdoutEncoding: UTF8);
-
-  var result = JSON.decode(res.stdout);
-
-  print("RES = ${result}");
-
 }
