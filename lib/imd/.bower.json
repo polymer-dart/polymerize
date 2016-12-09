@@ -1,0 +1,26 @@
+{
+  "name": "imd",
+  "version": "1.0.0",
+  "license": "http://polymer.github.io/LICENSE.txt",
+  "ignore": [
+    "/.*"
+  ],
+  "authors": [
+    "The Polymer Authors (http://polymer.github.io/AUTHORS.txt)"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PolymerLabs/imd.git"
+  },
+  "homepage": "https://github.com/PolymerLabs/IMD",
+  "_release": "1.0.0",
+  "_resolution": {
+    "type": "version",
+    "tag": "v1.0.0",
+    "commit": "05cab18b50a8c4e3f20e00494a8945cbea9d5eae"
+  },
+  "_source": "git://github.com/PolymerLabs/IMD.git",
+  "_target": "^1.0.0",
+  "_originalSource": "PolymerLabs/IMD",
+  "_direct": true
+}

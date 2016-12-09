@@ -415,6 +415,13 @@ Future<String> _buildOne(
       await sum.copy(bazelModeArgs['output_summary']);
       //print("BZLBUILD Out       :${bazelModeArgs['output']}");
       //print("BZLBUILD Sum. Out  :${bazelModeArgs['output_summary']}");
+
+
+      // WRITE HTML STUB
+      var html = new File(bazelModeArgs['output_html']);
+      // TODO : Aggiungere un import per ogni dipendenza - aggiungere l'import per ogni template
+      await html.writeAsString("""<script src='${path.basename(js.path)}' as='${packageName}'></script>
+""");
     }
 
     await new Directory(path.join(dest.path, packageName)).create();
@@ -669,6 +676,7 @@ main(List<String> args) {
           ..addOption('base_path', abbr: 'b', help: 'base package path')
           ..addOption('export-sdk', help: 'do export sdk')
           ..addOption('export-requirejs', help: 'do export requirejs')
+          ..addOption('export-require_html',help:'do export requirehtml')
           ..addOption('source',
               abbr: 's', allowMultiple: true, help: 'dart source file')
           ..addOption('mapping',
@@ -677,6 +685,7 @@ main(List<String> args) {
           ..addOption('summary',
               abbr: 'm', allowMultiple: true, help: 'dart summary file')
           ..addOption('output', abbr: 'o', help: 'output file')
+          ..addOption('output_html',help:'output html wrapper')
           ..addOption('output_summary', abbr: 'x', help: 'output summary file')
           ..addOption('package_name', abbr: 'p', help: 'the package name')
           ..addOption('package_version',
@@ -692,7 +701,10 @@ main(List<String> args) {
         'generate-wrapper',
         new ArgParser()
           ..addOption('base-dir', abbr: 'b', help: 'base dir')
-          ..addOption('file-path', abbr: 'f', help: 'file path'));
+          ..addOption('file-path',allowMultiple: true,abbr: 'f', help: 'file path')
+          ..addOption('package-name',abbr:'p',help:'dest packag')
+          ..addOption('output-path',allowMultiple: true,abbr:'F',help:'corresponding generated wrappers')
+          ..addFlag('help',help:'help on generate'));
 
   // Configure logger
   log.Logger.root.onRecord.listen((log.LogRecord rec) {
@@ -730,7 +742,11 @@ main(List<String> args) {
   }
 
   if (results.command?.name=='generate-wrapper') {
-    runGenerateWrapper(results.command);
+    if (results.command['help']) {
+      print("generate-wrapper usage :\n${parser.commands['generate-wrapper'].usage}");
+      return;
+    }
+    new Generator().runGenerateWrapper(results.command);
     return;
   }
 
@@ -825,7 +841,7 @@ Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,
   }
 
   if (params['export-requirejs'] != null) {
-    await _exportRequireJs(params['export-requirejs']);
+    await _exportRequireJs(params['export-requirejs'],params['export-require_html']);
   }
 }
 
@@ -841,6 +857,7 @@ Future _exportSDK(String dest, [ModuleFormat format = ModuleFormat.amd]) async {
   }
 }
 
-Future _exportRequireJs(String dest) async {
-  return _copyResource("package:polymerize/require.js", dest);
+Future _exportRequireJs(String dest,String dest_html) async {
+  await _copyResource("package:polymerize/imd/imd.js", dest);
+  return _copyResource("package:polymerize/imd/imd.html", dest_html);
 }
