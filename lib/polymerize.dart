@@ -164,6 +164,11 @@ Future<String> _buildOne(
   }
   String libPath = path.join(location.path, "lib");
 
+  Map<String, String> mapping = new Map.fromIterable(
+      bazelModeArgs['mapping'].map((x) => x.split('=')),
+      key: (x) => x[0],
+      value: (x) => x[1]);
+
   // If use repo (after collect and copy)
   // TODO : Spostare questa logica sotto
   // 1) buildare sempre dentro il repo
@@ -214,10 +219,8 @@ Future<String> _buildOne(
     ModuleCompiler moduleCompiler = new ModuleCompiler(opts);
     CompilerOptions compilerOptions = new CompilerOptions();
 
-    Map<String, String> mapping = new Map.fromIterable(
-        bazelModeArgs['mapping'].map((x) => x.split('=')),
-        key: (x) => x[0],
-        value: (x) => x[1]);
+    // print("MAPPING : ${mapping} - ${bazelModeArgs['base_path']}");
+    //mapping[packageName] = path.relative(bazelModeArgs['output'],from:libPath);
 
     BuildUnit bu = new BuildUnit(packageName, path.absolute(location.path),
         sources, (source) => _moduleForLibrary(source, mapping: mapping));
@@ -251,6 +254,7 @@ Future<String> _buildOne(
     // Analizzo il modulo
 
     //if (bazelModeArgs==null)
+
     moduleCompiler.context.librarySources.forEach((Source src) {
       if (src.isInSystemLibrary) {
         return;
@@ -285,6 +289,10 @@ Future<String> _buildOne(
             String pathThis = path.join(
                 _moduleForUri(ce.source.uri, mapping: mapping), template);
             pathThis = path.dirname(pathThis);
+
+            String reversePath = path.relative(
+                _moduleForUri(ce.source.uri, mapping: mapping),
+                from: pathThis);
 
             List<String> toImport = [];
 
@@ -355,9 +363,21 @@ Future<String> _buildOne(
                   native: native,
                   mapping: mapping);
               List<String> _tmp = new File(finalDest).readAsLinesSync();
+
+              List _jsImports = [
+                "<link rel='import' href='${path.normalize(path.join(reversePath,relativePolymerElementPath(packageName,mapping)))}/polymerize.html'>",
+                "<link rel='import' href='${path.normalize(path.join(reversePath,packageName))}.mod.html'>"
+              ];
+
+              if (native) {
+                _jsImports.add(
+                    "<link rel='import' href='${path.normalize(path.join(reversePath,relativePolymerElementPath(packageName,mapping)))}/native_import.html'>");
+              }
+
               _tmp = toImport
                   .map((x) => "<link rel='import' href='${x}'>")
-                  .toList()..addAll(_tmp);
+                  .toList()..addAll(_jsImports)..addAll(_tmp);
+
               new File(finalDest).writeAsStringSync(
                 _tmp.join("\n") + htmlTemplate, /*mode: FileMode.APPEND*/
               );
@@ -384,6 +404,8 @@ Future<String> _buildOne(
         });
       });
     });
+
+    //print("${_moduleForPackage(packageName,mapping:mapping)} DEPS: ${dependencies}");
 
     // Write outputs
     JSModuleCode code = res.getCode(format, false, "${packageName}.js", "");
@@ -416,11 +438,16 @@ Future<String> _buildOne(
       //print("BZLBUILD Out       :${bazelModeArgs['output']}");
       //print("BZLBUILD Sum. Out  :${bazelModeArgs['output_summary']}");
 
-
       // WRITE HTML STUB
       var html = new File(bazelModeArgs['output_html']);
-      // TODO : Aggiungere un import per ogni dipendenza - aggiungere l'import per ogni template
-      await html.writeAsString("""<script src='${path.basename(js.path)}' as='${packageName}'></script>
+      // TODO : Aggiungere un import per ogni dipendenza - aggiungere l'import
+      // per ogni template
+
+      //print("MAPPIUNG : ${mapping}");
+      await html.writeAsString("""
+<link rel='import' href='${path.relative("dart_sdk.html",from:path.dirname(mapping[packageName]))}'>
+${importDeps(mapping,packageName)}
+<script src='${path.basename(js.path)}' as='${mapping[packageName]}'></script>
 """);
     }
 
@@ -433,6 +460,17 @@ Future<String> _buildOne(
   }
   return sum.path;
 }
+
+String importDeps(Map<String, String> mapping, String packageName) => mapping
+    .keys
+    .where((k) => k != packageName)
+    .map((k) =>
+        "<link rel='import' href='${relativeModulePath(k,from:packageName,mapping:mapping)}.mod.html'>")
+    .join('\n');
+
+String relativeModulePath(String module,
+        {String from, Map<String, String> mapping}) =>
+    path.relative(mapping[module], from: path.dirname(mapping[from]));
 
 Map collectConfig(AnalysisContext context, ClassElement ce) {
   List<String> observers = [];
@@ -491,7 +529,7 @@ String webComponentTemplate(
         String tagName}) =>
     """
 <script>
-  require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
+  define(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
   polymerize.define('${tagName}',pkg.${name}.${className});
 });
 </script>
@@ -499,6 +537,10 @@ String webComponentTemplate(
 
 String polymerElementPath(Map<String, String> mapping) =>
     _moduleForPackage('polymer_element', mapping: mapping);
+
+String relativePolymerElementPath(String from, Map<String, String> mapping) =>
+    path.dirname(
+        relativeModulePath('polymer_element', from: from, mapping: mapping));
 
 String htmlImportTemplate(
         {String template,
@@ -510,10 +552,9 @@ String htmlImportTemplate(
         bool native,
         Map<String, String> mapping}) =>
     """
-<!--link href='${path.basenameWithoutExtension(template)}_orig.html' rel='import'-->
 ${native?nativePreloadScript(tagName,['PolymerElements',className],polymerElementPath(mapping)):""}
 <script>
-  require(['${_moduleForPackage(packageName,mapping:mapping)}/${packageName}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
+  define('${tagName}',['${_moduleForPackage(packageName,mapping:mapping)}/${packageName}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
 });
 </script>
@@ -523,7 +564,7 @@ String nativePreloadScript(
         String tagName, List<String> classPath, String polymerElementPath) =>
     """
 <script>
- require(['${polymerElementPath}/native_import'],function(util) {
+ define('${tagName}-native-import',['${polymerElementPath}/native_import'],function(util) {
    util.importNative('${tagName}',${classPath.map((s) => '\'${s}\'').join(',')});
  });
 </script>
@@ -620,13 +661,13 @@ String _moduleForLibrary(Source source, {Map<String, String> mapping}) {
 
 String _moduleForPackage(String package, {Map<String, String> mapping}) {
   //print("MODULE FOR ${source}");
-  if (package == 'polymer_element') {
-    return "external/polymer_element";
-  }
+  //if (package == 'polymer_element') {
+  //  return "external/polymer_element";
+  //}
 
   String res = mapping[package];
   if (res != null) {
-    return res;
+    return path.dirname(res);
   }
 
   return "${package}";
@@ -675,8 +716,9 @@ main(List<String> args) {
         new ArgParser()
           ..addOption('base_path', abbr: 'b', help: 'base package path')
           ..addOption('export-sdk', help: 'do export sdk')
+          ..addOption('export-sdk-html', help: 'do export sdk HTML')
           ..addOption('export-requirejs', help: 'do export requirejs')
-          ..addOption('export-require_html',help:'do export requirehtml')
+          ..addOption('export-require_html', help: 'do export requirehtml')
           ..addOption('source',
               abbr: 's', allowMultiple: true, help: 'dart source file')
           ..addOption('mapping',
@@ -685,7 +727,7 @@ main(List<String> args) {
           ..addOption('summary',
               abbr: 'm', allowMultiple: true, help: 'dart summary file')
           ..addOption('output', abbr: 'o', help: 'output file')
-          ..addOption('output_html',help:'output html wrapper')
+          ..addOption('output_html', help: 'output html wrapper')
           ..addOption('output_summary', abbr: 'x', help: 'output summary file')
           ..addOption('package_name', abbr: 'p', help: 'the package name')
           ..addOption('package_version',
@@ -701,10 +743,14 @@ main(List<String> args) {
         'generate-wrapper',
         new ArgParser()
           ..addOption('base-dir', abbr: 'b', help: 'base dir')
-          ..addOption('file-path',allowMultiple: true,abbr: 'f', help: 'file path')
-          ..addOption('package-name',abbr:'p',help:'dest packag')
-          ..addOption('output-path',allowMultiple: true,abbr:'F',help:'corresponding generated wrappers')
-          ..addFlag('help',help:'help on generate'));
+          ..addOption('file-path',
+              allowMultiple: true, abbr: 'f', help: 'file path')
+          ..addOption('package-name', abbr: 'p', help: 'dest packag')
+          ..addOption('output-path',
+              allowMultiple: true,
+              abbr: 'F',
+              help: 'corresponding generated wrappers')
+          ..addFlag('help', help: 'help on generate'));
 
   // Configure logger
   log.Logger.root.onRecord.listen((log.LogRecord rec) {
@@ -741,9 +787,10 @@ main(List<String> args) {
     return;
   }
 
-  if (results.command?.name=='generate-wrapper') {
+  if (results.command?.name == 'generate-wrapper') {
     if (results.command['help']) {
-      print("generate-wrapper usage :\n${parser.commands['generate-wrapper'].usage}");
+      print(
+          "generate-wrapper usage :\n${parser.commands['generate-wrapper'].usage}");
       return;
     }
     new Generator().runGenerateWrapper(results.command);
@@ -837,15 +884,17 @@ Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,
       bazelModeArgs: params);
 
   if (params['export-sdk'] != null) {
-    await _exportSDK(params['export-sdk'], fmt);
+    await _exportSDK(params['export-sdk'], params['export-sdk-html'], fmt);
   }
 
   if (params['export-requirejs'] != null) {
-    await _exportRequireJs(params['export-requirejs'],params['export-require_html']);
+    await _exportRequireJs(
+        params['export-requirejs'], params['export-require_html']);
   }
 }
 
-Future _exportSDK(String dest, [ModuleFormat format = ModuleFormat.amd]) async {
+Future _exportSDK(String dest, String destHTML,
+    [ModuleFormat format = ModuleFormat.amd]) async {
   if (format == ModuleFormat.legacy) {
     await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js", dest);
     //await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
@@ -855,9 +904,13 @@ Future _exportSDK(String dest, [ModuleFormat format = ModuleFormat.amd]) async {
   } else if (format == ModuleFormat.amd) {
     await _copyResource("package:dev_compiler/js/amd/dart_sdk.js", dest);
   }
+
+  // export HTML
+  await new File(destHTML).writeAsString(
+      """<script src='${path.basename(dest)}' as='dart_sdk'></script>""");
 }
 
-Future _exportRequireJs(String dest,String dest_html) async {
+Future _exportRequireJs(String dest, String dest_html) async {
   await _copyResource("package:polymerize/imd/imd.js", dest);
   return _copyResource("package:polymerize/imd/imd.html", dest_html);
 }

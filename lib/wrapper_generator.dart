@@ -79,20 +79,20 @@ class Generator {
     return analysisResult;
   }
 
-  Map<String,String> packageMappings = {};
+  Map<String, String> packageMappings = {};
   String packageName;
-  Map<String,String> inOutMap;
+  Map<String, String> inOutMap;
 
   runGenerateWrapper(ArgResults params) async {
-
-    inOutMap = new Map.fromIterables(params['file-path'], params['output-path']);
-    packageName =params['package-name'];
+    inOutMap =
+        new Map.fromIterables(params['file-path'], params['output-path']);
+    packageName = params['package-name'];
 
     //new res.Resource('package:polymerize/src/js/analyze.js');
     //print("FILE TO PROCESS: ${params['file-path']}");
     await Future.wait(params['file-path'].map((p) async {
       // Read and analyze the source doc
-      var res= await _analyze(p, params['base-dir']);
+      var res = await _analyze(p, params['base-dir']);
 
       var mineBehaviors = res['behaviors'].values.where((x) => x['main_file']);
       var mineElements = res['elements'].values.where((x) => x['main_file']);
@@ -100,15 +100,12 @@ class Generator {
       mineBehaviors.forEach((b) {
         // Fill the map
         packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
-
       });
 
       mineElements.forEach((b) {
         // Fill the map
         packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
-
       });
-
     }));
 
     print("Resulting mappings :${packageMappings}");
@@ -144,6 +141,7 @@ class Generator {
   }
 
   generate_element(String name, Map descr) {
+    _importPrefixes = {};
     return """
 @JS('PolymerElements')
 library ${name};
@@ -168,6 +166,7 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
   }
 
   generate_behavior(String name, Map descr) {
+    _importPrefixes = {};
     return """
 @JS('PolymerElements')
 library ${name};
@@ -198,8 +197,16 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
             .join(',');
   }
 
-  withBehavior(String relPath, String name, Map descr, Map behavior) =>
-      behavior['name'];
+  withBehavior(String relPath, String name, Map descr, Map behavior) {
+    String n =   behavior['name'];
+    String prefix = _importPrefixes[n];
+    int p = n.lastIndexOf(".");
+    if (p>=0) {
+      n = n.substring(p+1);
+    }
+
+    return "${prefix}.${n}";
+  }
 
   indents(int i, String s) =>
       ((p, s) => s.split("\n").map((x) => p + x).join("\n"))(
@@ -208,9 +215,14 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
   generateComment(String comment, {int indent: 0}) => indents(indent,
       "/**\n * " + comment.split(new RegExp("\n+")).join("\n * ") + "\n */");
 
-  importBehaviors(String relPath, String name, Map descr) => descr['behaviors']
-      .map((b) => 'import \'${resolveImport(b)}\';')
-      .join('\n');
+  Map<String,String> _importPrefixes;
+
+  importBehaviors(String relPath, String name, Map descr) =>
+      descr['behaviors'].map((b) {
+        String prefix = "imp${_importPrefixes.length}";
+        _importPrefixes[b['name']] = prefix;
+        return 'import \'${resolveImport(b)}\' as ${prefix};';
+      }).join('\n');
 
   generateProperties(String relPath, String name, Map descr, Map properties) {
     if (properties == null) {
