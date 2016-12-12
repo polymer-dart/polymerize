@@ -28,5 +28,6 @@ dependencies:
 executables:
  polymerize: polymerize
 #dependency_overrides:
+# analyzer: 0.29.1
 # dev_compiler:
 #  path: ../sdk/pkg/dev_compiler

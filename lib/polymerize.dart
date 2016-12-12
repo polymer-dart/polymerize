@@ -912,5 +912,19 @@ Future _exportSDK(String dest, String destHTML,
 
 Future _exportRequireJs(String dest, String dest_html) async {
   await _copyResource("package:polymerize/imd/imd.js", dest);
-  return _copyResource("package:polymerize/imd/imd.html", dest_html);
+  await new File(dest_html).writeAsString("""
+<script src='${path.basename(dest)}'></script>
+<script>
+(function(scope){
+  scope.define(['require'],function(require) {
+    scope.require = function(ids, func) {
+      func.apply(null, ids.map(function(m) {
+        return require(m);
+      }));
+    };
+  });
+})(this);
+</script>
+""");
+  //return _copyResource("package:polymerize/imd/imd.html", dest_html);
 }
