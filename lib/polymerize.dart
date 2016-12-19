@@ -289,7 +289,7 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
             String finalDest = in_out_html[html_templates[rel]];
             //print("ADJUSTED TEMPLATE : ${templatePath} -> ${finalDest}");
 
-            if (new File(templatePath).existsSync()) {
+            //if (templatePath!=null && new File(templatePath).existsSync()) {
               //print("found ${templatePath} -> ${destTemplate}");
 
               if (native && !native_imported) {
@@ -306,7 +306,7 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
               }
               post_dart.add( htmlImportTemplate(template: template, packageName: packageName, name: name, className: ce.name, tagName: tag, config: config, native: native, mapping: mapping));
 
-            }
+            //}
           } else if ((reg = getAnnotation(ce.metadata, isDefine)) != null) {
             throw "NOT WORKING ANYMMORE, TO BE UPDATED";
             /*
