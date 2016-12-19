@@ -731,10 +731,11 @@ runBowerMode(ArgResults res) async {
   //tmp.createSync(recursive: true);
   //File c = new File(path.join(tmp.path,"bower.json"));
   //dest.copySync(c.path);
-  ProcessResult x = await Process.run("/usr/local/bin/bower",["install"],workingDirectory: tmp.path,environment: {
+  print("Downloading JS components");
+  ProcessResult x = await Process.run("/usr/local/bin/bower",["install","-s"],workingDirectory: tmp.path,environment: {
     "HOME":tmp.path
   });
-  print("Bower install result : ${x.stdout} , ${x.stderr}");
+  print("Bower install finished : ${x.stdout} , ${x.stderr}");
 }
 
 const Map _HEADERS = const {"Content-Type": "application/json"};
