@@ -129,6 +129,10 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
   Directory assetDir = new Directory(path.join(summaryDest.path, "assets"));
 
   List bower_imports = <BowerImport>[];
+  List pre_dart=<String>[];
+  List post_dart = <String>[];
+  bool native_imported = false;
+  bool polymerize_imported = false;
 
   Map<String, String> maps = null;
   if (!useRepo || !(repo_js.existsSync()) || !repo_smap.existsSync()) {
@@ -279,7 +283,6 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
             String rel = path.relative(templatePath, from: libPath);
 
             String destTemplate = path.join(assetDir.path, rel);
-            String renameTo = "${destTemplate.substring(0,destTemplate.length-5)}_orig.html";
 
             // adjust
             templatePath = html_templates[rel];
@@ -289,33 +292,24 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
             if (new File(templatePath).existsSync()) {
               //print("found ${templatePath} -> ${destTemplate}");
 
-              Directory tempDest = new Directory(path.dirname(renameTo));
-              if (!tempDest.existsSync()) {
-                tempDest.createSync(recursive: true);
+              if (native && !native_imported) {
+                post_dart.add("<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
+                native_imported = true;
+              } else if (!native) {
+                // TODO : embed template here ?
+                pre_dart.add("<link rel='import' href='${path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html']))}'>");
               }
+              if (!polymerize_imported) {
+                post_dart.add("<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
+                polymerize_imported=true;
 
-              new File(templatePath).copySync(renameTo);
-              String htmlTemplate =
-                  htmlImportTemplate(template: template, packageName: packageName, name: name, className: ce.name, tagName: tag, config: config, native: native, mapping: mapping);
-              List<String> _tmp = new File(finalDest).readAsLinesSync();
-
-              List _jsImports = [
-                "<link rel='import' href='${path.normalize(path.join(reversePath,relativePolymerElementPath(packageName,mapping)))}/polymerize.html'>",
-                "<link rel='import' href='${path.normalize(path.join(reversePath,packageName))}.mod.html'>"
-              ];
-
-              if (native) {
-                _jsImports.add("<link rel='import' href='${path.normalize(path.join(reversePath,relativePolymerElementPath(packageName,mapping)))}/native_import.html'>");
               }
+              post_dart.add( htmlImportTemplate(template: template, packageName: packageName, name: name, className: ce.name, tagName: tag, config: config, native: native, mapping: mapping));
 
-              _tmp = toImport.map((x) => "<link rel='import' href='${x}'>").toList()..addAll(_jsImports)..addAll(_tmp);
-
-              new File(finalDest).writeAsStringSync(
-                _tmp.join("\n") + htmlTemplate, /*mode: FileMode.APPEND*/
-              );
-              new File(destTemplate).writeAsStringSync(htmlTemplate);
             }
           } else if ((reg = getAnnotation(ce.metadata, isDefine)) != null) {
+            throw "NOT WORKING ANYMMORE, TO BE UPDATED";
+            /*
             String tag = reg.getField('tagName').toStringValue();
             String htmlFile = reg.getField('htmlFile').toStringValue();
 
@@ -327,6 +321,7 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
 
             String destTemplate = path.join(assetDir.path, rel);
             new File(destTemplate).writeAsStringSync(webComponentTemplate(packageName: packageName, name: name, className: ce.name, tagName: tag));
+            */
           }
         });
       });
@@ -376,9 +371,13 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
       //print("MAPPIUNG : ${mapping}");
       await html.writeAsString("""
 <link rel='import' href='${path.relative("dart_sdk.html",from:path.dirname(mapping[packageName]))}'>
-${importBowers(bower_imports)}
+${importBowers(bower_imports,from:path.dirname(mapping[packageName]))}
 ${importDeps(mapping,packageName)}
+${pre_dart.join("\n")}
+<!-- Module Dart -->
 <script src='${path.basename(js.path)}' as='${mapping[packageName]}'></script>
+<!-- components reg -->
+${post_dart.join("\n")}
 """);
     }
 
@@ -392,7 +391,7 @@ ${importDeps(mapping,packageName)}
   return sum.path;
 }
 
-importBowers(List<BowerImport> imports) => imports.map((b) => "<link rel='import' href='bower_components/${b.import}>").join("\n");
+importBowers(List<BowerImport> imports, {String from}) => imports.map((b) => "<link rel='import' href='${path.relative('bower_components',from:from)}/${b.import}'>").join("\n");
 
 class BowerImport {
   String ref;
