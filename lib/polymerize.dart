@@ -454,11 +454,10 @@ DartObject getAnnotation(
 
 String webComponentTemplate({String template, String packageName, String name, String className, String tagName}) => """
 <script>
-  define(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
+  require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
   polymerize.define('${tagName}',pkg.${name}.${className});
 });
-</script>
-""";
+</script>""";
 
 String polymerElementPath(Map<String, String> mapping) => _moduleForPackage('polymer_element', mapping: mapping);
 
@@ -467,19 +466,17 @@ String relativePolymerElementPath(String from, Map<String, String> mapping) => p
 String htmlImportTemplate({String template, String packageName, String name, String className, String tagName, Map config, bool native, Map<String, String> mapping}) => """
 ${native?nativePreloadScript(tagName,['PolymerElements',className],polymerElementPath(mapping)):""}
 <script>
-  define('${tagName}',['${_moduleForPackage(packageName,mapping:mapping)}/${packageName}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
+  require(['${_moduleForPackage(packageName,mapping:mapping)}/${packageName}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
 });
-</script>
-""";
+</script>""";
 
 String nativePreloadScript(String tagName, List<String> classPath, String polymerElementPath) => """
 <script>
- define('${tagName}-native-import',['${polymerElementPath}/native_import'],function(util) {
+ require(['${polymerElementPath}/native_import'],function(util) {
    util.importNative('${tagName}',${classPath.map((s) => '\'${s}\'').join(',')});
  });
-</script>
-""";
+</script>""";
 
 String configTemplate(Map config) => (config == null || config.isEmpty)
     ? "null"
@@ -631,10 +628,10 @@ main(List<String> args) {
     ..addCommand(
         'generate-wrapper',
         new ArgParser()
-          ..addOption('base-dir', abbr: 'b', help: 'base dir')
-          ..addOption('file-path', allowMultiple: true, abbr: 'f', help: 'file path')
-          ..addOption('package-name', abbr: 'p', help: 'dest packag')
-          ..addOption('output-path', allowMultiple: true, abbr: 'F', help: 'corresponding generated wrappers')
+          ..addOption('component-refs',help:'Components references yaml')
+          ..addOption('dest-path',help:'Destination path')
+          ..addOption('bower-needs-map',allowMultiple: true,help:'bower needs')
+          ..addOption('package-name', abbr: 'p', help: 'dest dart package name')
           ..addFlag('help', help: 'help on generate'))
     ..addCommand("bower", new ArgParser()..addOption("use-bower", allowMultiple: true, abbr: 'u', help: 'use bower')..addOption('output', abbr: 'o', help: 'output bower file'));
 
