@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:args/args.dart';
+import 'package:logging/logging.dart';
 import 'package:package_resolver/package_resolver.dart';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
@@ -30,7 +31,11 @@ class Generator {
 
   Map behaviors = <String, ImportedData>{};
 
-  String resolveImport(var descr) => packageMappings[descr['name']];
+  String resolveImport(var descr) =>
+      packageMappings[descr['name']] ??
+      (x) {
+        throw "Cannot resolve ${x}";
+      }(descr['name']);
 
   String resolveImportOld(var descr) {
     String behaviorName = descr['name'];
@@ -51,9 +56,8 @@ class Generator {
    * Analyzing a file
    */
   Future _analyze(String src, String baseDir) async {
-    print("Reading ${src}");
     PackageResolver resolver = PackageResolver.current;
-    String relPath = path.relative(src, from: baseDir);
+    String relPath = src;
 
     ProcessResult res = await Process.run('node', [(await resolver.resolveUri('package:polymerize/src/js/analyze.js')).toFilePath(), baseDir, relPath], stdoutEncoding: UTF8);
 
@@ -68,7 +72,7 @@ class Generator {
     try {
       analysisResult = JSON.decode(out);
     } catch (e) {
-      throw "Error while analizing ${src} from ${baseDir}";
+      throw "Error while analizing ${src} from ${baseDir} : ${e},${out}";
     }
     //var relPath = "src/${relPath}";
 
@@ -118,30 +122,33 @@ class Generator {
   }
 
   String _currentBowerRef;
-  Map<String,String> _bowerRefsByPath = {};
+  Map<String, String> _bowerRefsByPath = {};
 
-  _generateMappingFromNeeds(bowerNeeds) async {}
+  _generateMappingFromNeeds(bowerNeeds) async {
+    if (bowerNeeds == null) {
+      return;
+    }
 
-  _addInternalMapping(String dartPackageName, Map mappings, componentsRefs) {}
+    packageMappings.addAll(new Map.fromIterable(bowerNeeds.map((x) => x.split("=")), key: (x) => x[0], value: (x) => x[1]));
+  }
 
   _generateWrappers(String dartPackageName, componentsRefs, Map mappings, String destPath) async {
-    _addInternalMapping(dartPackageName, mappings, componentsRefs);
     await Future.wait(componentsRefs['components'].map((comp) => _generateWrapper(dartPackageName, comp, componentsRefs, mappings, destPath)));
 
     print("Resulting mappings :${packageMappings}");
 
-    analysisResults.forEach((p, res) {
+    for (String p in analysisResults.keys) {
       relPath = p;
-      analysisResult = res;
+      analysisResult = analysisResults[p];
       _currentBowerRef = _bowerRefsByPath[p];
 
-      _generateElements();
-      _generateBehaviors();
-    });
+      await _generateElements(path.join(destPath, "lib"));
+      await _generateBehaviors(path.join(destPath, "lib"));
+    }
   }
 
   Future<List<String>> _enlistFile(String destPath, String componentName, List<String> includes, List<String> excludes) async {
-    String from = path.join(destPath, 'bower_components', componentName);
+    String from = path.join(destPath, componentName);
     Iterable<Glob> includeGlobs = ((includes ?? ["${componentName}.html"]) as List).map((pat) => new Glob(pat));
     Iterable<Glob> excludeGlobs = ((excludes ?? []) as List).map((pat) => new Glob(pat));
     List result = [];
@@ -158,38 +165,50 @@ class Generator {
     String componentName = component['name'];
     String componentRef = component['ref'];
 
-    List paths = component['paths'] ?? await _enlistFile(destPath, componentName, component['includes'], component['excludes']);
+    String compDir = path.join(destPath, "bower_components");
+
+    List paths = component['paths'] ?? await _enlistFile(compDir, componentName, component['includes'], component['excludes']);
 
     if (paths.isEmpty) {
       throw "No files found for ${destPath}/${componentName}, please specify explicit `path` list in component entry or appropriate `includes` and `excludes` pattern lists";
     }
 
-    print("[${componentName}]: ${paths}");
+    //print("[${componentName}]: ${paths}");
 
     packageName = dartPackageName;
     inOutMap = mappings ?? {};
 
     await Future.wait(paths.map((p) async {
       // Read and analyze the source doc
-      var res = await _analyze(p, destPath);
-      _bowerRefsByPath[p]="${componentRef}";
+      //print("anal ${compDir}  ${p}");
+      var res = await _analyze(p, compDir);
+      //print("RES: ${res}");
+      _bowerRefsByPath[p] = "${componentRef}";
 
       var mineBehaviors = res['behaviors'].values.where((x) => x['main_file']);
       var mineElements = res['elements'].values.where((x) => x['main_file']);
 
+      inOutMap[p] = _outputFileFor(p);
+
       mineBehaviors.forEach((b) {
         // Fill the map
         packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
+        print("Analized ${b['name']}");
       });
 
       mineElements.forEach((b) {
         // Fill the map
         packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
+        print("Analized ${b['name']}");
       });
+
+      if (mineBehaviors.isEmpty && mineElements.isEmpty) {
+        new Logger("analzing phase").warning("${p} was empty");
+      }
     }));
-
-
   }
+
+  _outputFileFor(String p) => path.basenameWithoutExtension(p).replaceAll("-", "_") + ".dart";
 
   runGenerateWrapper(ArgResults params) async {
     // 1. legge il components.yaml
@@ -205,7 +224,7 @@ class Generator {
 
     var componentsRefs = loadYaml(await new File(componentRefsPath).readAsString());
 
-    print("Genrating wrappers with : ${componentsRefs['components'].map((c)=>c['name']).join(',')}");
+    //print("Genrating wrappers with : ${componentsRefs['components'].map((c)=>c['name']).join(',')}");
 
     await _generateBowerJson(componentsRefs, destPath);
 
@@ -214,64 +233,35 @@ class Generator {
     var mappings = await _generateMappingFromNeeds(bowerNeeds);
 
     await _generateWrappers(dartPackageName, componentsRefs, mappings, destPath);
-
-    if (1 == 1) {
-      return;
-    }
-
-    inOutMap = new Map.fromIterables(params['file-path'], params['output-path']);
-    packageName = params['package-name'];
-
-    //new res.Resource('package:polymerize/src/js/analyze.js');
-    //print("FILE TO PROCESS: ${params['file-path']}");
-    await Future.wait(params['file-path'].map((p) async {
-      // Read and analyze the source doc
-      var res = await _analyze(p, params['base-dir']);
-
-      var mineBehaviors = res['behaviors'].values.where((x) => x['main_file']);
-      var mineElements = res['elements'].values.where((x) => x['main_file']);
-
-      mineBehaviors.forEach((b) {
-        // Fill the map
-        packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
-      });
-
-      mineElements.forEach((b) {
-        // Fill the map
-        packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
-      });
-    }));
-
-    print("Resulting mappings :${packageMappings}");
-
-    analysisResults.forEach((p, res) {
-      relPath = p;
-      analysisResult = res;
-
-      _generateElements();
-      _generateBehaviors();
-    });
-//print("RES = ${result}");
   }
 
-  _generateElements() {
+  _generateElements(String destPath) async {
     Map<String, Map> elements = analysisResult['elements'];
     if (elements == null) return;
-    elements.forEach((name, descr) {
+    await Future.wait(elements.keys.map((name) async {
+      var descr = elements[name];
       if (!descr['main_file']) return;
       String res = _generateElement(name, _currentBowerRef, descr);
-      print(res);
-    });
+      await _writeDart(destPath, res);
+    }));
   }
 
-  _generateBehaviors() {
+  _generateBehaviors(String destPath) async {
     Map<String, Map> elements = analysisResult['behaviors'];
     if (elements == null) return;
-    elements.forEach((name, descr) {
+    await Future.wait(elements.keys.map((name) async {
+      var descr = elements[name];
       if (!descr['main_file']) return;
       String res = _generateBehavior(name, descr);
-      print(res);
-    });
+      await _writeDart(destPath, res);
+    }));
+  }
+
+  _writeDart(String destPath, String content) async {
+    String p = path.join(destPath, inOutMap[relPath]);
+    await new Directory(path.dirname(p)).create(recursive: true);
+    await new File(p).writeAsString(content);
+    print("Wrote ${p}");
   }
 
   _generateElement(String name, String bowerRef, Map descr) {
