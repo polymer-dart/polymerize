@@ -252,7 +252,7 @@ class Generator {
     await Future.wait(elements.keys.map((name) async {
       var descr = elements[name];
       if (!descr['main_file']) return;
-      String res = _generateBehavior(name, descr);
+      String res = _generateBehavior(name,_currentBowerRef, descr);
       await _writeDart(destPath, res);
     }));
   }
@@ -276,21 +276,16 @@ ${importBehaviors(relPath,name,descr)}
 
 ${generateComment(descr['description'])}
 
-abstract class PaperButtonBehavior {
-  bool get raised;
-  set raised(bool value);
-}
-
 //@JS('PaperButton')
 @PolymerRegister('${descr['name']}',native:true)
 @BowerImport(ref:'${bowerRef}',import:"${relPath}",name:'${descr['name']}')
-class ${name} extends PolymerElement ${withBehaviors(relPath,name,descr)} {
+abstract class ${name} extends PolymerElement ${withBehaviors(relPath,name,descr)} {
 ${generateProperties(relPath,name,descr,descr['properties'])}
 }
 """;
   }
 
-  _generateBehavior(String name, Map descr) {
+  _generateBehavior(String name,String bowerRef, Map descr) {
     _importPrefixes = {};
     return """
 @JS('PolymerElements')
@@ -302,21 +297,21 @@ ${importBehaviors(relPath,name,descr)}
 
 ${generateComment(descr['description'])}
 
-@PolymerRegister('${descr['name']}',template:'${relPath}',native:true,behavior:true)
-abstract class ${name}  ${withBehaviors(relPath,name,descr)} {
+@BowerImport(ref:'${bowerRef}',import:"${relPath}",name:'${descr['name']}')
+abstract class ${name.split('.').last} ${withBehaviors(relPath,name,descr,keyword:'implements')} {
 ${generateProperties(relPath,name,descr,descr['properties'])}
 }
 
 """;
   }
 
-  withBehaviors(String relPath, String name, Map descr) {
+  withBehaviors(String relPath, String name, Map descr,{String keyword:'with'}) {
     List behaviors = descr['behaviors'];
-    if (behaviors == null) {
+    if (behaviors == null||behaviors.isEmpty) {
       return "";
     }
 
-    return "with " + behaviors.map((behavior) => withBehavior(relPath, name, descr, behavior)).join(',');
+    return "${keyword} " + behaviors.map((behavior) => withBehavior(relPath, name, descr, behavior)).join(',');
   }
 
   withBehavior(String relPath, String name, Map descr, Map behavior) {
@@ -336,6 +331,14 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
 
   Map<String, String> _importPrefixes;
 
+  String _dartType(String jsType) => const {
+    'string' : 'String',
+    'boolean' : 'bool',
+    'Object' : '',
+    'number' :'num',
+    'Array' : 'List'
+  }[jsType] ?? jsType;
+
   importBehaviors(String relPath, String name, Map descr) => descr['behaviors'].map((b) {
         String prefix = "imp${_importPrefixes.length}";
         _importPrefixes[b['name']] = prefix;
@@ -352,7 +355,7 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
 
   generateProperty(String relPath, String name, Map descr, Map prop) => """
 ${generateComment(prop['description'],indent:2)}
-  ${prop['type']} get ${prop['name']}();
-  void set ${prop['name']}(${prop['type']} value);
+  ${_dartType(prop['type'])} get ${prop['name']};
+  set ${prop['name']}(${_dartType(prop['type'])} value);
 """;
 }

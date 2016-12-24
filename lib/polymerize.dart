@@ -260,16 +260,18 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
                   DartObject reg2 = getAnnotation(ce2.metadata, isPolymerRegister);
                   if (reg2 != null) {
                     String template2 = reg2.getField('template').toStringValue();
-                    // print(
-                    //    "Template : ${template2} , ${ce2.library.identifier} ,${ce2.source.uri}");
-                    // Calc root path or this template
+                    if (template2!=null) {
+                      // print(
+                      //    "Template : ${template2} , ${ce2.library.identifier} ,${ce2.source.uri}");
+                      // Calc root path or this template
 
-                    String path2 = path.joinAll([_moduleForUri(ce2.source.uri, mapping: mapping), template2]);
+                      String path2 = path.joinAll([_moduleForUri(ce2.source.uri, mapping: mapping), template2]);
 
-                    String relPath2 = path.relative(path2, from: pathThis);
-                    // print("PATH ${path2} from ${pathThis}");
-                    // print("Path relative : ${relPath2}");
-                    toImport.add(relPath2);
+                      String relPath2 = path.relative(path2, from: pathThis);
+                      // print("PATH ${path2} from ${pathThis}");
+                      // print("Path relative : ${relPath2}");
+                      toImport.add(relPath2);
+                    }
                   }
                 }
                 // Lookup for an annotation
