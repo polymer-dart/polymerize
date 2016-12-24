@@ -152,7 +152,7 @@ class Generator {
     Iterable<Glob> includeGlobs = ((includes ?? ["${componentName}.html"]) as List).map((pat) => new Glob(pat));
     Iterable<Glob> excludeGlobs = ((excludes ?? []) as List).map((pat) => new Glob(pat));
     List result = [];
-    await for (FileSystemEntity entry in new Directory(from).list()) {
+    await for (FileSystemEntity entry in new Directory(from).list(recursive: true)) {
       if (entry is File) {
         String rel = path.relative(entry.path, from: from);
         if (includeGlobs.any((g) => g.matches(rel)) && excludeGlobs.every((g) => !g.matches(rel))) result.add("${componentName}/${rel}");
@@ -336,7 +336,8 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
     'boolean' : 'bool',
     'Object' : '',
     'number' :'num',
-    'Array' : 'List'
+    'Array' : 'List',
+    'HTMLElement' : 'HtmlElement'
   }[jsType] ?? jsType;
 
   importBehaviors(String relPath, String name, Map descr) => descr['behaviors'].map((b) {

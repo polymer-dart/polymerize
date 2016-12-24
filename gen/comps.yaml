@@ -1,10 +1,29 @@
 components:
+ - name: iron-list
+   ref : "PolymerElements/iron-list#2.0-preview"
+
+ - name: paper-spinner
+   ref : "PolymerElements/paper-spinner#2.0-preview"
+   includes:
+    - "*.html"
+   excludes:
+    - index.html
+    - all-imports.html
+ - name : "iron-scroll-target-behavior" 
+   ref : "PolymerElements/iron-scroll-target-behavior#2.0-preview"
+   
+ - name : "paper-card" 
+   ref : "PolymerElements/paper-card#2.0-preview"
+
  - name : "paper-material" 
    ref : "PolymerElements/paper-material#2.0-preview"
+
  - name : "paper-button" 
    ref : "PolymerElements/paper-button#2.0-preview"
+
  - name :  "paper-radio-button"
    ref : "PolymerElements/paper-radio-button#2.0-preview"
+
  - name :    "paper-input"
    ref : "PolymerElements/paper-input#2.0-preview"
    includes:
@@ -12,21 +31,22 @@ components:
    excludes:
     - index.html
     - all-imports.html
+
  - name :    "paper-checkbox"
    ref : "PolymerElements/paper-checkbox#2.0-preview"
+
  - name :    "iron-flex-layout"
    ref : "PolymerElements/iron-flex-layout#2.0-preview"
+
  - name :    "iron-icon"
    ref : "PolymerElements/iron-icon#2.0-preview"
+
  - name :    "iron-icons"
    ref : "PolymerElements/iron-icons#2.0-preview"
+
  - name : "iron-form-element-behavior"
    ref : "PolymerElements/iron-form-element-behavior#2.0-preview"
 
-
- #
- # Example with patterns
- #
  - name :    "iron-behaviors"
    ref : "PolymerElements/iron-behaviors#2.0-preview"
    includes:
@@ -41,13 +61,16 @@ components:
    excludes:
     - index.html
     - all-imports.html
+
  - name :    "neon-animation"
    ref : "PolymerElements/neon-animation#2.0-preview"
    includes:
     - "*.html"
+    - "animations/*.html"
    excludes:
     - index.html
     - all-imports.html
+
  - name :    "iron-selector"
    ref : "PolymerElements/iron-selector#2.0-preview"
    includes:
@@ -55,9 +78,7 @@ components:
    excludes:
     - index.html
     - all-imports.html
- #
- # An Example with explicit paths
- #
+
  - name :    "paper-behaviors"
    ref : "PolymerElements/paper-behaviors#2.0-preview"
    paths:
@@ -68,12 +89,16 @@ components:
 
  - name: 'paper-dialog-behavior'
    ref: 'PolymerElements/paper-dialog-behavior#2.0-preview'
+
  - name: 'iron-resizable-behavior'
    ref: 'PolymerElements/iron-resizable-behavior#2.0-preview'
+
  - name: 'iron-fit-behavior'
    ref: 'PolymerElements/iron-fit-behavior#2.0-preview'
+
  - name :    "paper-ripple"
    ref : "PolymerElements/paper-ripple#2.0-preview"
+
  - name :    "paper-dialog"
    ref : "PolymerElements/paper-dialog#2.0-preview"
    includes:
@@ -84,13 +109,18 @@ components:
 
  - name :    "iron-meta"
    ref : "PolymerElements/iron-meta#2.0-preview"
+
  - name :    "paper-icon-button"
    ref : "PolymerElements/paper-icon-button#2.0-preview"
+
  - name :    "iron-input"
    ref : "PolymerElements/iron-input#2.0-preview"
+
  - name :    "iron-a11y-keys-behavior"
    ref : "PolymerElements/iron-a11y-keys-behavior#2.0-preview"
+
  - name :    "iron-checked-element-behavior"
    ref : "PolymerElements/iron-checked-element-behavior#2.0-preview"
+
  - name :    "iron-validatable-behavior"
    ref : "PolymerElements/iron-validatable-behavior#2.0-preview"
