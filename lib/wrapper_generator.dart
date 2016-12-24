@@ -121,8 +121,8 @@ class Generator {
     }
   }
 
-  String _currentBowerRef;
-  Map<String, String> _bowerRefsByPath = {};
+  var _currentBowerRef;
+  Map<String, dynamic> _bowerRefsByPath = {};
 
   _generateMappingFromNeeds(bowerNeeds) async {
     if (bowerNeeds == null) {
@@ -183,7 +183,7 @@ class Generator {
       //print("anal ${compDir}  ${p}");
       var res = await _analyze(p, compDir);
       //print("RES: ${res}");
-      _bowerRefsByPath[p] = "${componentRef}";
+      _bowerRefsByPath[p] = component;
 
       var mineBehaviors = res['behaviors'].values.where((x) => x['main_file']);
       var mineElements = res['elements'].values.where((x) => x['main_file']);
@@ -264,7 +264,7 @@ class Generator {
     print("Wrote ${p}");
   }
 
-  _generateElement(String name, String bowerRef, Map descr) {
+  _generateElement(String name, var bowerRef, Map descr) {
     _importPrefixes = {};
     return """
 @JS('PolymerElements')
@@ -278,14 +278,14 @@ ${generateComment(descr['description'])}
 
 //@JS('PaperButton')
 @PolymerRegister('${descr['name']}',native:true)
-@BowerImport(ref:'${bowerRef}',import:"${relPath}",name:'${descr['name']}')
+@BowerImport(ref:'${bowerRef['ref']}',import:"${relPath}",name:'${bowerRef['name']}')
 abstract class ${name} extends PolymerElement ${withBehaviors(relPath,name,descr)} {
 ${generateProperties(relPath,name,descr,descr['properties'])}
 }
 """;
   }
 
-  _generateBehavior(String name,String bowerRef, Map descr) {
+  _generateBehavior(String name,var bowerRef, Map descr) {
     _importPrefixes = {};
     return """
 @JS('PolymerElements')
@@ -297,7 +297,7 @@ ${importBehaviors(relPath,name,descr)}
 
 ${generateComment(descr['description'])}
 
-@BowerImport(ref:'${bowerRef}',import:"${relPath}",name:'${descr['name']}')
+@BowerImport(ref:'${bowerRef['ref']}',import:"${relPath}",name:'${bowerRef['name']}')
 abstract class ${name.split('.').last} ${withBehaviors(relPath,name,descr,keyword:'implements')} {
 ${generateProperties(relPath,name,descr,descr['properties'])}
 }

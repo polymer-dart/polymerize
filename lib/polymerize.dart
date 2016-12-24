@@ -700,11 +700,11 @@ main(List<String> args) {
 runBowerMode(ArgResults res) async {
   File dest = new File(res['output']);
 
-  List allDeps=[];
+  Map<String,String> allDeps={};
 
   for (String dep in res['use-bower']) {
     List cont = await new File(dep).readAsLines();
-    if (cont != null) allDeps.addAll(cont);
+    if (cont != null) allDeps.addAll(new Map.fromIterable(cont,key:(x)=>x.split(":")[0].trim()));
   }
 
 
@@ -718,7 +718,7 @@ runBowerMode(ArgResults res) async {
   ],
   "private": true,
   "dependencies": {
-    ${allDeps.join(",\n")}
+    ${allDeps.values.join(",\n")}
   }
 }
 """);
