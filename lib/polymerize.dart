@@ -726,7 +726,7 @@ runBowerMode(ArgResults res) async {
   //File c = new File(path.join(tmp.path,"bower.json"));
   //dest.copySync(c.path);
   print("Downloading JS components");
-  ProcessResult x = await Process.run("/usr/local/bin/bower", ["install", "-s"], workingDirectory: tmp.path, environment: {"HOME": tmp.path});
+  ProcessResult x = await Process.run("bower", ["install", "-s"], workingDirectory: tmp.path, environment: {"HOME": tmp.path});
   print("Bower install finished : ${x.stdout} , ${x.stderr}");
 }
 
