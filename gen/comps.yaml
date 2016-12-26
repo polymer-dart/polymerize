@@ -1,4 +1,11 @@
 components:
+ - name: app-layout
+   ref: "PolymerElements/app-layout#2.0-preview"
+   includes:
+    - "**/app-*.html"
+   excludes:
+    - "**/test/*"
+
  - name: iron-list
    ref : "PolymerElements/iron-list#2.0-preview"
 
