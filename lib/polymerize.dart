@@ -129,7 +129,7 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
   Directory assetDir = new Directory(path.join(summaryDest.path, "assets"));
 
   List bower_imports = <BowerImport>[];
-  List pre_dart=<String>[];
+  List pre_dart = <String>[];
   List post_dart = <String>[];
   bool native_imported = false;
   bool polymerize_imported = false;
@@ -260,7 +260,7 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
                   DartObject reg2 = getAnnotation(ce2.metadata, isPolymerRegister);
                   if (reg2 != null) {
                     String template2 = reg2.getField('template').toStringValue();
-                    if (template2!=null) {
+                    if (template2 != null) {
                       // print(
                       //    "Template : ${template2} , ${ce2.library.identifier} ,${ce2.source.uri}");
                       // Calc root path or this template
@@ -292,21 +292,21 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
             //print("ADJUSTED TEMPLATE : ${templatePath} -> ${finalDest}");
 
             //if (templatePath!=null && new File(templatePath).existsSync()) {
-              //print("found ${templatePath} -> ${destTemplate}");
+            //print("found ${templatePath} -> ${destTemplate}");
 
-              if (native && !native_imported) {
-                post_dart.add("<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
-                native_imported = true;
-              } else if (!native) {
-                // TODO : embed template here ?
-                pre_dart.add("<link rel='import' href='${path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html']))}'>");
-              }
-              if (!polymerize_imported) {
-                post_dart.add("<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
-                polymerize_imported=true;
-
-              }
-              post_dart.add( htmlImportTemplate(template: template, packageName: packageName, name: name, className: ce.name, tagName: tag, config: config, native: native, mapping: mapping));
+            if (native && !native_imported) {
+              post_dart.add("<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
+              native_imported = true;
+            } else if (!native) {
+              // TODO : embed template here ?
+              pre_dart.add("<link rel='import' href='${path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html']))}'>");
+            }
+            if (!polymerize_imported) {
+              post_dart.add("<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
+              polymerize_imported = true;
+            }
+            post_dart.add(
+                htmlImportTemplate(template: template, packageName: packageName, name: name, className: ce.name, tagName: tag, config: config, native: native, mapping: mapping));
 
             //}
           } else if ((reg = getAnnotation(ce.metadata, isDefine)) != null) {
@@ -399,13 +399,13 @@ class BowerImport {
   String ref;
   String import;
   String name;
-  BowerImport({this.ref, this.import,this.name});
+  BowerImport({this.ref, this.import, this.name});
 }
 
 Iterable bowerImportsFor(ClassElement e) sync* {
   DartObject ref = getAnnotation(e.metadata, isBowerImport);
   if (ref != null) {
-    yield new BowerImport(ref:ref.getField("ref").toStringValue(), import:ref.getField("import").toStringValue(),name:ref.getField("name").toStringValue());
+    yield new BowerImport(ref: ref.getField("ref").toStringValue(), import: ref.getField("import").toStringValue(), name: ref.getField("name").toStringValue());
   }
 }
 
@@ -630,12 +630,18 @@ main(List<String> args) {
     ..addCommand(
         'generate-wrapper',
         new ArgParser()
-          ..addOption('component-refs',help:'Components references yaml')
-          ..addOption('dest-path',help:'Destination path')
-          ..addOption('bower-needs-map',allowMultiple: true,help:'bower needs')
+          ..addOption('component-refs', help: 'Components references yaml')
+          ..addOption('dest-path', help: 'Destination path')
+          ..addOption('bower-needs-map', allowMultiple: true, help: 'bower needs')
           ..addOption('package-name', abbr: 'p', help: 'dest dart package name')
           ..addFlag('help', help: 'help on generate'))
-    ..addCommand("bower", new ArgParser()..addOption("use-bower", allowMultiple: true, abbr: 'u', help: 'use bower')..addOption('output', abbr: 'o', help: 'output bower file'));
+    ..addCommand(
+        "bower",
+        new ArgParser()
+          ..addOption("resolution-key", abbr: "r", allowMultiple: true)
+          ..addOption("resolution-value", abbr: "R", allowMultiple: true)
+          ..addOption("use-bower", allowMultiple: true, abbr: 'u', help: 'use bower')
+          ..addOption('output', abbr: 'o', help: 'output bower file'));
 
   // Configure logger
   log.Logger.root.onRecord.listen((log.LogRecord rec) {
@@ -700,29 +706,19 @@ main(List<String> args) {
 runBowerMode(ArgResults res) async {
   File dest = new File(res['output']);
 
-  Map<String,String> allDeps={};
+  Map<String, String> allDeps = {};
 
   for (String dep in res['use-bower']) {
     List cont = await new File(dep).readAsLines();
-    if (cont != null) allDeps.addAll(new Map.fromIterable(cont,key:(x)=>x.split(":")[0].trim()));
+    if (cont != null) allDeps.addAll(JSON.decode("{${cont.join(",")}}"));
   }
 
-
-  await dest.writeAsString("""
-{
-  "name": "_bower_generatede_",
-  "version": "0.0.0",
-  "homepage": "https://",
-  "authors": [
-    "VB <vittorio.ballestra@drafintech.it>"
-  ],
-  "private": true,
-  "dependencies": {
-    ${allDeps.values.join(",\n")}
-  }
-}
-""");
-
+  await dest.writeAsString(JSON.encode({
+    "name": "_polymerize_generated_bower_file_",
+    "private": true,
+    "dependencies": allDeps,
+    "resolutions": new Map.fromIterables(res['resolution-key'], res['resolution-value'])
+  }));
   // Execute bower
   Directory tmp = new Directory(path.absolute(path.dirname(dest.path)));
   print("Running bower with ${dest.path}");
@@ -730,9 +726,7 @@ runBowerMode(ArgResults res) async {
   //File c = new File(path.join(tmp.path,"bower.json"));
   //dest.copySync(c.path);
   print("Downloading JS components");
-  ProcessResult x = await Process.run("/usr/local/bin/bower",["install","-s"],workingDirectory: tmp.path,environment: {
-    "HOME":tmp.path
-  });
+  ProcessResult x = await Process.run("/usr/local/bin/bower", ["install", "-s"], workingDirectory: tmp.path, environment: {"HOME": tmp.path});
   print("Bower install finished : ${x.stdout} , ${x.stderr}");
 }
 
