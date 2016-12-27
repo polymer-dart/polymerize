@@ -304,7 +304,7 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
               native_imported = true;
             } else if (!native) {
               // TODO : embed template here ?
-              pre_dart.add("<link rel='import' href='${path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html']))}'>");
+              pre_dart.add("<link rel='import' href='${path.normalize(path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html'])))}'>");
             }
             if (!polymerize_imported) {
               post_dart.add("<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
@@ -473,7 +473,7 @@ String relativePolymerElementPath(String from, Map<String, String> mapping) => p
 String htmlImportTemplate({String template, String packageName, String name, String className, String tagName, Map config, bool native, Map<String, String> mapping}) => """
 ${native?nativePreloadScript(tagName,['PolymerElements',className],polymerElementPath(mapping)):""}
 <script>
-  require(['${_moduleForPackage(packageName,mapping:mapping)}/${packageName}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
+  require(['${path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName)}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
 });
 </script>""";
