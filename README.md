@@ -34,8 +34,9 @@ In theory all you have to do is start using bazel rules and enjoy your building.
 
 But unfortunately maintaining bazel build file is not an easy task, expecially when dealing with transitive dependencies.
 
-`polymerize` can be used to automatically generate all that stuff for you from your `pubspec.yaml` (and resolved lock file). 
-You only have to write and maitain your `pubspec.yaml` and  `polymerize init -y <path-to-root-pubspec.yaml` after installing the polymerize tool:
+`polymerize` can be used to automatically generate and update all the `bazel` stuff for you from your `pubspec.yaml` (and resolved lock file). 
+
+With that all you have to do is to write and maitain your usual `pubspec.yaml` and then run `polymerize init -y <path-to-root-pubspec.yaml` (after installing the polymerize tool):
 
     pub global activate polymerize  # <-- to install the tool
     
@@ -80,7 +81,7 @@ This is a sample component definition:
       factory MyTag.tag() => Element.tag('my-tag'); // <- If you want to create it programmatically use this
 
       connectedCallback() {
-        super.connectedCallback(); // <- MUST BE CALLED !!!!
+        super.connectedCallback(); // <- super MUST BE CALLED if you override this callback (needed by webcomponents v1) !!!!
       }
     }
 
