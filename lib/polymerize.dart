@@ -17,8 +17,11 @@ import 'package:resource/resource.dart' as res;
 import 'package:args/args.dart';
 import 'package:homedir/homedir.dart' as user;
 import 'package:logging/logging.dart' as log;
-import 'package:archive/archive.dart';
-import 'package:polymerize/wrapper_generator.dart';
+
+import 'package:polymerize/src/wrapper_generator.dart';
+import 'package:polymerize/src/bower_command.dart';
+import 'package:polymerize/src/init_command.dart';
+import 'package:polymerize/src/pub_command.dart';
 
 const Map<ModuleFormat, String> _formatToString = const {ModuleFormat.amd: 'amd', ModuleFormat.es6: 'es6', ModuleFormat.common: 'common', ModuleFormat.legacy: 'legacy'};
 
@@ -635,6 +638,7 @@ main(List<String> args) {
           ..addOption('bower-needs-map', allowMultiple: true, help: 'bower needs')
           ..addOption('package-name', abbr: 'p', help: 'dest dart package name')
           ..addFlag('help', help: 'help on generate'))
+    ..addCommand('init', new ArgParser()..addOption('pubspec', abbr: 'y', help: 'Path to the root pubspec'))
     ..addCommand(
         "bower",
         new ArgParser()
@@ -683,6 +687,12 @@ main(List<String> args) {
     return;
   }
 
+  if (results.command?.name == 'init') {
+    runInit(results.command);
+    return;
+
+  }
+
   if (results.command?.name == 'generate-wrapper') {
     if (results.command['help']) {
       print("generate-wrapper usage :\n${parser.commands['generate-wrapper'].usage}");
@@ -703,72 +713,7 @@ main(List<String> args) {
   });
 }
 
-runBowerMode(ArgResults res) async {
-  File dest = new File(res['output']);
-
-  Map<String, String> allDeps = {};
-
-  for (String dep in res['use-bower']) {
-    List cont = await new File(dep).readAsLines();
-    if (cont != null) allDeps.addAll(JSON.decode("{${cont.join(",")}}"));
-  }
-
-  await dest.writeAsString(JSON.encode({
-    "name": "_polymerize_generated_bower_file_",
-    "private": true,
-    "dependencies": allDeps,
-    "resolutions": new Map.fromIterables(res['resolution-key'], res['resolution-value'])
-  }));
-  // Execute bower
-  Directory tmp = new Directory(path.absolute(path.dirname(dest.path)));
-  print("Running bower with ${dest.path}");
-  //tmp.createSync(recursive: true);
-  //File c = new File(path.join(tmp.path,"bower.json"));
-  //dest.copySync(c.path);
-  print("Downloading JS components");
-  ProcessResult x = await Process.run("bower", ["install", "-s"], workingDirectory: tmp.path, environment: {"HOME": tmp.path});
-  print("Bower install finished : ${x.stdout} , ${x.stderr}");
-}
-
 const Map _HEADERS = const {"Content-Type": "application/json"};
-
-Future runPubMode(ArgResults params) async {
-  // Ask pub to download
-  var baseApiUrl = params['pub-host'] ?? "https://pub.dartlang.org/api";
-  var url = "$baseApiUrl/packages/${params['package']}";
-  HttpClient client = new HttpClient();
-  HttpClientRequest req = await client.getUrl(Uri.parse(url));
-  req.headers.contentType = new ContentType('application', 'json');
-  HttpClientResponse response = await req.close();
-  if (response.statusCode >= 300) {
-    throw "error resp";
-  }
-
-  String body = await response.transform(UTF8.decoder).fold("", (a, b) => a + b);
-
-  Map res = JSON.decode(body);
-
-  Map ver = res['versions'].firstWhere((Map x) => x['version'] == params['version']);
-
-  String archive_url = ver['archive_url'];
-
-  // print("RES: ${archive_url}");
-
-  req = await client.getUrl(Uri.parse(archive_url));
-  response = await req.close();
-  List<int> allBytes = [];
-  await response.transform(GZIP.decoder).forEach((x) => allBytes.addAll(x));
-
-  Archive a = new TarDecoder().decodeBytes(allBytes);
-
-  a.files.forEach((f) {
-    new File(path.join(params['dest'], f.name))
-      ..createSync(recursive: true)
-      ..writeAsBytesSync(f.content);
-  });
-
-  client.close();
-}
 
 Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath, ModuleFormat fmt, ArgResults params) async {
   String packageName = params['package_name'];
