@@ -26,30 +26,33 @@ builtin path and this will be fixed very soon.
 
 Bazel doesn't work on windows system for now because dart `dev_compiler` is not ready for windows, so... sorry guys.
 
-## Install
+## Install 
 
 This tool is actually used internally by bazel rules so you don't really need to install it (bazel will do that for you).
-All you have to do is start using bazel rules and enjoy your building. 
 
-But maintaining bazel build file is not an easy task, expecially when dealing with transitive dependencies.
+In theory all you have to do is start using bazel rules and enjoy your building. 
 
-So you can let `polymerize` generate all that stuff for you, so that you have only to write your `pubspec.yaml` and 
-than use `polymerize init -y <path-to-root-pubspec.yaml` after installing the polymerize tool:
+But unfortunately maintaining bazel build file is not an easy task, expecially when dealing with transitive dependencies.
+
+`polymerize` can be used to automatically generate all that stuff for you from your `pubspec.yaml` (and resolved lock file). 
+You only have to write and maitain your `pubspec.yaml` and  `polymerize init -y <path-to-root-pubspec.yaml` after installing the polymerize tool:
 
     pub global activate polymerize  # <-- to install the tool
     
     polymerize init -y pubspec.yaml # <-- to auto generate or update bazel build files
 
+If you update any `pubspec.yaml` just launch `polymerize init -y pubspec.yaml` again to have your `WORKSPACE` and `BUILD`s file updated accordingly.
 
-## Usage
+# Develping with polymerize
+
+## Sample project
 
 A sample project demostrating how to build `polymer-2` components using `polymerize` can be found here :
  - [Sample mini todo APP for Polymer2-Dart-DDC Project](https://github.com/dam0vm3nt/todo_ddc)
 
 See the [README](https://github.com/dam0vm3nt/polymer_dcc/blob/master/README.md) for more information.
 
-
-### Component definition
+## Component definition
 
 This is a sample component definition:
 
@@ -87,7 +90,7 @@ the annoying *unused import* analyzer warning when a component is imported but r
 
 The `index.html` should preload `imd`, `webcomponents` polyfill and `polymer.html` (see the demo).
 
-### Importing a Bower component
+## Importing a Bower component
 
 To import a bower component and use it in your project simply create a stub for it and use the `@BowerImport` annotation along with `@PolymerRegister` with `native=true`, for instance:
 
