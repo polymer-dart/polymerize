@@ -78,21 +78,21 @@ class PackageGraph {
     /// Create all [PackageNode]s for all deps.
     var nodes = <String, PackageNode>{};
     Map<String, dynamic> rootDeps;
-    PackageNode addNodeAndDeps(YamlMap yaml, PackageDependencyType type,
-        {bool isRoot: false}) {
+    Map<String, dynamic> lockDeps =  _depsFromLock(path.join(packagePath,"pubspec.lock"));
+    PackageNode addNodeAndDeps(YamlMap yaml, PackageDependencyType type) {
       var name = yaml['name'];
       assert(!nodes.containsKey(name));
       var node =
           new PackageNode(name, yaml['version'], type, packageLocations[name]);
       nodes[name] = node;
-
+      bool isRoot = type==PackageDependencyType.root;
       var deps = _depsFromYaml(yaml, isRoot: isRoot);
       if (isRoot) rootDeps = deps;
       deps.forEach((name, source) {
         var dep = nodes[name];
         if (dep == null) {
           var pubspec = _pubspecForUri(packageLocations[name]);
-          dep = addNodeAndDeps(pubspec, _dependencyType(rootDeps[name]));
+          dep = addNodeAndDeps(pubspec, _dependencyType(lockDeps[name]));
         }
         node.dependencies.add(dep);
       });
@@ -101,7 +101,7 @@ class PackageGraph {
     }
 
     var root =
-        addNodeAndDeps(rootYaml, PackageDependencyType.path, isRoot: true);
+        addNodeAndDeps(rootYaml, PackageDependencyType.root);
     return new PackageGraph._(root, nodes);
   }
 
@@ -121,6 +121,8 @@ class PackageGraph {
     return buffer.toString();
   }
 }
+
+_depsFromLock(String lockFile) => loadYaml(new File(lockFile).readAsStringSync())['packages'];
 
 /// A node in a [PackageGraph].
 class PackageNode {
@@ -152,22 +154,18 @@ class PackageNode {
 
 /// The type of dependency being used. This dictates how the package should be
 /// watched for changes.
-enum PackageDependencyType { pub, github, path }
+enum PackageDependencyType { pub, github, path,root}
 
 PackageDependencyType _dependencyType(source) {
-  if (source is String || source == null) return PackageDependencyType.pub;
-
-  assert(source is YamlMap);
-  assert(source.keys.length == 1);
-
-  var typeString = source.keys.first;
-  switch (typeString) {
-    case 'git':
-      return PackageDependencyType.github;
+  switch(source['source']) {
+    case 'hosted':
+      return PackageDependencyType.pub;
     case 'path':
       return PackageDependencyType.path;
+    case 'git':
+      return PackageDependencyType.github;
     default:
-      throw 'Unrecognized package dependency type `$typeString`';
+      throw "Unknown dep ${source['source']}";
   }
 }
 
