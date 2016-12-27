@@ -12,7 +12,7 @@ _depsFor(PackageNode n) => n.dependencies.map((PackageNode d) => '"@${d.name}//:
 _depsFor2(PackageNode g, PackageNode root) => g.dependencies.map((PackageNode n) => _asDep(n, root)).join(",");
 
 _asDep(PackageNode n, PackageNode root) {
-  if (n.dependencyType==PackageDependencyType.root) {
+  if (n.dependencyType == PackageDependencyType.root) {
     return '":${n.name}"';
   }
   if (n.dependencyType != PackageDependencyType.path || _isExternal(n, root)) {
@@ -31,7 +31,14 @@ dart_library(
   name='${n.name}',
   deps= [${_depsFor(n)}],
   package_name='${n.name}',
+  pub_host = '${n.source['description']['url']}',
   version='${n.version}')
+""",
+          PackageDependencyType.github: (PackageNoden) => """git_repository(
+    name = "${n.name}",
+    remote = "${n.source['description']['url']}",
+    tag = "${n.source['description']['ref']}",
+)
 """,
           PackageDependencyType.path: (PackageNode n) => _isExternal(n, g.root)
               ? """
@@ -49,11 +56,12 @@ dart_library(
     .where((x) => x != null)
     .join("\n\n");
 
-_generateWorkspaceFile(PackageGraph g, String destDir) async {
-  File workspace = new File(path.join(destDir, "WORKSPACE.new"));
+_generateWorkspaceFile(PackageGraph g, String destDir,{String developHome}) async {
+  File workspace = new File(path.join(destDir, "WORKSPACE"));
   print(g.allPackages.values.map((PackageNode p) => p.toString()).join("\n"));
 
-  await workspace.writeAsString("""
+  if (developHome==null) {
+    await workspace.writeAsString("""
 # Polymerize rules repository
 git_repository(
  name='polymerize',
@@ -76,6 +84,32 @@ init_polymerize()
 ${_libDeps(g)}
 
 """);
+  } else {
+    await workspace.writeAsString("""
+# Polymerize rules repository
+
+local_repository(
+ name='polymerize',
+ path='${path.join(developHome,'bazel_polymerize_rules')}'
+)
+
+# Load Polymerize rules
+load('@polymerize//:polymerize_workspace.bzl',
+    'dart_library',
+    'init_polymerize')
+
+# Init
+init_local_polymerize('${path.join(developHome,'polymerize')}')
+
+
+##
+## All the dart libraries we depend on
+##
+
+${_libDeps(g)}
+
+""");
+  }
 }
 
 _generateBuildFiles(PackageNode g, PackageNode r, String destDir, {Iterable<PackageNode> allPackages}) async {
@@ -85,7 +119,7 @@ _generateBuildFiles(PackageNode g, PackageNode r, String destDir, {Iterable<Pack
   }));
 
   // Then us
-  String dd = path.join(g.location.toFilePath(), "BUILD.new");
+  String dd = path.join(g.location.toFilePath(), "BUILD");
   print("Loc : ${dd}");
   if (g.dependencyType == PackageDependencyType.root)
     await new File(dd).writeAsString("""
@@ -159,7 +193,8 @@ polymer_library(
 
 runInit(ArgResults args) async {
   var mainDir = path.dirname(args['pubspec']);
+  String develop = args['develop'];
   PackageGraph g = new PackageGraph.forPath(mainDir);
-  await _generateWorkspaceFile(g, mainDir);
+  await _generateWorkspaceFile(g, mainDir,developHome:develop!=null?path.canonicalize(develop):null);
   await _generateBuildFiles(g.root, g.root, mainDir, allPackages: g.allPackages.values);
 }

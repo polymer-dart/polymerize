@@ -638,7 +638,11 @@ main(List<String> args) {
           ..addOption('bower-needs-map', allowMultiple: true, help: 'bower needs')
           ..addOption('package-name', abbr: 'p', help: 'dest dart package name')
           ..addFlag('help', help: 'help on generate'))
-    ..addCommand('init', new ArgParser()..addOption('pubspec', abbr: 'y', help: 'Path to the root pubspec'))
+    ..addCommand(
+        'init',
+        new ArgParser()
+          ..addOption('pubspec', abbr: 'y', help: 'Path to the root pubspec')
+          ..addOption('develop', help: "enable polymerize develop mode, with repo home at the given path"))
     ..addCommand(
         "bower",
         new ArgParser()
@@ -690,7 +694,6 @@ main(List<String> args) {
   if (results.command?.name == 'init') {
     runInit(results.command);
     return;
-
   }
 
   if (results.command?.name == 'generate-wrapper') {

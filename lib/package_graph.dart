@@ -83,7 +83,7 @@ class PackageGraph {
       var name = yaml['name'];
       assert(!nodes.containsKey(name));
       var node =
-          new PackageNode(name, yaml['version'], type, packageLocations[name]);
+          new PackageNode(name, yaml['version'], type, packageLocations[name],lockDeps[name]);
       nodes[name] = node;
       bool isRoot = type==PackageDependencyType.root;
       var deps = _depsFromYaml(yaml, isRoot: isRoot);
@@ -141,7 +141,9 @@ class PackageNode {
   /// The location of the current version of this package.
   final Uri location;
 
-  PackageNode(this.name, this.version, this.dependencyType, this.location);
+  final  source;
+
+  PackageNode(this.name, this.version, this.dependencyType, this.location,this.source);
 
   @override
   String toString() => '''
