@@ -28,10 +28,18 @@ Bazel doesn't work on windows system for now because dart `dev_compiler` is not 
 
 ## Install
 
-This tool is actually used internally by bazel rules so you don't need to install it (bazel will do that for you).
-All you have to do is start using bazel rules and enjoy. 
+This tool is actually used internally by bazel rules so you don't really need to install it (bazel will do that for you).
+All you have to do is start using bazel rules and enjoy your building. 
 
-If you want to learn more, check out the sample project (see below).
+But maintaining bazel build file is not an easy task, expecially when dealing with transitive dependencies.
+
+So you can let `polymerize` generate all that stuff for you, so that you have only to write your `pubspec.yaml` and 
+than use `polymerize init -y <path-to-root-pubspec.yaml` after installing the polymerize tool:
+
+    pub global activate polymerize  # <-- to install the tool
+    
+    polymerize init -y pubspec.yaml # <-- to auto generate or update bazel build files
+
 
 ## Usage
 

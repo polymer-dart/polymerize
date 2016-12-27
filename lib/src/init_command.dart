@@ -31,7 +31,7 @@ dart_library(
   name='${n.name}',
   deps= [${_depsFor(n)}],
   package_name='${n.name}',
-  pub_host = '${n.source['description']['url']}',
+  pub_host = '${n.source['description']['url']}/api',
   version='${n.version}')
 """,
           PackageDependencyType.github: (PackageNoden) => """git_repository(
@@ -58,7 +58,7 @@ dart_library(
 
 _generateWorkspaceFile(PackageGraph g, String destDir,{String developHome}) async {
   File workspace = new File(path.join(destDir, "WORKSPACE"));
-  print(g.allPackages.values.map((PackageNode p) => p.toString()).join("\n"));
+  //print(g.allPackages.values.map((PackageNode p) => p.toString()).join("\n"));
 
   if (developHome==null) {
     await workspace.writeAsString("""
@@ -96,7 +96,7 @@ local_repository(
 # Load Polymerize rules
 load('@polymerize//:polymerize_workspace.bzl',
     'dart_library',
-    'init_polymerize')
+    'init_local_polymerize')
 
 # Init
 init_local_polymerize('${path.join(developHome,'polymerize')}')
@@ -120,7 +120,7 @@ _generateBuildFiles(PackageNode g, PackageNode r, String destDir, {Iterable<Pack
 
   // Then us
   String dd = path.join(g.location.toFilePath(), "BUILD");
-  print("Loc : ${dd}");
+  //print("Loc : ${dd}");
   if (g.dependencyType == PackageDependencyType.root)
     await new File(dd).writeAsString("""
 load("@polymerize//:polymerize.bzl", "polymer_library", "bower")

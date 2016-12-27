@@ -26,7 +26,7 @@ Future runPubMode(ArgResults params) async {
 
   String archive_url = ver['archive_url'];
 
-  // print("RES: ${archive_url}");
+  print("RES: ${archive_url}");
 
   req = await client.getUrl(Uri.parse(archive_url));
   response = await req.close();
