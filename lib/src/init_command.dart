@@ -7,9 +7,21 @@ import 'package:polymerize/package_graph.dart';
 
 const String RULES_VERSION = 'v_0_0_5';
 
-_depsFor(PackageNode n) => n.dependencies.map((PackageNode d) => '"@${d.name}//:${d.name}"').join(",");
+Iterable<PackageNode> _transitiveDeps(PackageNode n, {Set<PackageNode> visited}) sync* {
+  if (visited == null) {
+    visited = new Set();
+  }
 
-_depsFor2(PackageNode g, PackageNode root) => g.dependencies.map((PackageNode n) => _asDep(n, root)).join(",");
+  for (PackageNode d in (n.dependencies ?? [])) {
+    yield* _transitiveDeps(d, visited: visited);
+    if (!visited.contains(d)) {
+      visited.add(d);
+      yield d;
+    }
+  }
+}
+
+_depsFor(PackageNode g, PackageNode root) => _transitiveDeps(g).map((PackageNode n) => _asDep(n, root)).join(",");
 
 _asDep(PackageNode n, PackageNode root) {
   if (n.dependencyType == PackageDependencyType.root) {
@@ -29,7 +41,7 @@ String _libDeps(PackageGraph g) => g.allPackages.values
           PackageDependencyType.pub: (PackageNode n) => """
 dart_library(
   name='${n.name}',
-  deps= [${_depsFor(n)}],
+  deps= [${_depsFor(n,g.root)}],
   package_name='${n.name}',
   pub_host = '${n.source['description']['url']}/api',
   version='${n.version}')
@@ -44,7 +56,7 @@ dart_library(
               ? """
 dart_library(
   name='${n.name}',
-  deps= [${_depsFor(n)}],
+  deps= [${_depsFor(n,g.root)}],
   src_path='${n.location.toFilePath()}',
   #pub_host = 'http://pub.drafintech.it:5001/api',
   package_name='${n.name}',
@@ -56,11 +68,11 @@ dart_library(
     .where((x) => x != null)
     .join("\n\n");
 
-_generateWorkspaceFile(PackageGraph g, String destDir,{String developHome}) async {
+_generateWorkspaceFile(PackageGraph g, String destDir, {String developHome}) async {
   File workspace = new File(path.join(destDir, "WORKSPACE"));
   //print(g.allPackages.values.map((PackageNode p) => p.toString()).join("\n"));
 
-  if (developHome==null) {
+  if (developHome == null) {
     await workspace.writeAsString("""
 # Polymerize rules repository
 git_repository(
@@ -142,7 +154,7 @@ polymer_library(
     ),
     version = "${g.version}",
     deps = [
-        ${_depsFor2(g,r)}
+        ${_depsFor(g,r)}
     ],
 )
 
@@ -184,7 +196,7 @@ polymer_library(
     ),
     version = "1.0",
     deps = [
-        ${_depsFor2(g,r)}
+        ${_depsFor(g,r)}
     ],
 )
 """);
@@ -195,6 +207,6 @@ runInit(ArgResults args) async {
   var mainDir = path.dirname(args['pubspec']);
   String develop = args['develop'];
   PackageGraph g = new PackageGraph.forPath(mainDir);
-  await _generateWorkspaceFile(g, mainDir,developHome:develop!=null?path.canonicalize(develop):null);
+  await _generateWorkspaceFile(g, mainDir, developHome: develop != null ? path.canonicalize(develop) : null);
   await _generateBuildFiles(g.root, g.root, mainDir, allPackages: g.allPackages.values);
 }

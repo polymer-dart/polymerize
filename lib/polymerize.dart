@@ -244,7 +244,7 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
             String template = reg.getField('template').toStringValue();
             //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
 
-            List<DartObject> uses = reg.getField('uses').toListValue();
+            List<DartObject> uses = reg.getField('uses')?.toListValue() ?? [];
             String pathThis = path.join(_moduleForUri(ce.source.uri, mapping: mapping), template);
             pathThis = path.dirname(pathThis);
 
@@ -281,6 +281,8 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
                 //DartObject anno2 = getAnnotation(obj.toCl, matches)
               });
             }
+
+            // NOTE : toImport is deprecated and no more used
 
             // Trovo il file relativo all'element
             String templatePath = path.join(path.dirname(e.source.fullName), template);
