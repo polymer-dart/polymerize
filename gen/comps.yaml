@@ -1,4 +1,19 @@
 components:
+ - name: iron-image
+   ref: "PolymerElements/iron-image#2.0-preview"
+ - name: iron-iconset-svg
+   ref: "PolymerElements/iron-iconset-svg#2.0-preview"
+ - name: iron-autogrow-textarea
+   ref: "PolymerElements/iron-autogrow-textarea#2.0-preview"
+ - name: iron-a11y-announcer
+   ref: "PolymerElements/iron-a11y-announcer#2.0-preview"
+ - name: iron-media-query
+   ref: "PolymerElements/iron-media-query#2.0-preview"
+   overrides:
+    query:
+      - "get mediaQuery => getProperty(this,'query');"
+      - "set mediaQuery(v) => setProperty(this,'query',v);"
+
  - name: app-layout
    ref: "PolymerElements/app-layout#2.0-preview"
    includes:

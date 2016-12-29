@@ -86,7 +86,7 @@ class PackageGraph {
       nodes[name] = node;
       bool isRoot = type==PackageDependencyType.root;
       var deps = _depsFromYaml(yaml, isRoot: isRoot);
-      if (isRoot) rootDeps = deps;
+      //if (isRoot) rootDeps = deps;
       deps.forEach((name, source) {
         var dep = nodes[name];
         if (dep == null) {
