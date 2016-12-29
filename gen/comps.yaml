@@ -3,8 +3,12 @@ components:
    ref: "PolymerElements/app-layout#2.0-preview"
    includes:
     - "**/app-*.html"
+    - "app-scroll-effects/effects/*.html"
    excludes:
+    - "**/test/**/*"
     - "**/test/*"
+    - "templates/**/*"
+    - "**/app-grid-*.html"
 
  - name: iron-list
    ref : "PolymerElements/iron-list#2.0-preview"
@@ -16,16 +20,16 @@ components:
    excludes:
     - index.html
     - all-imports.html
- - name : "iron-scroll-target-behavior" 
+ - name : "iron-scroll-target-behavior"
    ref : "PolymerElements/iron-scroll-target-behavior#2.0-preview"
-   
- - name : "paper-card" 
+
+ - name : "paper-card"
    ref : "PolymerElements/paper-card#2.0-preview"
 
- - name : "paper-material" 
+ - name : "paper-material"
    ref : "PolymerElements/paper-material#2.0-preview"
 
- - name : "paper-button" 
+ - name : "paper-button"
    ref : "PolymerElements/paper-button#2.0-preview"
 
  - name :  "paper-radio-button"
@@ -51,8 +55,8 @@ components:
  - name :    "iron-icons"
    ref : "PolymerElements/iron-icons#2.0-preview"
 
- - name : "iron-form-element-behavior"
-   ref : "PolymerElements/iron-form-element-behavior#2.0-preview"
+# - name : "iron-form-element-behavior"
+#   ref : "PolymerElements/iron-form-element-behavior#2.0-preview"
 
  - name :    "iron-behaviors"
    ref : "PolymerElements/iron-behaviors#2.0-preview"

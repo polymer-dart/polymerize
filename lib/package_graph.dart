@@ -77,7 +77,6 @@ class PackageGraph {
 
     /// Create all [PackageNode]s for all deps.
     var nodes = <String, PackageNode>{};
-    Map<String, dynamic> rootDeps;
     Map<String, dynamic> lockDeps =  _depsFromLock(path.join(packagePath,"pubspec.lock"));
     PackageNode addNodeAndDeps(YamlMap yaml, PackageDependencyType type) {
       var name = yaml['name'];
