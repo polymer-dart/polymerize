@@ -23,13 +23,24 @@ import 'package:polymerize/src/bower_command.dart';
 import 'package:polymerize/src/init_command.dart';
 import 'package:polymerize/src/pub_command.dart';
 
-const Map<ModuleFormat, String> _formatToString = const {ModuleFormat.amd: 'amd', ModuleFormat.es6: 'es6', ModuleFormat.common: 'common', ModuleFormat.legacy: 'legacy'};
+const Map<ModuleFormat, String> _formatToString = const {
+  ModuleFormat.amd: 'amd',
+  ModuleFormat.es6: 'es6',
+  ModuleFormat.common: 'common',
+  ModuleFormat.legacy: 'legacy'
+};
 
-const Map<String, ModuleFormat> _stringToFormat = const {'amd': ModuleFormat.amd, 'es6': ModuleFormat.es6, 'common': ModuleFormat.common, 'legacy': ModuleFormat.legacy};
+const Map<String, ModuleFormat> _stringToFormat = const {
+  'amd': ModuleFormat.amd,
+  'es6': ModuleFormat.es6,
+  'common': ModuleFormat.common,
+  'legacy': ModuleFormat.legacy
+};
 
 log.Logger logger = new log.Logger("polymerize");
 
-Future _buildAll(String rootPath, Directory dest, ModuleFormat format, String repoPath) async {
+Future _buildAll(String rootPath, Directory dest, ModuleFormat format,
+    String repoPath) async {
   /*if (await dest.exists()) {
     await dest.delete(recursive:true);
   }*/
@@ -43,7 +54,8 @@ Future _buildAll(String rootPath, Directory dest, ModuleFormat format, String re
   // Build Packages in referse order
 
   Map summaries = {};
-  await _buildPackage(rootPath, packageGraph.root, summaries, dest, repoPath, format);
+  await _buildPackage(
+      rootPath, packageGraph.root, summaries, dest, repoPath, format);
 
   if (dest == null) {
     return;
@@ -51,14 +63,19 @@ Future _buildAll(String rootPath, Directory dest, ModuleFormat format, String re
 
   // The order is irrelevant ---
   if (format == ModuleFormat.legacy) {
-    await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js", path.join(dest.path, "dart_sdk.js"));
-    await _copyResource("package:dev_compiler/js/legacy/dart_library.js", path.join(dest.path, "dart_library.js"));
+    await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js",
+        path.join(dest.path, "dart_sdk.js"));
+    await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
+        path.join(dest.path, "dart_library.js"));
   } else if (format == ModuleFormat.es6) {
-    await _copyResource("package:dev_compiler/js/es6/dart_sdk.js", path.join(dest.path, "dart_sdk.js"));
+    await _copyResource("package:dev_compiler/js/es6/dart_sdk.js",
+        path.join(dest.path, "dart_sdk.js"));
   } else if (format == ModuleFormat.amd) {
-    await _copyResource("package:dev_compiler/js/amd/dart_sdk.js", path.join(dest.path, "dart_sdk.js"));
+    await _copyResource("package:dev_compiler/js/amd/dart_sdk.js",
+        path.join(dest.path, "dart_sdk.js"));
 
-    await _copyResource("package:polymerize/require.js", path.join(dest.path, "require.js"));
+    await _copyResource(
+        "package:polymerize/require.js", path.join(dest.path, "require.js"));
   }
 
   // If an index.html template exists use it
@@ -76,7 +93,13 @@ Future _copyResource(String resx, String dest) async {
   return new File(dest).writeAsString(content);
 }
 
-Future<List<String>> _buildPackage(String rootPath, PackageNode node, Map<PackageNode, List<String>> summaries, Directory dest, String summaryRepoPath, ModuleFormat format) async {
+Future<List<String>> _buildPackage(
+    String rootPath,
+    PackageNode node,
+    Map<PackageNode, List<String>> summaries,
+    Directory dest,
+    String summaryRepoPath,
+    ModuleFormat format) async {
   List<String> result;
 
   result = summaries[node];
@@ -88,7 +111,8 @@ Future<List<String>> _buildPackage(String rootPath, PackageNode node, Map<Packag
 
   Set deps = new Set();
   for (PackageNode dep in node.dependencies) {
-    deps.addAll(await _buildPackage(rootPath, dep, summaries, dest, summaryRepoPath, format));
+    deps.addAll(await _buildPackage(
+        rootPath, dep, summaries, dest, summaryRepoPath, format));
   }
 
   /*
@@ -100,17 +124,37 @@ Future<List<String>> _buildPackage(String rootPath, PackageNode node, Map<Packag
   logger.fine("Building ${node.name}");
 
   result = new List.from(deps);
-  result.add(await _buildOne(rootPath, node.name, new Directory.fromUri(node.location), dest,
-      new Directory(path.joinAll([summaryRepoPath, node.name, node.version != null ? node.version : ""])), result, node.dependencyType == PackageDependencyType.pub, format));
+  result.add(await _buildOne(
+      rootPath,
+      node.name,
+      new Directory.fromUri(node.location),
+      dest,
+      new Directory(path.joinAll([
+        summaryRepoPath,
+        node.name,
+        node.version != null ? node.version : ""
+      ])),
+      result,
+      node.dependencyType == PackageDependencyType.pub,
+      format));
 
   summaries[node] = result;
 
   return result;
 }
 
-Future<String> _buildOne(String rootPath, String packageName, Directory location, Directory dest, Directory summaryDest, List<String> summaries, bool useRepo, ModuleFormat format,
+Future<String> _buildOne(
+    String rootPath,
+    String packageName,
+    Directory location,
+    Directory dest,
+    Directory summaryDest,
+    List<String> summaries,
+    bool useRepo,
+    ModuleFormat format,
     {ArgResults bazelModeArgs}) async {
-  File repo_smap = new File(path.join(summaryDest.path, "${packageName}.js.map"));
+  File repo_smap =
+      new File(path.join(summaryDest.path, "${packageName}.js.map"));
   File sum = new File(path.join(summaryDest.path, "${packageName}.sum"));
   File repo_js = new File(path.join(summaryDest.path, "${packageName}.js"));
 
@@ -123,7 +167,10 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
   }
   String libPath = path.join(location.path, "lib");
 
-  Map<String, String> mapping = new Map.fromIterable(bazelModeArgs['mapping'].map((x) => x.split('=')), key: (x) => x[0], value: (x) => x[1]);
+  Map<String, String> mapping = new Map.fromIterable(
+      bazelModeArgs['mapping'].map((x) => x.split('=')),
+      key: (x) => x[0],
+      value: (x) => x[1]);
 
   // If use repo (after collect and copy)
   // TODO : Spostare questa logica sotto
@@ -145,10 +192,12 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
       assetDir.createSync();
     }
     if (bazelModeArgs == null) {
-      await _collectSourcesAndCopyResources(packageName, new Directory(libPath), sources, assetDir);
+      await _collectSourcesAndCopyResources(
+          packageName, new Directory(libPath), sources, assetDir);
     } else {
       sources = bazelModeArgs['source'];
-      summaries = bazelModeArgs['summary'].map((x) => path.absolute(x)).toList();
+      summaries =
+          bazelModeArgs['summary'].map((x) => path.absolute(x)).toList();
       if (!summaries.every((x) => new File(x).existsSync())) {
         throw "SOME SUMMARY DO NOT EXISTS!";
       }
@@ -156,7 +205,9 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
 
       // Build library map
       //print("LIUB: ${libPath}");
-      maps = new Map.fromIterable(sources, key: (x) => "package:${packageName}/${path.relative(x,from:libPath)}", value: (x) => path.absolute(x));
+      maps = new Map.fromIterable(sources,
+          key: (x) => "package:${packageName}/${path.relative(x,from:libPath)}",
+          value: (x) => path.absolute(x));
 
       sources = maps.keys.toList();
       //print("URL MAP : ${maps}");
@@ -181,7 +232,8 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
     // print("MAPPING : ${mapping} - ${bazelModeArgs['base_path']}");
     //mapping[packageName] = path.relative(bazelModeArgs['output'],from:libPath);
 
-    BuildUnit bu = new BuildUnit(packageName, path.absolute(location.path), sources, (source) => _moduleForLibrary(source, mapping: mapping));
+    BuildUnit bu = new BuildUnit(packageName, path.absolute(location.path),
+        sources, (source) => _moduleForLibrary(source, mapping: mapping));
 
     JSModuleFile res = moduleCompiler.compile(bu, compilerOptions);
     if (!res.isValid) {
@@ -189,7 +241,8 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
     }
 
     // Leggo il file delle regole per creare una mappa tra ingressi ed uscite
-    List<String> lines = (await new File(bazelModeArgs['template_out']).readAsLines());
+    List<String> lines =
+        (await new File(bazelModeArgs['template_out']).readAsLines());
     Map<String, String> in_out_html = {};
     Map<String, String> html_templates = {};
     for (int i = 0; i < lines.length; i += 2) {
@@ -198,7 +251,8 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
     }
 
     // Copy files
-    await Future.wait(in_out_html.keys.map((source) => new File(source).copy(in_out_html[source])));
+    await Future.wait(in_out_html.keys
+        .map((source) => new File(source).copy(in_out_html[source])));
 
     // Costruisco l'elenco dei file html
     //Map html_templates = new Map.fromIterable(bazelModeArgs['template'],
@@ -226,11 +280,17 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
 
       LibraryElement le = moduleCompiler.context.getLibraryElement(src);
 
+      DartObject libJsAnno = getAnnotation(le.metadata, isJS);
+      String jsNamespace = libJsAnno?.getField('name')?.toStringValue();
+
       le?.units?.forEach((CompilationUnitElement e) async {
         //print("Unit : ${e.name}");
         e.types.forEach((ClassElement ce) {
           List localImports = bowerImportsFor(ce);
           bower_imports.addAll(localImports);
+
+          DartObject classJsAnno = getAnnotation(ce.metadata, isJS);
+          String jsClass = classJsAnno?.getField('name')?.toStringValue();
 
           DartObject reg = getAnnotation(ce.metadata, isPolymerRegister);
           if (reg != null) {
@@ -245,10 +305,13 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
             //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
 
             List<DartObject> uses = reg.getField('uses')?.toListValue() ?? [];
-            String pathThis = path.join(_moduleForUri(ce.source.uri, mapping: mapping), template);
+            String pathThis = path.join(
+                _moduleForUri(ce.source.uri, mapping: mapping), template);
             pathThis = path.dirname(pathThis);
 
-            String reversePath = path.relative(_moduleForUri(ce.source.uri, mapping: mapping), from: pathThis);
+            String reversePath = path.relative(
+                _moduleForUri(ce.source.uri, mapping: mapping),
+                from: pathThis);
 
             List<String> toImport = [];
 
@@ -260,15 +323,20 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
                 ClassElement ce2 = dartType.element;
                 // print("META : ${ce2.metadata}");
                 if (ce2 != null) {
-                  DartObject reg2 = getAnnotation(ce2.metadata, isPolymerRegister);
+                  DartObject reg2 =
+                      getAnnotation(ce2.metadata, isPolymerRegister);
                   if (reg2 != null) {
-                    String template2 = reg2.getField('template').toStringValue();
+                    String template2 =
+                        reg2.getField('template').toStringValue();
                     if (template2 != null) {
                       // print(
                       //    "Template : ${template2} , ${ce2.library.identifier} ,${ce2.source.uri}");
                       // Calc root path or this template
 
-                      String path2 = path.joinAll([_moduleForUri(ce2.source.uri, mapping: mapping), template2]);
+                      String path2 = path.joinAll([
+                        _moduleForUri(ce2.source.uri, mapping: mapping),
+                        template2
+                      ]);
 
                       String relPath2 = path.relative(path2, from: pathThis);
                       // print("PATH ${path2} from ${pathThis}");
@@ -285,7 +353,8 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
             // NOTE : toImport is deprecated and no more used
 
             // Trovo il file relativo all'element
-            String templatePath = path.join(path.dirname(e.source.fullName), template);
+            String templatePath =
+                path.join(path.dirname(e.source.fullName), template);
 
             String rel = path.relative(templatePath, from: libPath);
 
@@ -300,18 +369,30 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
             //print("found ${templatePath} -> ${destTemplate}");
 
             if (native && !native_imported) {
-              post_dart.add("<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
+              post_dart.add(
+                  "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
               native_imported = true;
             } else if (!native) {
               // TODO : embed template here ?
-              pre_dart.add("<link rel='import' href='${path.normalize(path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html'])))}'>");
+              pre_dart.add(
+                  "<link rel='import' href='${path.normalize(path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html'])))}'>");
             }
             if (!polymerize_imported) {
-              post_dart.add("<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
+              post_dart.add(
+                  "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
               polymerize_imported = true;
             }
-            post_dart.add(
-                htmlImportTemplate(template: template, packageName: packageName, name: name, className: ce.name, tagName: tag, config: config, native: native, mapping: mapping));
+            post_dart.add(htmlImportTemplate(
+                template: template,
+                jsNamespace: jsNamespace,
+                jsClassName: jsClass,
+                packageName: packageName,
+                name: name,
+                className: ce.name,
+                tagName: tag,
+                config: config,
+                native: native,
+                mapping: mapping));
 
             //}
           } else if ((reg = getAnnotation(ce.metadata, isDefine)) != null) {
@@ -359,7 +440,8 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
 
     if (bazelModeArgs == null) {
       js = new File(path.join(dest.path, packageName, "${packageName}.js"));
-      smap = new File(path.join(dest.path, packageName, "${packageName}.js.map"));
+      smap =
+          new File(path.join(dest.path, packageName, "${packageName}.js.map"));
     } else {
       js = new File(bazelModeArgs['output']);
       await sum.copy(bazelModeArgs['output_summary']);
@@ -372,7 +454,8 @@ Future<String> _buildOne(String rootPath, String packageName, Directory location
       // per ogni template
 
       if (bazelModeArgs['bower-needs'] != null) {
-        await new File(bazelModeArgs['bower-needs']).writeAsString(bower_imports.map((b) => '"${b.name}":"${b.ref}"').join("\n"));
+        await new File(bazelModeArgs['bower-needs']).writeAsString(
+            bower_imports.map((b) => '"${b.name}":"${b.ref}"').join("\n"));
       }
 
       //print("MAPPIUNG : ${mapping}");
@@ -398,7 +481,10 @@ ${post_dart.join("\n")}
   return sum.path;
 }
 
-importBowers(List<BowerImport> imports, {String from}) => imports.map((b) => "<link rel='import' href='${path.relative('bower_components',from:from)}/${b.import}'>").join("\n");
+importBowers(List<BowerImport> imports, {String from}) => imports
+    .map((b) =>
+        "<link rel='import' href='${path.relative('bower_components',from:from)}/${b.import}'>")
+    .join("\n");
 
 class BowerImport {
   String ref;
@@ -410,14 +496,23 @@ class BowerImport {
 Iterable bowerImportsFor(ClassElement e) sync* {
   DartObject ref = getAnnotation(e.metadata, isBowerImport);
   if (ref != null) {
-    yield new BowerImport(ref: ref.getField("ref").toStringValue(), import: ref.getField("import").toStringValue(), name: ref.getField("name").toStringValue());
+    yield new BowerImport(
+        ref: ref.getField("ref").toStringValue(),
+        import: ref.getField("import").toStringValue(),
+        name: ref.getField("name").toStringValue());
   }
 }
 
-String importDeps(Map<String, String> mapping, String packageName) =>
-    mapping.keys.where((k) => k != packageName).map((k) => "<link rel='import' href='${relativeModulePath(k,from:packageName,mapping:mapping)}.mod.html'>").join('\n');
+String importDeps(Map<String, String> mapping, String packageName) => mapping
+    .keys
+    .where((k) => k != packageName)
+    .map((k) =>
+        "<link rel='import' href='${relativeModulePath(k,from:packageName,mapping:mapping)}.mod.html'>")
+    .join('\n');
 
-String relativeModulePath(String module, {String from, Map<String, String> mapping}) => path.relative(mapping[module], from: path.dirname(mapping[from]));
+String relativeModulePath(String module,
+        {String from, Map<String, String> mapping}) =>
+    path.relative(mapping[module], from: path.dirname(mapping[from]));
 
 Map collectConfig(AnalysisContext context, ClassElement ce) {
   List<String> observers = [];
@@ -442,43 +537,82 @@ Map collectConfig(AnalysisContext context, ClassElement ce) {
   return {'observers': observers, 'properties': properties};
 }
 
-final Uri POLYMER_REGISTER_URI = Uri.parse('package:polymer_element/polymer_element.dart');
+final Uri POLYMER_REGISTER_URI =
+    Uri.parse('package:polymer_element/polymer_element.dart');
+final Uri JS_URI = Uri.parse('package:js/js.dart');
 
-bool isPolymerRegister(DartObject o) => (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) && (o.type.name == 'PolymerRegister');
+bool isPolymerRegister(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'PolymerRegister');
 
-bool isBowerImport(DartObject o) => (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) && (o.type.name == 'BowerImport');
+bool isJS(DartObject o) =>
+    (o.type.element.librarySource.uri == JS_URI) && (o.type.name == 'JS');
 
-bool isDefine(DartObject o) => (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) && (o.type.name == 'Define');
+bool isBowerImport(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'BowerImport');
 
-bool isObserve(DartObject o) => (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) && (o.type.name == 'Observe');
+bool isDefine(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'Define');
 
-bool isNotify(DartObject o) => (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) && (o.type.name == 'Notify');
+bool isObserve(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'Observe');
+
+bool isNotify(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'Notify');
 
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //
         bool matches(DartObject)) =>
-    metadata.map((ElementAnnotation an) => an.computeConstantValue()).firstWhere(matches, orElse: () => null);
+    metadata
+        .map((ElementAnnotation an) => an.computeConstantValue())
+        .firstWhere(matches, orElse: () => null);
 
-String webComponentTemplate({String template, String packageName, String name, String className, String tagName}) => """
+String webComponentTemplate(
+        {String template,
+        String packageName,
+        String name,
+        String className,
+        String tagName}) =>
+    """
 <script>
   require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
   polymerize.define('${tagName}',pkg.${name}.${className});
 });
 </script>""";
 
-String polymerElementPath(Map<String, String> mapping) => _moduleForPackage('polymer_element', mapping: mapping);
+String polymerElementPath(Map<String, String> mapping) =>
+    _moduleForPackage('polymer_element', mapping: mapping);
 
-String relativePolymerElementPath(String from, Map<String, String> mapping) => path.dirname(relativeModulePath('polymer_element', from: from, mapping: mapping));
+String relativePolymerElementPath(String from, Map<String, String> mapping) =>
+    path.dirname(
+        relativeModulePath('polymer_element', from: from, mapping: mapping));
 
-String htmlImportTemplate({String template, String packageName, String name, String className, String tagName, Map config, bool native, Map<String, String> mapping}) => """
-${native?nativePreloadScript(tagName,['PolymerElements',className],polymerElementPath(mapping)):""}
+String htmlImportTemplate(
+        {String template,
+        String packageName,
+        String name,
+        String className,
+        String tagName,
+        Map config,
+        bool native,
+        Map<String, String> mapping,
+        String jsNamespace,
+        String jsClassName}) =>
+    """
+${native?nativePreloadScript(tagName,jsNamespace.split('.')..add(jsClassName),polymerElementPath(mapping)):""}
 <script>
   require(['${path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName)}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
 });
 </script>""";
 
-String nativePreloadScript(String tagName, List<String> classPath, String polymerElementPath) => """
+String nativePreloadScript(
+        String tagName, List<String> classPath, String polymerElementPath) =>
+    """
 <script>
  require(['${polymerElementPath}/native_import'],function(util) {
    util.importNative('${tagName}',${classPath.map((s) => '\'${s}\'').join(',')});
@@ -495,7 +629,10 @@ String configTemplate(Map config) => (config == null || config.isEmpty)
     }
   }""";
 
-String configPropsTemplate(Map properties) => properties.keys.map((String propName) => "${propName} : { notify: ${properties[propName]['notify']}}").join(',\n      ');
+String configPropsTemplate(Map properties) => properties.keys
+    .map((String propName) =>
+        "${propName} : { notify: ${properties[propName]['notify']}}")
+    .join(',\n      ');
 
 DartType metadataType(ElementAnnotation meta) {
   if (meta is ConstructorElement) {
@@ -512,7 +649,8 @@ class BuildError {
   toString() => messages.join("\n");
 }
 
-Future _collectSourcesAndCopyResources(String packageName, Directory dir, List<String> sources, Directory dest) async {
+Future _collectSourcesAndCopyResources(String packageName, Directory dir,
+    List<String> sources, Directory dest) async {
   if (!await dir.exists()) {
     return [];
   }
@@ -521,7 +659,8 @@ Future _collectSourcesAndCopyResources(String packageName, Directory dir, List<S
     String rel = path.relative(e.path, from: dir.path);
 
     if (e is File) {
-      if (path.extension(e.path) == '.dart' && !path.basename(e.path).startsWith('.')) {
+      if (path.extension(e.path) == '.dart' &&
+          !path.basename(e.path).startsWith('.')) {
         sources.add("package:${packageName}/${rel}");
       } else {
         String destPath = path.join(dest.path, rel);
@@ -600,12 +739,26 @@ main(List<String> args) {
   }
 
   ArgParser parser = new ArgParser()
-    ..addFlag('emit-output', abbr: 'e', negatable: true, defaultsTo: true, help: 'Should emit output')
-    ..addOption('output', abbr: 'o', defaultsTo: 'out', help: 'output directory')
-    ..addOption('repo', defaultsTo: path.join(homePath, '.polymerize'), help: 'Repository path (defaults to "\$HOME/.polymerize")')
-    ..addOption('source', abbr: 's', defaultsTo: Directory.current.path, help: 'source package path')
+    ..addFlag('emit-output',
+        abbr: 'e',
+        negatable: true,
+        defaultsTo: true,
+        help: 'Should emit output')
+    ..addOption('output',
+        abbr: 'o', defaultsTo: 'out', help: 'output directory')
+    ..addOption('repo',
+        defaultsTo: path.join(homePath, '.polymerize'),
+        help: 'Repository path (defaults to "\$HOME/.polymerize")')
+    ..addOption('source',
+        abbr: 's',
+        defaultsTo: Directory.current.path,
+        help: 'source package path')
     ..addOption('module-format',
-        abbr: 'm', allowed: ModuleFormat.values.map((ModuleFormat x) => _formatToString[x]), defaultsTo: _formatToString[ModuleFormat.amd], help: 'module format')
+        abbr: 'm',
+        allowed:
+            ModuleFormat.values.map((ModuleFormat x) => _formatToString[x]),
+        defaultsTo: _formatToString[ModuleFormat.amd],
+        help: 'module format')
     ..addFlag('help', abbr: 'h', negatable: false, help: 'showHelp')
     ..addCommand(
         'bazel',
@@ -616,15 +769,19 @@ main(List<String> args) {
           ..addOption('export-sdk-html', help: 'do export sdk HTML')
           ..addOption('export-requirejs', help: 'do export requirejs')
           ..addOption('export-require_html', help: 'do export requirehtml')
-          ..addOption('source', abbr: 's', allowMultiple: true, help: 'dart source file')
-          ..addOption('mapping', abbr: 'M', allowMultiple: true, help: 'external package mapping')
+          ..addOption('source',
+              abbr: 's', allowMultiple: true, help: 'dart source file')
+          ..addOption('mapping',
+              abbr: 'M', allowMultiple: true, help: 'external package mapping')
           ..addOption('template_out', abbr: 'T', help: 'html templates rule')
-          ..addOption('summary', abbr: 'm', allowMultiple: true, help: 'dart summary file')
+          ..addOption('summary',
+              abbr: 'm', allowMultiple: true, help: 'dart summary file')
           ..addOption('output', abbr: 'o', help: 'output file')
           ..addOption('output_html', help: 'output html wrapper')
           ..addOption('output_summary', abbr: 'x', help: 'output summary file')
           ..addOption('package_name', abbr: 'p', help: 'the package name')
-          ..addOption('package_version', abbr: 'v', help: 'the package version'))
+          ..addOption('package_version',
+              abbr: 'v', help: 'the package version'))
     ..addCommand(
         'pub',
         new ArgParser()
@@ -637,20 +794,24 @@ main(List<String> args) {
         new ArgParser()
           ..addOption('component-refs', help: 'Components references yaml')
           ..addOption('dest-path', help: 'Destination path')
-          ..addOption('bower-needs-map', allowMultiple: true, help: 'bower needs')
+          ..addOption('bower-needs-map',
+              allowMultiple: true, help: 'bower needs')
           ..addOption('package-name', abbr: 'p', help: 'dest dart package name')
           ..addFlag('help', help: 'help on generate'))
     ..addCommand(
         'init',
         new ArgParser()
           ..addOption('pubspec', abbr: 'y', help: 'Path to the root pubspec')
-          ..addOption('develop', help: "enable polymerize develop mode, with repo home at the given path"))
+          ..addOption('develop',
+              help:
+                  "enable polymerize develop mode, with repo home at the given path"))
     ..addCommand(
         "bower",
         new ArgParser()
           ..addOption("resolution-key", abbr: "r", allowMultiple: true)
           ..addOption("resolution-value", abbr: "R", allowMultiple: true)
-          ..addOption("use-bower", allowMultiple: true, abbr: 'u', help: 'use bower')
+          ..addOption("use-bower",
+              allowMultiple: true, abbr: 'u', help: 'use bower')
           ..addOption('output', abbr: 'o', help: 'output bower file'));
 
   // Configure logger
@@ -700,7 +861,8 @@ main(List<String> args) {
 
   if (results.command?.name == 'generate-wrapper') {
     if (results.command['help']) {
-      print("generate-wrapper usage :\n${parser.commands['generate-wrapper'].usage}");
+      print(
+          "generate-wrapper usage :\n${parser.commands['generate-wrapper'].usage}");
       return;
     }
     new Generator().runGenerateWrapper(results.command);
@@ -708,7 +870,8 @@ main(List<String> args) {
   }
 
   Chain.capture(() {
-    _buildAll(sourcePath, destPath == null ? null : new Directory(destPath), fmt, repoPath);
+    _buildAll(sourcePath, destPath == null ? null : new Directory(destPath),
+        fmt, repoPath);
   }, onError: (error, Chain chain) {
     if (error is BuildError) {
       logger.severe("BUILD ERROR : \n${error}", error);
@@ -720,7 +883,8 @@ main(List<String> args) {
 
 const Map _HEADERS = const {"Content-Type": "application/json"};
 
-Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath, ModuleFormat fmt, ArgResults params) async {
+Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath,
+    ModuleFormat fmt, ArgResults params) async {
   String packageName = params['package_name'];
   String packageVersion = params['package_version'];
 
@@ -736,8 +900,19 @@ Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath, 
     basePath = new Directory(basePath).parent.path;
   }
 
-  await _buildOne(rootPath, packageName, new Directory(basePath), new Directory(destPath),
-      new Directory(path.joinAll([summaryRepoPath, packageName, packageVersion != null ? packageVersion : ""])), [], params['summary'], fmt,
+  await _buildOne(
+      rootPath,
+      packageName,
+      new Directory(basePath),
+      new Directory(destPath),
+      new Directory(path.joinAll([
+        summaryRepoPath,
+        packageName,
+        packageVersion != null ? packageVersion : ""
+      ])),
+      [],
+      params['summary'],
+      fmt,
       bazelModeArgs: params);
 
   if (params['export-sdk'] != null) {
@@ -745,11 +920,13 @@ Future runInBazelMode(String rootPath, String destPath, String summaryRepoPath, 
   }
 
   if (params['export-requirejs'] != null) {
-    await _exportRequireJs(params['export-requirejs'], params['export-require_html']);
+    await _exportRequireJs(
+        params['export-requirejs'], params['export-require_html']);
   }
 }
 
-Future _exportSDK(String dest, String destHTML, [ModuleFormat format = ModuleFormat.amd]) async {
+Future _exportSDK(String dest, String destHTML,
+    [ModuleFormat format = ModuleFormat.amd]) async {
   if (format == ModuleFormat.legacy) {
     await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js", dest);
     //await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
@@ -761,7 +938,8 @@ Future _exportSDK(String dest, String destHTML, [ModuleFormat format = ModuleFor
   }
 
   // export HTML
-  await new File(destHTML).writeAsString("""<script src='${path.basename(dest)}' as='dart_sdk'></script>""");
+  await new File(destHTML).writeAsString(
+      """<script src='${path.basename(dest)}' as='dart_sdk'></script>""");
 }
 
 Future _exportRequireJs(String dest, String dest_html) async {

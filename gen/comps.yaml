@@ -1,3 +1,4 @@
+namespace: PolymerElements
 components:
  - name: iron-image
    ref: "PolymerElements/iron-image#2.0-preview"
