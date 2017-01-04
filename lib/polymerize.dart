@@ -801,7 +801,7 @@ main(List<String> args) {
     ..addCommand(
         'init',
         new ArgParser()
-          ..addOption('pubspec', abbr: 'y', help: 'Path to the root pubspec')
+          ..addOption('rules-version',abbr:'R',defaultsTo: RULES_VERSION,help:'Bazel rules version')
           ..addOption('develop',
               help:
                   "enable polymerize develop mode, with repo home at the given path"))

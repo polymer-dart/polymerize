@@ -5,9 +5,10 @@ import 'package:args/args.dart';
 import 'package:path/path.dart' as path;
 import 'package:polymerize/package_graph.dart';
 
-const String RULES_VERSION = 'v_0_0_7';
+const String RULES_VERSION = 'v_0_0_8';
 
-Iterable<PackageNode> _transitiveDeps(PackageNode n, {Set<PackageNode> visited}) sync* {
+Iterable<PackageNode> _transitiveDeps(PackageNode n,
+    {Set<PackageNode> visited}) sync* {
   if (visited == null) {
     visited = new Set();
   }
@@ -21,7 +22,8 @@ Iterable<PackageNode> _transitiveDeps(PackageNode n, {Set<PackageNode> visited})
   }
 }
 
-_depsFor(PackageNode g, PackageNode root) => _transitiveDeps(g).map((PackageNode n) => _asDep(n, root)).join(",");
+_depsFor(PackageNode g, PackageNode root) =>
+    _transitiveDeps(g).map((PackageNode n) => _asDep(n, root)).join(",");
 
 _asDep(PackageNode n, PackageNode root) {
   if (n.dependencyType == PackageDependencyType.root) {
@@ -34,7 +36,8 @@ _asDep(PackageNode n, PackageNode root) {
   }
 }
 
-bool _isExternal(PackageNode n, PackageNode root) => !path.isWithin(root.location.toFilePath(), n.location.toFilePath());
+bool _isExternal(PackageNode n, PackageNode root) =>
+    !path.isWithin(root.location.toFilePath(), n.location.toFilePath());
 
 String _libDeps(PackageGraph g) => g.allPackages.values
     .map((PackageNode n) => <PackageDependencyType, Function>{
@@ -68,7 +71,8 @@ dart_library(
     .where((x) => x != null)
     .join("\n\n");
 
-_generateWorkspaceFile(PackageGraph g, String destDir, {String developHome}) async {
+_generateWorkspaceFile(PackageGraph g, String destDir, String rules_version,
+    {String developHome}) async {
   File workspace = new File(path.join(destDir, "WORKSPACE"));
   //print(g.allPackages.values.map((PackageNode p) => p.toString()).join("\n"));
 
@@ -77,7 +81,7 @@ _generateWorkspaceFile(PackageGraph g, String destDir, {String developHome}) asy
 # Polymerize rules repository
 git_repository(
  name='polymerize',
- tag='${RULES_VERSION}',
+ tag='${rules_version}',
  remote='https://github.com/dam0vm3nt/bazel_polymerize_rules')
 
 # Load Polymerize rules
@@ -124,9 +128,13 @@ ${_libDeps(g)}
   }
 }
 
-_generateBuildFiles(PackageNode g, PackageNode r, String destDir, {Iterable<PackageNode> allPackages}) async {
+_generateBuildFiles(PackageNode g, PackageNode r, String destDir,
+    {Iterable<PackageNode> allPackages}) async {
   // Deps first
-  await Future.wait(g.dependencies.where((PackageNode d) => d.dependencyType == PackageDependencyType.path && !_isExternal(d, r)).map((PackageNode d) async {
+  await Future.wait(g.dependencies
+      .where((PackageNode d) =>
+          d.dependencyType == PackageDependencyType.path && !_isExternal(d, r))
+      .map((PackageNode d) async {
     await _generateBuildFiles(d, r, destDir);
   }));
 
@@ -179,7 +187,8 @@ filegroup(
 )
 """);
   else {
-    String relPath = path.relative(g.location.toFilePath(), from: r.location.toFilePath());
+    String relPath =
+        path.relative(g.location.toFilePath(), from: r.location.toFilePath());
     await new File(dd).writeAsString("""
 load("@polymerize//:polymerize.bzl", "polymer_library")
 
@@ -204,9 +213,11 @@ polymer_library(
 }
 
 runInit(ArgResults args) async {
-  var mainDir = path.dirname(args['pubspec']);
+  var mainDir = path.dirname(args.rest.isEmpty ? 'pubspec.yaml' : args.rest[0]);
   String develop = args['develop'];
   PackageGraph g = new PackageGraph.forPath(mainDir);
-  await _generateWorkspaceFile(g, mainDir, developHome: develop != null ? path.canonicalize(develop) : null);
-  await _generateBuildFiles(g.root, g.root, mainDir, allPackages: g.allPackages.values);
+  await _generateWorkspaceFile(g, mainDir, args['rules-version'],
+      developHome: develop != null ? path.canonicalize(develop) : null);
+  await _generateBuildFiles(g.root, g.root, mainDir,
+      allPackages: g.allPackages.values);
 }
