@@ -15,6 +15,24 @@ components:
       - "get mediaQuery => getProperty(this,'query');"
       - "set mediaQuery(v) => setProperty(this,'query',v);"
 
+ - name: iron-location
+   ref: "PolymerElements/iron-location#2.0-preview"
+   includes:
+    - "*.html"
+   excludes:
+    - index.html
+    - all-imports.html
+   overrides:
+    query:
+      - "get queryPart => getProperty(this,'query');"
+      - "set queryPart(v) => setProperty(this,'query',v);"
+ - name: app-route
+   ref: "PolymerElements/app-route#2.0-preview"
+   includes:
+    - "*.html"
+   excludes:
+    - index.html
+    - all-imports.html
  - name: app-layout
    ref: "PolymerElements/app-layout#2.0-preview"
    includes:
