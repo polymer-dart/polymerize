@@ -53,7 +53,7 @@ Future _buildAll(String rootPath, Directory dest, ModuleFormat format,
 
   // Build Packages in referse order
 
-  Map summaries = {};
+  Map<PackageNode,List<String>> summaries = <PackageNode,List<String>>{};
   await _buildPackage(
       rootPath, packageGraph.root, summaries, dest, repoPath, format);
 
@@ -178,7 +178,7 @@ Future<String> _buildOne(
   // 2) a poi copiare sempre dal repo verso la dest
   Directory assetDir = new Directory(path.join(summaryDest.path, "assets"));
 
-  List bower_imports = <BowerImport>[];
+  List<BowerImport> bower_imports = <BowerImport>[];
   List pre_dart = <String>[];
   List post_dart = <String>[];
   bool native_imported = false;
@@ -286,7 +286,7 @@ Future<String> _buildOne(
       le?.units?.forEach((CompilationUnitElement e) async {
         //print("Unit : ${e.name}");
         e.types.forEach((ClassElement ce) {
-          List localImports = bowerImportsFor(ce);
+          Iterable<BowerImport> localImports = bowerImportsFor(ce);
           bower_imports.addAll(localImports);
 
           DartObject classJsAnno = getAnnotation(ce.metadata, isJS);
@@ -309,9 +309,9 @@ Future<String> _buildOne(
                 _moduleForUri(ce.source.uri, mapping: mapping), template);
             pathThis = path.dirname(pathThis);
 
-            String reversePath = path.relative(
+            /*String reversePath = path.relative(
                 _moduleForUri(ce.source.uri, mapping: mapping),
-                from: pathThis);
+                from: pathThis);*/
 
             List<String> toImport = [];
 
@@ -358,7 +358,7 @@ Future<String> _buildOne(
 
             String rel = path.relative(templatePath, from: libPath);
 
-            String destTemplate = path.join(assetDir.path, rel);
+            //String destTemplate = path.join(assetDir.path, rel);
 
             // adjust
             templatePath = html_templates[rel];
@@ -418,7 +418,15 @@ Future<String> _buildOne(
     //print("${_moduleForPackage(packageName,mapping:mapping)} DEPS: ${dependencies}");
 
     // Write outputs
-    JSModuleCode code = res.getCode(format, false, "${packageName}.js", "");
+    JSModuleCode code = res.getCode(
+        format,
+        false,
+        path
+            .toUri(path.join(dest.path, packageName, "${packageName}.js"))
+            .toString(),
+        path
+            .toUri(path.join(dest.path, packageName, "${packageName}.js.map"))
+            .toString());
     await repo_js.writeAsString(code.code);
 
     // Write source map
@@ -493,7 +501,7 @@ class BowerImport {
   BowerImport({this.ref, this.import, this.name});
 }
 
-Iterable bowerImportsFor(ClassElement e) sync* {
+Iterable<BowerImport> bowerImportsFor(ClassElement e) sync* {
   DartObject ref = getAnnotation(e.metadata, isBowerImport);
   if (ref != null) {
     yield new BowerImport(
@@ -577,8 +585,7 @@ String webComponentTemplate(
         String name,
         String className,
         String tagName}) =>
-    """
-<script>
+    """<script>
   require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
   polymerize.define('${tagName}',pkg.${name}.${className});
 });
@@ -602,8 +609,7 @@ String htmlImportTemplate(
         Map<String, String> mapping,
         String jsNamespace,
         String jsClassName}) =>
-    """
-${native?nativePreloadScript(tagName,jsNamespace.split('.')..add(jsClassName),polymerElementPath(mapping)):""}
+    """${native?nativePreloadScript(tagName,jsNamespace.split('.')..add(jsClassName),polymerElementPath(mapping)):""}
 <script>
   require(['${path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName)}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
@@ -612,8 +618,7 @@ ${native?nativePreloadScript(tagName,jsNamespace.split('.')..add(jsClassName),po
 
 String nativePreloadScript(
         String tagName, List<String> classPath, String polymerElementPath) =>
-    """
-<script>
+    """<script>
  require(['${polymerElementPath}/native_import'],function(util) {
    util.importNative('${tagName}',${classPath.map((s) => '\'${s}\'').join(',')});
  });
@@ -621,8 +626,7 @@ String nativePreloadScript(
 
 String configTemplate(Map config) => (config == null || config.isEmpty)
     ? "null"
-    : """
-  {
+    : """{
     observers:[${config['observers'].map((x) => '"${x}"').join(',')}],
     properties: {
       ${configPropsTemplate(config['properties'])}
@@ -801,7 +805,8 @@ main(List<String> args) {
     ..addCommand(
         'init',
         new ArgParser()
-          ..addOption('rules-version',abbr:'R',defaultsTo: RULES_VERSION,help:'Bazel rules version')
+          ..addOption('rules-version',
+              abbr: 'R', defaultsTo: RULES_VERSION, help: 'Bazel rules version')
           ..addOption('develop',
               help:
                   "enable polymerize develop mode, with repo home at the given path"))
@@ -944,8 +949,7 @@ Future _exportSDK(String dest, String destHTML,
 
 Future _exportRequireJs(String dest, String dest_html) async {
   await _copyResource("package:polymerize/imd/imd.js", dest);
-  await new File(dest_html).writeAsString("""
-<script src='${path.basename(dest)}'></script>
+  await new File(dest_html).writeAsString("""<script src='${path.basename(dest)}'></script>
 <script>
 (function(scope){
   scope.define(['require'],function(require) {

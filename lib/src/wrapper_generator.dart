@@ -147,7 +147,7 @@ class Generator {
         value: (x) => x[1]));
   }
 
-  _generateWrappers(String dartPackageName, componentsRefs, Map mappings,
+  _generateWrappers(String dartPackageName, componentsRefs, Map<String,String> mappings,
       String destPath) async {
     await Future.wait(componentsRefs['components'].map((comp) =>
         _generateWrapper(
@@ -187,9 +187,9 @@ class _ {
       List<String> includes, List<String> excludes) async {
     String from = path.join(destPath, componentName);
     Iterable<Glob> includeGlobs =
-        ((includes ?? ["${componentName}.html"]) as List)
+        (includes ?? ["${componentName}.html"])
             .map((pat) => new Glob(pat, recursive: false));
-    Iterable<Glob> excludeGlobs = ((excludes ?? []) as List)
+    Iterable<Glob> excludeGlobs = (excludes ?? [])
         .map((pat) => new Glob(pat, recursive: false));
     List result = [];
     await for (FileSystemEntity entry
@@ -206,9 +206,9 @@ class _ {
   }
 
   _generateWrapper(String dartPackageName, component, componentsRefs,
-      Map mappings, String destPath) async {
+      Map<String,String> mappings, String destPath) async {
     String componentName = component['name'];
-    String componentRef = component['ref'];
+    //String componentRef = component['ref'];
 
     String compDir = path.join(destPath, "bower_components");
 
@@ -224,7 +224,7 @@ class _ {
     //    "[${componentName}]: ${component['includes']} - ${component['excludes']} => ${paths}");
 
     packageName = dartPackageName;
-    inOutMap = mappings ?? {};
+    inOutMap = mappings ?? <String,String>{};
 
     await Future.wait(paths.map((p) async {
       // Read and analyze the source doc
