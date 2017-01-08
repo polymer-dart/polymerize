@@ -6,6 +6,7 @@ import 'package:dev_compiler/src/analyzer/context.dart';
 import 'package:dev_compiler/src/compiler/compiler.dart';
 import 'package:analyzer/src/summary/package_bundle_reader.dart';
 import 'package:dev_compiler/src/compiler/module_builder.dart';
+import 'package:html/dom.dart' as dom;
 import 'package:path/path.dart' as path;
 import 'package:analyzer/src/generated/source.dart';
 import 'package:polymerize/package_graph.dart';
@@ -53,7 +54,7 @@ Future _buildAll(String rootPath, Directory dest, ModuleFormat format,
 
   // Build Packages in referse order
 
-  Map<PackageNode,List<String>> summaries = <PackageNode,List<String>>{};
+  Map<PackageNode, List<String>> summaries = <PackageNode, List<String>>{};
   await _buildPackage(
       rootPath, packageGraph.root, summaries, dest, repoPath, format);
 
@@ -353,16 +354,27 @@ Future<String> _buildOne(
             // NOTE : toImport is deprecated and no more used
 
             // Trovo il file relativo all'element
-            String templatePath =
-                path.join(path.dirname(e.source.fullName), template);
+            String templatePath;
+            String finalDest;
+            HtmlDocResume docResume;
+            if (template != null) {
+              templatePath = path.isAbsolute(template)
+                  ? path.join(libPath, template)
+                  : path.join(path.dirname(e.source.fullName), template);
 
-            String rel = path.relative(templatePath, from: libPath);
+              docResume =
+                  _analyzeHtmlTemplate(moduleCompiler.context, templatePath);
 
-            //String destTemplate = path.join(assetDir.path, rel);
+              String rel = path.relative(templatePath, from: libPath);
 
-            // adjust
-            templatePath = html_templates[rel];
-            String finalDest = in_out_html[html_templates[rel]];
+              //String destTemplate = path.join(assetDir.path, rel);
+
+              // adjust
+              templatePath = html_templates[rel];
+
+              finalDest = in_out_html[html_templates[rel]];
+            }
+
             //print("ADJUSTED TEMPLATE : ${templatePath} -> ${finalDest}");
 
             //if (templatePath!=null && new File(templatePath).existsSync()) {
@@ -391,6 +403,7 @@ Future<String> _buildOne(
                 className: ce.name,
                 tagName: tag,
                 config: config,
+                resume : docResume,
                 native: native,
                 mapping: mapping));
 
@@ -488,6 +501,66 @@ ${post_dart.join("\n")}
   }
   return sum.path;
 }
+
+/***
+ * Analyze one HTML template
+ */
+
+class HtmlDocResume {
+  Set<String> propertyPaths = new Set();
+  Set<String> eventHandlers = new Set();
+  Set<String> customElementsRefs = new Set();
+
+  toString() =>
+      "props : ${propertyPaths} , events : ${eventHandlers}, ele : ${customElementsRefs}";
+}
+
+HtmlDocResume _analyzeHtmlTemplate(
+    AnalysisContext context, String templatePath) {
+  HtmlDocResume resume = new HtmlDocResume();
+  Source source =
+      context.sourceFactory.forUri(path.toUri(templatePath).toString());
+  dom.Document doc = context.parseHtmlDocument(source);
+  dom.Element domElement = doc.querySelector('dom-module');
+  if (domElement == null) {
+    return resume;
+  }
+  dom.Element templateElement = domElement.querySelector('template');
+  if (templateElement == null) {
+    return resume;
+  }
+
+  // Lookup all the refs
+  _extractRefs(resume, templateElement);
+
+  return resume;
+}
+
+_extractRefs(HtmlDocResume resume, dom.Element element) {
+  if (element.localName.contains('-')) {
+    resume.customElementsRefs.add(element.localName);
+  }
+  element.attributes.keys.forEach((k) {
+    String val = element.attributes[k];
+    if (k.startsWith('on-')) {
+      resume.eventHandlers.add(val);
+    } else {
+      // Check for prop refs
+      resume.propertyPaths.addAll(_extractRefsFromString(val));
+    }
+  });
+
+  _extractRefsFromString(element.text);
+
+  element.children.forEach((el) => _extractRefs(resume, el));
+}
+
+final RegExp _propRefRE = new RegExp(r"(\{\{|\[\[)!?([^}]+)(\}\}|\]\])");
+
+final RegExp _funcCallRE = new RegExp(r'([^()]+)\(([^)]+\)');
+
+Iterable<String> _extractRefsFromString(String element) =>
+    _propRefRE.allMatches(element).map((x) => x.group(2));
 
 importBowers(List<BowerImport> imports, {String from}) => imports
     .map((b) =>
@@ -607,12 +680,13 @@ String htmlImportTemplate(
         Map config,
         bool native,
         Map<String, String> mapping,
+        HtmlDocResume resume,
         String jsNamespace,
         String jsClassName}) =>
     """${native?nativePreloadScript(tagName,jsNamespace.split('.')..add(jsClassName),polymerElementPath(mapping)):""}
 <script>
   require(['${path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName)}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
-  polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${native});
+  polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${docResumeTemplate(resume)},${native});
 });
 </script>""";
 
@@ -632,6 +706,11 @@ String configTemplate(Map config) => (config == null || config.isEmpty)
       ${configPropsTemplate(config['properties'])}
     }
   }""";
+
+String docResumeTemplate(HtmlDocResume resume) => resume == null ? "null":"""{
+  props:[${resume.propertyPaths.map((x) => "'${x}'").join(',')}],
+  events:[${resume.eventHandlers.map((x) => "'${x}'").join(',')}]
+}""";
 
 String configPropsTemplate(Map properties) => properties.keys
     .map((String propName) =>
@@ -949,7 +1028,8 @@ Future _exportSDK(String dest, String destHTML,
 
 Future _exportRequireJs(String dest, String dest_html) async {
   await _copyResource("package:polymerize/imd/imd.js", dest);
-  await new File(dest_html).writeAsString("""<script src='${path.basename(dest)}'></script>
+  await new File(dest_html)
+      .writeAsString("""<script src='${path.basename(dest)}'></script>
 <script>
 (function(scope){
   scope.define(['require'],function(require) {
