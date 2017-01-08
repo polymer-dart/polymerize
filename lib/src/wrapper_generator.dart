@@ -323,7 +323,7 @@ class _ {
     print("Wrote ${p}");
   }
 
-  _generateElement(Sting namespace,String name, var bowerRef, Map descr) {
+  _generateElement(String namespace,String name, var bowerRef, Map descr) {
     _importPrefixes = {};
     return """
 @JS('${namespace}')
