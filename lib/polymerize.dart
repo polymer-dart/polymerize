@@ -418,7 +418,10 @@ Future<String> _buildOne(
     //print("${_moduleForPackage(packageName,mapping:mapping)} DEPS: ${dependencies}");
 
     // Write outputs
-    JSModuleCode code = res.getCode(format, false, "${packageName}.js", "");
+    JSModuleCode code = res.getCode(
+        format,
+        path.toUri(path.join(dest.path, packageName, "${packageName}.js")).toString(),
+        path.toUri(path.join(dest.path, packageName, "${packageName}.js.map")).toString());
     await repo_js.writeAsString(code.code);
 
     // Write source map
@@ -801,7 +804,8 @@ main(List<String> args) {
     ..addCommand(
         'init',
         new ArgParser()
-          ..addOption('rules-version',abbr:'R',defaultsTo: RULES_VERSION,help:'Bazel rules version')
+          ..addOption('rules-version',
+              abbr: 'R', defaultsTo: RULES_VERSION, help: 'Bazel rules version')
           ..addOption('develop',
               help:
                   "enable polymerize develop mode, with repo home at the given path"))
