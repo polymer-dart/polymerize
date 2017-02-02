@@ -6,7 +6,7 @@ packages:
       name: analyzer
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "0.30.0-alpha.0"
+    version: "0.30.0-alpha.1"
   archive:
     description:
       name: archive
@@ -24,13 +24,13 @@ packages:
       name: async
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "1.11.3"
+    version: "1.12.0"
   bazel_worker:
     description:
       name: bazel_worker
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "0.1.1"
+    version: "0.1.2"
   browser:
     description:
       name: browser
@@ -72,19 +72,25 @@ packages:
       name: csslib
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "0.13.2+2"
+    version: "0.13.3+1"
   dev_compiler:
     description:
       name: dev_compiler
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "0.2.0-unofficial.2016111201"
+    version: "0.2.0-unofficial.2017020101"
   fixnum:
     description:
       name: fixnum
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.10.5"
+  front_end:
+    description:
+      name: front_end
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.1.0-alpha.1"
   func:
     description:
       name: func
@@ -126,7 +132,7 @@ packages:
       name: isolate
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "0.2.3"
+    version: "1.0.0"
   js:
     description:
       name: js
@@ -186,7 +192,7 @@ packages:
       name: resource
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "2.0.2"
+    version: "2.1.1"
   source_maps:
     description:
       name: source_maps

@@ -23,6 +23,7 @@ import 'package:polymerize/src/wrapper_generator.dart';
 import 'package:polymerize/src/bower_command.dart';
 import 'package:polymerize/src/init_command.dart';
 import 'package:polymerize/src/pub_command.dart';
+import 'package:args/src/arg_results.dart';
 
 const Map<ModuleFormat, String> _formatToString = const {
   ModuleFormat.amd: 'amd',
@@ -221,10 +222,30 @@ Future<String> _buildOne(
     //print("SUM 1 ");
     //summaryDataStore.bundles.forEach((b) => print(b.linkedLibraryUris));
     //print("SUM 2 ");
-    AnalyzerOptions opts = new AnalyzerOptions(
-        dartSdkPath: '/usr/lib/dart',
-        customUrlMappings: maps,
-        /*  packageRoot: path.join(rootPath, "packages"),*/
+    AnalyzerOptions opts = new AnalyzerOptions.fromArguments(
+        newArgResults(
+            new ArgParser()
+              ..addOption('dart-sdk-summary')
+              ..addOption('options')
+              ..addOption('packages')
+              ..addOption('package-root')
+              ..addOption('dart-sdk')
+              ..addOption('url-mapping', allowMultiple: true)
+              ..addOption('enable-strict-call-checks')
+              ..addOption('supermixin')
+              ..addOption('no-implicit-casts')
+              ..addOption('no-implicit-dynamic')
+              ..addOption('strong')
+              ..addOption('D'),
+            {
+              'D': [],
+              'dart-sdk': '/usr/lib/dart',
+              'url-mapping': maps.keys.map((k) => "${k},${maps[k]}")
+            },
+            null,
+            null,
+            null,
+            null),
         summaryPaths: summaries);
 
     ModuleCompiler moduleCompiler = new ModuleCompiler(opts);
@@ -292,6 +313,11 @@ Future<String> _buildOne(
 
           DartObject classJsAnno = getAnnotation(ce.metadata, isJS);
           String jsClass = classJsAnno?.getField('name')?.toStringValue();
+
+          //print("SUPER : ${ce.supertype.element.name} ${ce.supertype.element}");
+          jsClass ??= getAnnotation(ce.supertype.element.metadata, isJS)
+              ?.getField('name')
+              ?.toStringValue();
 
           DartObject reg = getAnnotation(ce.metadata, isPolymerRegister);
           if (reg != null) {
@@ -380,15 +406,21 @@ Future<String> _buildOne(
             //if (templatePath!=null && new File(templatePath).existsSync()) {
             //print("found ${templatePath} -> ${destTemplate}");
 
-            if (native && !native_imported) {
-              post_dart.add(
+            if (native) {
+              if (!native_imported) {
+              pre_dart.add(
                   "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
-              native_imported = true;
+                  native_imported = true;
+                }
+              pre_dart.add(nativePreloadScript(tag,
+                jsNamespace.split('.')
+                  ..add(jsClass),polymerElementPath(mapping)));
             } else if (!native) {
               // TODO : embed template here ?
               pre_dart.add(
                   "<link rel='import' href='${path.normalize(path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html'])))}'>");
             }
+
             if (!polymerize_imported) {
               post_dart.add(
                   "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
@@ -403,7 +435,7 @@ Future<String> _buildOne(
                 className: ce.name,
                 tagName: tag,
                 config: config,
-                resume : docResume,
+                resume: docResume,
                 native: native,
                 mapping: mapping));
 
@@ -433,7 +465,6 @@ Future<String> _buildOne(
     // Write outputs
     JSModuleCode code = res.getCode(
         format,
-        false,
         path
             .toUri(path.join(dest.path, packageName, "${packageName}.js"))
             .toString(),
@@ -647,9 +678,9 @@ bool isNotify(DartObject o) =>
 
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //
-        bool matches(DartObject)) =>
+        bool matches(DartObject x)) =>
     metadata
-        .map((ElementAnnotation an) => an.computeConstantValue())
+        .map((an) => an.computeConstantValue())
         .firstWhere(matches, orElse: () => null);
 
 String webComponentTemplate(
@@ -683,8 +714,7 @@ String htmlImportTemplate(
         HtmlDocResume resume,
         String jsNamespace,
         String jsClassName}) =>
-    """${native?nativePreloadScript(tagName,jsNamespace.split('.')..add(jsClassName),polymerElementPath(mapping)):""}
-<script>
+"""<script>
   require(['${path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName)}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${docResumeTemplate(resume)},${native});
 });
@@ -707,7 +737,9 @@ String configTemplate(Map config) => (config == null || config.isEmpty)
     }
   }""";
 
-String docResumeTemplate(HtmlDocResume resume) => resume == null ? "null":"""{
+String docResumeTemplate(HtmlDocResume resume) => resume == null
+    ? "null"
+    : """{
   props:[${resume.propertyPaths.map((x) => "'${x}'").join(',')}],
   events:[${resume.eventHandlers.map((x) => "'${x}'").join(',')}]
 }""";
