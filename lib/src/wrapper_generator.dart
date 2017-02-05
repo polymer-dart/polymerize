@@ -145,10 +145,12 @@ class Generator {
         bowerNeeds.map((x) => x.split("=")),
         key: (x) => x[0],
         value: (x) => x[1]));
+
+    //print("Using mappings : ${packageMappings} from ${bowerNeeds}");
   }
 
-  _generateWrappers(String dartPackageName, componentsRefs, Map<String,String> mappings,
-      String destPath) async {
+  _generateWrappers(String dartPackageName, componentsRefs,
+      Map<String, String> mappings, String destPath) async {
     await Future.wait(componentsRefs['components'].map((comp) =>
         _generateWrapper(
             dartPackageName, comp, componentsRefs, mappings, destPath)));
@@ -162,8 +164,10 @@ class Generator {
       analysisResult = analysisResults[p];
       _currentBowerRef = _bowerRefsByPath[p];
 
-      bool hadElements = await _generateElements(componentsRefs['namespace'],libPath);
-      bool hadBehaviors = await _generateBehaviors(componentsRefs['namespace'],libPath);
+      bool hadElements =
+          await _generateElements(componentsRefs['namespace'], libPath);
+      bool hadBehaviors =
+          await _generateBehaviors(componentsRefs['namespace'], libPath);
       if (!hadElements && !hadBehaviors) {
         await _writeDart(
             libPath,
@@ -186,11 +190,10 @@ class _ {
   Future<List<String>> _enlistFile(String destPath, String componentName,
       List<String> includes, List<String> excludes) async {
     String from = path.join(destPath, componentName);
-    Iterable<Glob> includeGlobs =
-        (includes ?? ["${componentName}.html"])
-            .map((pat) => new Glob(pat, recursive: false));
-    Iterable<Glob> excludeGlobs = (excludes ?? [])
+    Iterable<Glob> includeGlobs = (includes ?? ["${componentName}.html"])
         .map((pat) => new Glob(pat, recursive: false));
+    Iterable<Glob> excludeGlobs =
+        (excludes ?? []).map((pat) => new Glob(pat, recursive: false));
     List result = [];
     await for (FileSystemEntity entry
         in new Directory(from).list(recursive: true)) {
@@ -206,7 +209,7 @@ class _ {
   }
 
   _generateWrapper(String dartPackageName, component, componentsRefs,
-      Map<String,String> mappings, String destPath) async {
+      Map<String, String> mappings, String destPath) async {
     String componentName = component['name'];
     //String componentRef = component['ref'];
 
@@ -224,7 +227,7 @@ class _ {
     //    "[${componentName}]: ${component['includes']} - ${component['excludes']} => ${paths}");
 
     packageName = dartPackageName;
-    inOutMap = mappings ?? <String,String>{};
+    inOutMap = mappings ?? <String, String>{};
 
     await Future.wait(paths.map((p) async {
       // Read and analyze the source doc
@@ -268,7 +271,7 @@ class _ {
 
     String componentRefsPath = params['component-refs'];
     String destPath = params['dest-path'];
-    Map bowerNeeds = params['bower-needs-map'];
+    List bowerNeeds = params['bower-needs-map'];
     String dartPackageName = params['package-name'];
 
     var componentsRefs =
@@ -286,7 +289,7 @@ class _ {
         dartPackageName, componentsRefs, mappings, destPath);
   }
 
-  _generateElements(String namespace,String destPath) async {
+  _generateElements(String namespace, String destPath) async {
     Map<String, Map> elements = analysisResult['elements'];
     if (elements == null || elements.isEmpty) return false;
     bool found = false;
@@ -294,24 +297,31 @@ class _ {
       var descr = elements[name];
       if (!descr['main_file']) return;
       found = true;
-      String res = _generateElement(namespace,name, _currentBowerRef, descr);
+      String res = _generateElement(namespace, name, _currentBowerRef, descr);
       await _writeDart(destPath, res);
     }));
 
     return found;
   }
 
-  _generateBehaviors(String namespace,String destPath) async {
+  _generateBehaviors(String namespace, String destPath) async {
     Map<String, Map> elements = analysisResult['behaviors'];
     if (elements == null || elements.isEmpty) return false;
     bool found = false;
+    String res = null;
     await Future.wait(elements.keys.map((name) async {
       var descr = elements[name];
       if (!descr['main_file']) return;
       found = true;
-      String res = _generateBehavior(namespace,name, _currentBowerRef, descr);
-      await _writeDart(destPath, res);
+      if (res == null) {
+        res = _generateBehaviorHeader(namespace, name, _currentBowerRef, descr);
+      }
+      res += _generateBehavior(namespace, name, _currentBowerRef, descr);
     }));
+
+    if (res!=null) {
+      await _writeDart(destPath, res);
+    }
 
     return found;
   }
@@ -323,7 +333,7 @@ class _ {
     print("Wrote ${p}");
   }
 
-  _generateElement(String namespace,String name, var bowerRef, Map descr) {
+  _generateElement(String namespace, String name, var bowerRef, Map descr) {
     _importPrefixes = {};
     return """
 @JS('${namespace}')
@@ -346,21 +356,8 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
 """;
   }
 
-  _generateBehavior(String namespace,String name, var bowerRef, Map descr) {
-    _importPrefixes = {};
+_generateBehavior(String namespace, String name, var bowerRef, Map descr) {
     return """
-@JS('${(name){
-  List x = name.split('.');
-  return x.sublist(0,x.length-1).join('.');
-}(name)}')
-library ${name};
-import 'dart:html';
-import 'package:js/js.dart';
-import 'package:js/js_util.dart';
-
-import 'package:polymer_element/polymer_element.dart';
-${importBehaviors(relPath,name,descr)}
-
 ${generateComment(descr['description'])}
 
 @BowerImport(ref:'${bowerRef['ref']}',import:"${relPath}",name:'${bowerRef['name']}')
@@ -372,8 +369,26 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
 """;
   }
 
+  _generateBehaviorHeader(String namespace, String name, var bowerRef, Map descr) {
+      _importPrefixes = {};
+      return """
+  @JS('${(name){
+    List x = name.split('.');
+    return x.sublist(0,x.length-1).join('.');
+  }(name)}')
+  library ${name};
+  import 'dart:html';
+  import 'package:js/js.dart';
+  import 'package:js/js_util.dart';
+
+  import 'package:polymer_element/polymer_element.dart';
+  ${importBehaviors(relPath,name,descr)}
+
+  """;
+    }
+
   withBehaviors(String relPath, String name, Map descr,
-      {String keyword: 'with'}) {
+      {String keyword: 'implements'}) {
     List behaviors = descr['behaviors'];
     if (behaviors == null || behaviors.isEmpty) {
       return "";
@@ -393,7 +408,7 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
       n = n.substring(p + 1);
     }
 
-    return "${prefix}.${n}";
+    return (prefix!=null) ? "${prefix}.${n}" : n;
   }
 
   indents(int i, String s) =>

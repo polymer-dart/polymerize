@@ -1,3 +1,7 @@
+# 0.4.5
+
+ - updated to latest DDC (dart 1.22-dev.x)
+
 # 0.2.5
  - Updated libs
  
