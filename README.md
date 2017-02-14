@@ -1,4 +1,4 @@
-# Poylmerize - Polymer 2.0 Dart-DDC 
+# Polymerize - Polymer 2.0 Dart-DDC 
 
 [![Join the chat at https://gitter.im/devc_builder/Lobby](https://badges.gitter.im/devc_builder/Lobby.svg)](https://gitter.im/devc_builder/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
