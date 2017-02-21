@@ -1,5 +1,9 @@
 # 0.4.5
 
+ - update to latest DDC (dart 1.23-dev.x) - 2017 02 21
+
+# 0.4.4
+
  - updated to latest DDC (dart 1.22-dev.x)
 
 # 0.2.5

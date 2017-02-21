@@ -45,7 +45,8 @@ components:
     - "**/app-grid-*.html"
 
  - name: iron-list
-   ref : "PolymerElements/iron-list#2.0-preview"
+#   ref : "PolymerElements/iron-list#2.0-preview"
+   ref : "PolymerElements/iron-list#14150593d8b469b51552f78c15d55655d609eb2e"
 
  - name: paper-spinner
    ref : "PolymerElements/paper-spinner#2.0-preview"
@@ -65,6 +66,12 @@ components:
 
  - name : "paper-button"
    ref : "PolymerElements/paper-button#2.0-preview"
+
+ - name : "iron-range-behavior"
+   ref : "PolymerElements/iron-range-behavior#2.0-preview"
+
+ - name : "paper-progress"
+   ref : "PolymerElements/paper-progress#2.0-preview"
 
  - name :  "paper-radio-button"
    ref : "PolymerElements/paper-radio-button#2.0-preview"
