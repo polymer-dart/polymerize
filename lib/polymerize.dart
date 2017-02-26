@@ -239,7 +239,7 @@ Future<String> _buildOne(
               ..addOption('D'),
             {
               'D': [],
-              'dart-sdk': '/usr/lib/dart',
+              'dart-sdk': findDartSDKHome().parent.path,
               'url-mapping': maps.keys.map((k) => "${k},${maps[k]}")
             },
             null,
@@ -861,7 +861,6 @@ main(List<String> args) async {
   if (homePath == null) {
     homePath = "/tmp";
   }
-  print("SDK : ${findDartSDKHome()}");
 
   ArgParser parser = new ArgParser()
     ..addFlag('emit-output',
