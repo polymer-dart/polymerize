@@ -4,7 +4,7 @@ import 'package:args/args.dart';
 import 'package:path/path.dart' as path;
 import 'package:polymerize/package_graph.dart';
 
-const String RULES_VERSION = 'v0.9.0';
+const String RULES_VERSION = 'v0.9.1';
 
 Iterable<PackageNode> _transitiveDeps(PackageNode n,
     {Set<PackageNode> visited}) sync* {
@@ -70,7 +70,7 @@ dart_library(
     .where((x) => x != null)
     .join("\n\n");
 
-_generateWorkspaceFile(PackageGraph g, String destDir, String rules_version,
+_generateWorkspaceFile(PackageGraph g, String destDir, String rules_version, String sdk_home,
     {String developHome}) async {
   File workspace = new File(path.join(destDir, "WORKSPACE"));
   //print(g.allPackages.values.map((PackageNode p) => p.toString()).join("\n"));
@@ -89,7 +89,7 @@ load('@polymerize//:polymerize_workspace.bzl',
     'init_polymerize')
 
 # Init
-init_polymerize()
+init_polymerize('${sdk_home}')
 
 
 ##
@@ -114,7 +114,7 @@ load('@polymerize//:polymerize_workspace.bzl',
     'init_local_polymerize')
 
 # Init
-init_local_polymerize('${path.join(developHome,'polymerize')}')
+init_local_polymerize('${sdk_home}','${path.join(developHome,'polymerize')}')
 
 
 ##
@@ -215,7 +215,7 @@ runInit(ArgResults args) async {
   var mainDir = path.dirname(args.rest.isEmpty ? 'pubspec.yaml' : args.rest[0]);
   String develop = args['develop'];
   PackageGraph g = new PackageGraph.forPath(mainDir);
-  await _generateWorkspaceFile(g, mainDir, args['rules-version'],
+  await _generateWorkspaceFile(g, mainDir, args['rules-version'],  args['dart-bin-path'],
       developHome: develop != null ? path.canonicalize(develop) : null);
   await _generateBuildFiles(g.root, g.root, mainDir,
       allPackages: g.allPackages.values);

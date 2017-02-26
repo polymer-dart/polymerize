@@ -847,11 +847,21 @@ String _moduleForUri(Uri uri, {Map<String, String> mapping}) {
   return _moduleForPackage(m.group(1), mapping: mapping);
 }
 
-main(List<String> args) {
+Directory findDartSDKHome() {
+  if (Platform.environment['DART_HOME']!=null) {
+    return new Directory(Platform.environment['DART_HOME']);
+  }
+
+  // Else tries with current executable
+  return new File(Platform.resolvedExecutable).parent;
+}
+
+main(List<String> args) async {
   String homePath = user.homeDirPath;
   if (homePath == null) {
     homePath = "/tmp";
   }
+  print("SDK : ${findDartSDKHome()}");
 
   ArgParser parser = new ArgParser()
     ..addFlag('emit-output',
@@ -916,6 +926,7 @@ main(List<String> args) {
     ..addCommand(
         'init',
         new ArgParser()
+          ..addOption('dart-bin-path',defaultsTo: findDartSDKHome().path,help:'dart sdk path')
           ..addOption('rules-version',
               abbr: 'R', defaultsTo: RULES_VERSION, help: 'Bazel rules version')
           ..addOption('develop',
