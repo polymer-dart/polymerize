@@ -12,8 +12,8 @@ components:
    ref: "PolymerElements/iron-media-query#2.0-preview"
    overrides:
     query:
-      - "get mediaQuery => getProperty(this,'query');"
-      - "set mediaQuery(v) => setProperty(this,'query',v);"
+      - "get mediaQuery => getProperty(this as dynamic,'query');"
+      - "set mediaQuery(v) => setProperty(this as dynamic,'query',v);"
 
  - name: iron-location
    ref: "PolymerElements/iron-location#2.0-preview"
@@ -24,8 +24,8 @@ components:
     - all-imports.html
    overrides:
     query:
-      - "get queryPart => getProperty(this,'query');"
-      - "set queryPart(v) => setProperty(this,'query',v);"
+      - "get queryPart => getProperty(this as dynamic,'query');"
+      - "set queryPart(v) => setProperty(this as dynamic,'query',v);"
  - name: app-route
    ref: "PolymerElements/app-route#2.0-preview"
    includes:

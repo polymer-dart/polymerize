@@ -338,7 +338,7 @@ class _ {
     return """
 @JS('${namespace}')
 library ${name};
-import 'dart:html';
+import 'package:html5/html.dart';
 import 'package:js/js.dart';
 import 'package:js/js_util.dart';
 
@@ -377,7 +377,7 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
     return x.sublist(0,x.length-1).join('.');
   }(name)}')
   library ${name};
-  import 'dart:html';
+  import 'package:html5/html.dart';
   import 'package:js/js.dart';
   import 'package:js/js_util.dart';
 
@@ -427,7 +427,7 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
         'Object': '',
         'number': 'num',
         'Array': 'List',
-        'HTMLElement': 'HtmlElement'
+        
       }[jsType] ??
       jsType;
 
