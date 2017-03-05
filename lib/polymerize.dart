@@ -340,7 +340,60 @@ Future<String> _buildOne(
                 _moduleForUri(ce.source.uri, mapping: mapping),
                 from: pathThis);*/
 
+            String behaviorName(ClassElement intf, DartObject anno) {
+              DartObject libAnno = getAnnotation(intf.library.metadata, isJS);
+              String res = anno.getField('name').toStringValue();
+              if (libAnno == null) {
+                return res;
+              } else {
+                String pkg = libAnno.getField('name').toStringValue();
+                return "${pkg}.${res}";
+              }
+            }
+
+            bool notNull(x) => x != null;
+
             List<String> toImport = [];
+            Set<String> behaviors = new Set()
+              ..addAll(ce.interfaces.map((InterfaceType intf) {
+                DartObject anno = getAnnotation(
+                    intf.element.metadata, anyOf([isPolymerBehavior, isJS]));
+                if (anno != null) {
+                  return behaviorName(intf.element, anno);
+                } else {
+                  return null;
+                }
+              }).where(notNull));
+
+            // Look for ReduxBehavior
+            Map reduxInfo = ce.interfaces.map((intf) {
+              ElementAnnotation anno =
+                  getElementAnnotation(intf.element.metadata, isStoreDef);
+              if (anno == null) {
+                return null;
+              }
+
+              print("${anno.element.kind}");
+              if (anno.element.kind == ElementKind.GETTER) {
+                MethodElement m = anno.element;
+                String mod = _moduleForUri(m.source.uri, mapping: mapping);
+                List<String> p1 = path.split(m.source.uri.path).sublist(1);
+                p1[p1.length - 1] = path.basenameWithoutExtension(p1.last);
+                String p = p1.join('_');
+                print(
+                    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
+                return {
+                  'type': 'getter',
+                  'name': m.name,
+                  'source': p,
+                  'module': mod
+                };
+              }
+              DartObject reducer =
+                  anno.computeConstantValue().getField('reducer');
+              print("FOUND: ${reducer}");
+              return reducer;
+            }).firstWhere(notNull, orElse: () => {});
 
             if (uses != null) {
               // print("USES : ${uses}");
@@ -408,13 +461,14 @@ Future<String> _buildOne(
 
             if (native) {
               if (!native_imported) {
-              pre_dart.add(
-                  "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
-                  native_imported = true;
-                }
-              pre_dart.add(nativePreloadScript(tag,
-                jsNamespace.split('.')
-                  ..add(jsClass),polymerElementPath(mapping)));
+                pre_dart.add(
+                    "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
+                native_imported = true;
+              }
+              pre_dart.add(nativePreloadScript(
+                  tag,
+                  jsNamespace.split('.')..add(jsClass),
+                  polymerElementPath(mapping)));
             } else if (!native) {
               // TODO : embed template here ?
               pre_dart.add(
@@ -436,25 +490,10 @@ Future<String> _buildOne(
                 tagName: tag,
                 config: config,
                 resume: docResume,
+                reduxInfo: reduxInfo,
+                behaviors: behaviors,
                 native: native,
                 mapping: mapping));
-
-            //}
-          } else if ((reg = getAnnotation(ce.metadata, isDefine)) != null) {
-            throw "NOT WORKING ANYMMORE, TO BE UPDATED";
-            /*
-            String tag = reg.getField('tagName').toStringValue();
-            String htmlFile = reg.getField('htmlFile').toStringValue();
-
-            String name = path.basenameWithoutExtension(e.name);
-
-            String templatePath = path.join(path.dirname(e.source.fullName), htmlFile);
-
-            String rel = path.relative(templatePath, from: libPath);
-
-            String destTemplate = path.join(assetDir.path, rel);
-            new File(destTemplate).writeAsStringSync(webComponentTemplate(packageName: packageName, name: name, className: ce.name, tagName: tag));
-            */
           }
         });
       });
@@ -490,28 +529,23 @@ Future<String> _buildOne(
     File smap;
     File js;
 
-    if (bazelModeArgs == null) {
-      js = new File(path.join(dest.path, packageName, "${packageName}.js"));
-      smap =
-          new File(path.join(dest.path, packageName, "${packageName}.js.map"));
-    } else {
-      js = new File(bazelModeArgs['output']);
-      await sum.copy(bazelModeArgs['output_summary']);
-      //print("BZLBUILD Out       :${bazelModeArgs['output']}");
-      //print("BZLBUILD Sum. Out  :${bazelModeArgs['output_summary']}");
+    js = new File(bazelModeArgs['output']);
+    await sum.copy(bazelModeArgs['output_summary']);
+    //print("BZLBUILD Out       :${bazelModeArgs['output']}");
+    //print("BZLBUILD Sum. Out  :${bazelModeArgs['output_summary']}");
 
-      // WRITE HTML STUB
-      var html = new File(bazelModeArgs['output_html']);
-      // TODO : Aggiungere un import per ogni dipendenza - aggiungere l'import
-      // per ogni template
+    // WRITE HTML STUB
+    var html = new File(bazelModeArgs['output_html']);
+    // TODO : Aggiungere un import per ogni dipendenza - aggiungere l'import
+    // per ogni template
 
-      if (bazelModeArgs['bower-needs'] != null) {
-        await new File(bazelModeArgs['bower-needs']).writeAsString(
-            bower_imports.map((b) => '"${b.name}":"${b.ref}"').join("\n"));
-      }
+    if (bazelModeArgs['bower-needs'] != null) {
+      await new File(bazelModeArgs['bower-needs']).writeAsString(
+          bower_imports.map((b) => '"${b.name}":"${b.ref}"').join("\n"));
+    }
 
-      //print("MAPPIUNG : ${mapping}");
-      await html.writeAsString("""
+    //print("MAPPIUNG : ${mapping}");
+    await html.writeAsString("""
 <link rel='import' href='${path.relative("dart_sdk.html",from:path.dirname(mapping[packageName]))}'>
 ${importBowers(bower_imports,from:path.dirname(mapping[packageName]))}
 ${importDeps(mapping,packageName)}
@@ -521,7 +555,6 @@ ${pre_dart.join("\n")}
 <!-- components reg -->
 ${post_dart.join("\n")}
 """);
-    }
 
     await new Directory(path.join(dest.path, packageName)).create();
 
@@ -628,25 +661,34 @@ String relativeModulePath(String module,
 
 Map collectConfig(AnalysisContext context, ClassElement ce) {
   List<String> observers = [];
+  List<String> reduxActions = [];
   Map<String, Map> properties = {};
 
   ce.methods.forEach((MethodElement me) {
     DartObject obs = getAnnotation(me.metadata, isObserve);
-    if (obs == null) {
-      return;
+    if (obs != null) {
+      String params = obs.getField('observed').toStringValue();
+
+      observers.add("${me.name}(${params})");
     }
-
-    String params = obs.getField('observed').toStringValue();
-
-    observers.add("${me.name}(${params})");
+    obs = getAnnotation(me.metadata, isReduxActionFactory);
+    if (obs != null) {
+      reduxActions.add(me.name);
+    }
   });
 
   ce.fields.forEach((FieldElement fe) {
     DartObject not = getAnnotation(fe.metadata, isNotify);
     properties[fe.name] = {'notify': not != null};
+    DartObject prop = getAnnotation(fe.metadata, isProperty);
+    if (prop != null) {
+      properties[fe.name]
+        ..['notify'] = prop.getField('notify').toBoolValue()
+        ..['statePath'] = prop.getField('statePath').toStringValue();
+    }
   });
 
-  return {'observers': observers, 'properties': properties};
+  return {'observers': observers, 'properties': properties,'reduxActions':reduxActions};
 }
 
 final Uri POLYMER_REGISTER_URI =
@@ -656,6 +698,19 @@ final Uri JS_URI = Uri.parse('package:js/js.dart');
 bool isPolymerRegister(DartObject o) =>
     (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
     (o.type.name == 'PolymerRegister');
+
+bool isPolymerBehavior(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'PolymerBehavior');
+
+bool isStoreDef(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'StoreDef');
+
+typedef bool matcher(DartObject x);
+
+matcher anyOf(List<matcher> matches) =>
+    (DartObject o) => matches.any((m) => m(o));
 
 bool isJS(DartObject o) =>
     (o.type.element.librarySource.uri == JS_URI) && (o.type.name == 'JS');
@@ -672,6 +727,14 @@ bool isObserve(DartObject o) =>
     (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
     (o.type.name == 'Observe');
 
+bool isReduxActionFactory(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'ReduxActionFactory');
+
+bool isProperty(DartObject o) =>
+    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
+    (o.type.name == 'Property');
+
 bool isNotify(DartObject o) =>
     (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
     (o.type.name == 'Notify');
@@ -682,6 +745,12 @@ DartObject getAnnotation(
     metadata
         .map((an) => an.computeConstantValue())
         .firstWhere(matches, orElse: () => null);
+
+ElementAnnotation getElementAnnotation(
+        Iterable<ElementAnnotation> metadata, //
+        bool matches(DartObject x)) =>
+    metadata.firstWhere((an) => matches(an.computeConstantValue()),
+        orElse: () => null);
 
 String webComponentTemplate(
         {String template,
@@ -713,10 +782,12 @@ String htmlImportTemplate(
         Map<String, String> mapping,
         HtmlDocResume resume,
         String jsNamespace,
+        Set<String> behaviors,
+        Map reduxInfo,
         String jsClassName}) =>
-"""<script>
+    """<script>
   require(['${path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName)}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
-  polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config)},${docResumeTemplate(resume)},${native});
+  polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config,behaviors,reduxInfo)},${docResumeTemplate(resume)},${native});
 });
 </script>""";
 
@@ -728,10 +799,14 @@ String nativePreloadScript(
  });
 </script>""";
 
-String configTemplate(Map config) => (config == null || config.isEmpty)
-    ? "null"
-    : """{
+String configTemplate(Map config, Set behaviors, Map reduxInfo) =>
+    (config == null || config.isEmpty)
+        ? "null"
+        : """{
     observers:[${config['observers'].map((x) => '"${x}"').join(',')}],
+    behaviors:[${behaviors.map((x) => 'window.${x}').join(',')}],
+    reduxActions:[${config['reduxActions'].map((x) => '"${x}"').join(',')}],
+    reduxInfo:{ source : "${reduxInfo['source']??''}", module: "${reduxInfo['module']??''}", name:"${reduxInfo['name']??''}"},
     properties: {
       ${configPropsTemplate(config['properties'])}
     }
@@ -746,7 +821,7 @@ String docResumeTemplate(HtmlDocResume resume) => resume == null
 
 String configPropsTemplate(Map properties) => properties.keys
     .map((String propName) =>
-        "${propName} : { notify: ${properties[propName]['notify']}}")
+        "${propName} : { notify: ${properties[propName]['notify']}, statePath: '${properties[propName]['statePath']??''}'}")
     .join(',\n      ');
 
 DartType metadataType(ElementAnnotation meta) {
@@ -848,7 +923,7 @@ String _moduleForUri(Uri uri, {Map<String, String> mapping}) {
 }
 
 Directory findDartSDKHome() {
-  if (Platform.environment['DART_HOME']!=null) {
+  if (Platform.environment['DART_HOME'] != null) {
     return new Directory(Platform.environment['DART_HOME']);
   }
 
@@ -925,7 +1000,8 @@ main(List<String> args) async {
     ..addCommand(
         'init',
         new ArgParser()
-          ..addOption('dart-bin-path',defaultsTo: findDartSDKHome().path,help:'dart sdk path')
+          ..addOption('dart-bin-path',
+              defaultsTo: findDartSDKHome().path, help: 'dart sdk path')
           ..addOption('rules-version',
               abbr: 'R', defaultsTo: RULES_VERSION, help: 'Bazel rules version')
           ..addOption('develop',
@@ -1076,7 +1152,7 @@ Future _exportRequireJs(String dest, String dest_html) async {
 (function(scope){
   scope.define(['require'],function(require) {
     scope.require = function(ids, func) {
-      func.apply(null, ids.map(function(m) {
+      return func.apply(null, ids.map(function(m) {
         return require(m);
       }));
     };
