@@ -3,6 +3,7 @@
  - added support for mixins
  - better wrapper generation
  - updated polymer analyzer
+ - support for REDUX!!!
 
 # 0.4.5
 
