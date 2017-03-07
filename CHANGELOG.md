@@ -1,3 +1,9 @@
+# 0.5.0
+
+ - added support for mixins
+ - better wrapper generation
+ - updated polymer analyzer
+
 # 0.4.5
 
  - update to latest DDC (dart 1.23-dev.x) - 2017 02 21
