@@ -373,15 +373,15 @@ Future<String> _buildOne(
                 return null;
               }
 
-              print("${anno.element.kind}");
+              //print("${anno.element.kind}");
               if (anno.element.kind == ElementKind.GETTER) {
                 MethodElement m = anno.element;
                 String mod = _moduleForUri(m.source.uri, mapping: mapping);
                 List<String> p1 = path.split(m.source.uri.path).sublist(1);
                 p1[p1.length - 1] = path.basenameWithoutExtension(p1.last);
                 String p = p1.join('_');
-                print(
-                    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
+                //print(
+                //    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
                 return {
                   'type': 'getter',
                   'name': m.name,
@@ -688,7 +688,11 @@ Map collectConfig(AnalysisContext context, ClassElement ce) {
     }
   });
 
-  return {'observers': observers, 'properties': properties,'reduxActions':reduxActions};
+  return {
+    'observers': observers,
+    'properties': properties,
+    'reduxActions': reduxActions
+  };
 }
 
 final Uri POLYMER_REGISTER_URI =
@@ -821,8 +825,10 @@ String docResumeTemplate(HtmlDocResume resume) => resume == null
 
 String configPropsTemplate(Map properties) => properties.keys
     .map((String propName) =>
-        "${propName} : { notify: ${properties[propName]['notify']}, statePath: '${properties[propName]['statePath']??''}'}")
+        "${propName} : { notify: ${properties[propName]['notify']} ${prop('statePath',properties[propName]['statePath'])}}")
     .join(',\n      ');
+String prop(String name, String val) =>
+    val != null ? ", ${name} : '${val}'" : "";
 
 DartType metadataType(ElementAnnotation meta) {
   if (meta is ConstructorElement) {
@@ -938,6 +944,7 @@ main(List<String> args) async {
   }
 
   ArgParser parser = new ArgParser()
+    ..addSeparator("generic options")
     ..addFlag('emit-output',
         abbr: 'e',
         negatable: true,
@@ -962,6 +969,7 @@ main(List<String> args) async {
     ..addCommand(
         'bazel',
         new ArgParser()
+          ..addSeparator("bazel build helper")
           ..addOption('base_path', abbr: 'b', help: 'base package path')
           ..addOption("bower-needs", help: 'where to export bower needs')
           ..addOption('export-sdk', help: 'do export sdk')
@@ -984,6 +992,7 @@ main(List<String> args) async {
     ..addCommand(
         'pub',
         new ArgParser()
+          ..addSeparator("pub helper for bazel")
           ..addOption('package', abbr: 'p', help: 'package name')
           ..addOption('version', abbr: 'v', help: 'package version')
           ..addOption('dest', abbr: 'd', help: 'destination')
@@ -991,6 +1000,7 @@ main(List<String> args) async {
     ..addCommand(
         'generate-wrapper',
         new ArgParser()
+          ..addSeparator("component wrapper generator")
           ..addOption('component-refs', help: 'Components references yaml')
           ..addOption('dest-path', help: 'Destination path')
           ..addOption('bower-needs-map',
@@ -1025,7 +1035,10 @@ main(List<String> args) async {
   ArgResults results = parser.parse(args);
 
   if (results['help']) {
-    print(parser.usage);
+    print("polymerize <CMD> <options>\n${parser.usage}\n");
+    parser.commands.keys.forEach((cmd) {
+      print("polymerize ${cmd}\n${parser.commands[cmd].usage}\n");
+    });
     return;
   }
 
@@ -1067,7 +1080,13 @@ main(List<String> args) async {
           "generate-wrapper usage :\n${parser.commands['generate-wrapper'].usage}");
       return;
     }
-    new Generator().runGenerateWrapper(results.command);
+    try {
+      await new Generator().runGenerateWrapper(results.command);
+    } on String catch (error) {
+      if (error == "HELP") {
+        print("USAGE: ${parser.commands[results.command.name].usage}");
+      }
+    }
     return;
   }
 

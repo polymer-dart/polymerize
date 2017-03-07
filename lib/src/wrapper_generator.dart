@@ -8,6 +8,8 @@ import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 import 'package:glob/glob.dart';
 
+Logger _logger = new Logger('wrapper_generator');
+
 class ImportedData {
   String jsPackageName;
   String jsClassName;
@@ -95,40 +97,28 @@ class Generator {
   Map<String, String> inOutMap;
 
   _generateBowerJson(componentsRefs, String destPath) async {
-    bowerRefs(componentsRefs) => componentsRefs['components']
-        .map((c) => "\"${c['name']}\" : \"${c['ref']}\"")
-        .join(",\n\t");
-
     await new Directory(destPath).createSync(recursive: true);
-    await new File(path.join(destPath, 'bower.json')).writeAsString("""{
-  "name": "polymer_dcc",
-  "version": "0.0.0",
-  "homepage": "https://github.com/dart-lang/polymer-elements",
-  "authors": [
-    "Polymer.dart Authors <web-ui-dev@dartlang.org>"
-  ],
-  "private": true,
-  "dependencies": {
-    ${bowerRefs(componentsRefs)}
-  },
-  "resolutions": {
-    "iron-checked-element-behavior": "2.0-preview",
-    "paper-behaviors": "2.0-preview",
-    "polymer": "2.0-preview",
-    "iron-behaviors": "2.0-preview",
-    "iron-a11y-keys-behavior": "2.0-preview",
-    "iron-validatable-behavior": "2.0-preview",
-    "paper-ripple": "2.0-preview",
-    "webcomponentsjs": "v1",
-    "iron-meta": "2.0-preview"
-  }
-}""");
+    await new File(path.join(destPath, 'bower.json'))
+        .writeAsString(JSON.encode({
+      "name": "generated_elements",
+      "version": "0.0.0",
+      "homepage": "https://dart-polymer.com",
+      "authors": ["Dart-Polymer <info@dart-polymer.com>"],
+      "private": true,
+      "dependencies": new Map.fromIterable(componentsRefs['components'],
+          key: (x) => x['name'], value: (x) => x['ref']),
+      "resolutions": new Map()..addAll(componentsRefs['resolutions'])
+    }));
+    _logger.info("Created `bower.json`");
   }
 
   _installBowerComponents(String destPath) async {
+    _logger.info("Downloading bower components");
     ProcessResult res =
         await Process.run('bower', ['install'], workingDirectory: destPath);
     if (res.exitCode != 0) {
+      _logger.severe(
+          "Error downloading bower components, try running `bower install` in ${destPath}, and eventually add a `resolutions` section to the component file");
       throw res.stderr;
     }
   }
@@ -136,7 +126,7 @@ class Generator {
   var _currentBowerRef;
   Map<String, dynamic> _bowerRefsByPath = {};
 
-  _generateMappingFromNeeds(bowerNeeds) async {
+  Future _generateMappingFromNeeds(bowerNeeds) async {
     if (bowerNeeds == null) {
       return;
     }
@@ -149,14 +139,13 @@ class Generator {
     //print("Using mappings : ${packageMappings} from ${bowerNeeds}");
   }
 
-  _generateWrappers(String dartPackageName, componentsRefs,
-      Map<String, String> mappings, String destPath) async {
+  _generateWrappers(
+      String dartPackageName, componentsRefs, String destPath) async {
     await Future.wait(componentsRefs['components'].map((comp) =>
-        _generateWrapper(
-            dartPackageName, comp, componentsRefs, mappings, destPath)));
+        _generateWrapper(dartPackageName, comp, componentsRefs, destPath)));
 
     //print("Resulting mappings :${packageMappings}");
-    print("Start writing results: \n");
+    _logger.info("Start writing results: \n");
 
     String libPath = path.join(destPath, 'lib');
     for (String p in analysisResults.keys) {
@@ -174,7 +163,7 @@ class Generator {
             """
 import 'package:polymer_element/polymer_element.dart' show BowerImport;
 
-${importBehaviors(relPath,'_',{})}
+${importBehaviors(relPath,'_')}
 
 /**
  **/
@@ -209,7 +198,7 @@ class _ {
   }
 
   _generateWrapper(String dartPackageName, component, componentsRefs,
-      Map<String, String> mappings, String destPath) async {
+      String destPath) async {
     String componentName = component['name'];
     //String componentRef = component['ref'];
 
@@ -227,7 +216,7 @@ class _ {
     //    "[${componentName}]: ${component['includes']} - ${component['excludes']} => ${paths}");
 
     packageName = dartPackageName;
-    inOutMap = mappings ?? <String, String>{};
+    inOutMap = <String, String>{};
 
     await Future.wait(paths.map((p) async {
       // Read and analyze the source doc
@@ -244,17 +233,17 @@ class _ {
       mineBehaviors.forEach((b) {
         // Fill the map
         packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
-        new Logger("analyzing phase").info("Analyzed ${b['name']}");
+        _logger.info("Analyzed ${b['name']}");
       });
 
       mineElements.forEach((b) {
         // Fill the map
         packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
-        new Logger("analyzing phase").info("Analyzed ${b['name']}");
+        _logger.info("Analyzed ${b['name']}");
       });
 
       if (mineBehaviors.isEmpty && mineElements.isEmpty) {
-        new Logger("analyzing phase").warning("${p} was empty");
+        _logger.warning("${p} was empty");
       }
     }));
   }
@@ -272,10 +261,16 @@ class _ {
     String componentRefsPath = params['component-refs'];
     String destPath = params['dest-path'];
     List bowerNeeds = params['bower-needs-map'];
-    String dartPackageName = params['package-name'];
+
+    if (componentRefsPath == null || destPath == null) {
+      throw "HELP";
+    }
 
     var componentsRefs =
         loadYaml(await new File(componentRefsPath).readAsString());
+
+    String dartPackageName =
+        params['package-name'] ?? componentsRefs['package-name'];
 
     //print("Genrating wrappers with : ${componentsRefs['components'].map((c)=>c['name']).join(',')}");
 
@@ -283,10 +278,13 @@ class _ {
 
     await _installBowerComponents(destPath);
 
-    var mappings = await _generateMappingFromNeeds(bowerNeeds);
+    await _generateMappingFromNeeds(bowerNeeds);
+    if ((componentsRefs as Map).containsKey('externals')) {
+      packageMappings.addAll(componentsRefs['externals']);
+    }
 
-    await _generateWrappers(
-        dartPackageName, componentsRefs, mappings, destPath);
+    _logger.info("Generating components");
+    await _generateWrappers(dartPackageName, componentsRefs, destPath);
   }
 
   _generateElements(String namespace, String destPath) async {
@@ -298,7 +296,6 @@ class _ {
       if (!descr['main_file']) return;
       found = true;
       String res = _generateElement(namespace, name, _currentBowerRef, descr);
-      await _writeDart(destPath, res);
     }));
 
     return found;
@@ -308,29 +305,29 @@ class _ {
     Map<String, Map> elements = analysisResult['behaviors'];
     if (elements == null || elements.isEmpty) return false;
     bool found = false;
-    String res = null;
+
+    // Filter only elements
+    elements = new Map.fromIterable(
+        elements.keys.where((x) => elements[x]['main_file']),
+        value: (x) => elements[x]);
+    if (elements.isEmpty) return false;
+
+    String res = _generateBehaviorHeader(
+        namespace, elements.keys.first, _currentBowerRef);
     await Future.wait(elements.keys.map((name) async {
       var descr = elements[name];
-      if (!descr['main_file']) return;
-      found = true;
-      if (res == null) {
-        res = _generateBehaviorHeader(namespace, name, _currentBowerRef, descr);
-      }
       res += _generateBehavior(namespace, name, _currentBowerRef, descr);
     }));
 
-    if (res!=null) {
-      await _writeDart(destPath, res);
-    }
-
-    return found;
+    await _writeDart(destPath, res);
+    return true;
   }
 
   _writeDart(String destPath, String content) async {
     String p = path.join(destPath, inOutMap[relPath]);
     await new Directory(path.dirname(p)).create(recursive: true);
     await new File(p).writeAsString(content);
-    print("Wrote ${p}");
+    _logger.info("Wrote ${p}");
   }
 
   _generateElement(String namespace, String name, var bowerRef, Map descr) {
@@ -343,7 +340,7 @@ import 'package:js/js.dart';
 import 'package:js/js_util.dart';
 
 import 'package:polymer_element/polymer_element.dart';
-${importBehaviors(relPath,name,descr)}
+${importBehaviors(relPath,name)}
 
 ${generateComment(descr['description'])}
 
@@ -352,11 +349,12 @@ ${generateComment(descr['description'])}
 @BowerImport(ref:'${bowerRef['ref']}',import:"${relPath}",name:'${bowerRef['name']}')
 abstract class ${name} extends PolymerElement ${withBehaviors(relPath,name,descr)} {
 ${generateProperties(relPath,name,descr,descr['properties'])}
+${generateMethods(relPath,name,descr,descr['methods'])}
 }
 """;
   }
 
-_generateBehavior(String namespace, String name, var bowerRef, Map descr) {
+  _generateBehavior(String namespace, String name, var bowerRef, Map descr) {
     return """
 ${generateComment(descr['description'])}
 
@@ -364,28 +362,29 @@ ${generateComment(descr['description'])}
 @JS('${name.split('.').last}')
 abstract class ${name.split('.').last} ${withBehaviors(relPath,name,descr,keyword:'implements')} {
 ${generateProperties(relPath,name,descr,descr['properties'])}
+${generateMethods(relPath,name,descr,descr['methods'])}
 }
 
 """;
   }
 
-  _generateBehaviorHeader(String namespace, String name, var bowerRef, Map descr) {
-      _importPrefixes = {};
-      return """
-  @JS('${(name){
-    List x = name.split('.');
-    return x.sublist(0,x.length-1).join('.');
-  }(name)}')
-  library ${name};
-  import 'package:html5/html.dart';
-  import 'package:js/js.dart';
-  import 'package:js/js_util.dart';
+  _generateBehaviorHeader(String namespace, String name, var bowerRef) {
+    _importPrefixes = {};
+    return """
+@JS('${(name){
+  List x = name.split('.');
+  return x.sublist(0,x.length-1).join('.');
+}(name)}')
+library ${name};
+import 'package:html5/html.dart';
+import 'package:js/js.dart';
+import 'package:js/js_util.dart';
 
-  import 'package:polymer_element/polymer_element.dart';
-  ${importBehaviors(relPath,name,descr)}
+import 'package:polymer_element/polymer_element.dart';
+${importBehaviors(relPath,name)}
 
-  """;
-    }
+""";
+  }
 
   withBehaviors(String relPath, String name, Map descr,
       {String keyword: 'implements'}) {
@@ -408,7 +407,7 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
       n = n.substring(p + 1);
     }
 
-    return (prefix!=null) ? "${prefix}.${n}" : n;
+    return (prefix != null) ? "${prefix}.${n}" : n;
   }
 
   indents(int i, String s) =>
@@ -427,27 +426,37 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
         'Object': '',
         'number': 'num',
         'Array': 'List',
-        
       }[jsType] ??
       jsType;
 
-  Iterable _importedThings(Map descr) sync* {
+  Iterable _importedThings() sync* {
+    // Defined behavior names
+    Set<String> names = new Set.from((analysisResult['behaviors'] ?? {})
+        .keys
+        .where((x) => analysisResult['behaviors'][x]['main_file']));
+
     if (analysisResult['elements'] != null) {
-      yield* analysisResult['elements'].values.where((x) => !x['main_file']);
+      for (String k in analysisResult['elements'].keys) {
+        Map v = analysisResult['elements'][k];
+        if (!v['main_file'])
+          yield v;
+        else if ((v['behaviors'] ?? []).isNotEmpty)
+          yield* v['behaviors'].where((x) => !names.contains(x['name']));
+      }
     }
 
     if (analysisResult['behaviors'] != null) {
-      yield* analysisResult['behaviors'].values.where((x) => !x['main_file']);
+      for (String k in analysisResult['behaviors'].keys) {
+        Map v = analysisResult['behaviors'][k];
+        if (!v['main_file'])
+          yield v;
+        else if ((v['behaviors'] ?? []).isNotEmpty)
+          yield* v['behaviors'].where((x) => !names.contains(x['name']));
+      }
     }
-
-    Set<String> names = new Set.from(analysisResult['behaviors'].keys);
-
-    // For behaviors that are used but not analyzed (TODO: how to do the same with elements?)
-    yield* (descr['behaviors'] ?? []).where((x) => !names.contains(x['name']));
   }
 
-  importBehaviors(String relPath, String name, Map descr) =>
-      _importedThings(descr).map((b) {
+  importBehaviors(String relPath, String name) => _importedThings().map((b) {
         String prefix = "imp${_importPrefixes.length}";
         _importPrefixes[b['name']] = prefix;
         return 'import \'${resolveImport(b)}\' as ${prefix};';
@@ -463,8 +472,18 @@ ${generateProperties(relPath,name,descr,descr['properties'])}
         .join("\n");
   }
 
+  generateMethods(String relPath, String name, Map descr, Map methods) {
+    if (methods == null) {
+      return "";
+    }
+
+    return methods.values
+        .map((p) => generateMethod(relPath, name, descr, p))
+        .join("\n");
+  }
+
   generateProperty(String relPath, String name, Map descr, Map prop) {
-    Map overrides = _currentBowerRef['overrides'] ?? {};
+    Map overrides = (_currentBowerRef['overrides'] ?? {})[name] ?? {};
     //print("OVERRIDES: ${overrides} , ${name}");
     if (overrides.containsKey(prop['name'])) {
       return "${generateComment(prop['description'], indent: 2)}\n${overrides[prop['name']].join('\n')}";
@@ -476,4 +495,20 @@ ${generateComment(prop['description'], indent: 2)}
 """;
     }
   }
+
+  generateMethod(String relPath, String name, Map descr, Map method) {
+    Map overrides = (_currentBowerRef['overrides'] ?? {})[name] ?? {};
+    //print("OVERRIDES: ${overrides} , ${name}");
+    if (overrides.containsKey(method['name'])) {
+      return "${generateComment(method['description'], indent: 2)}\n${overrides[method['name']].join('\n')}";
+    } else {
+      return """
+${generateComment(method['description'], indent: 2)}
+  external ${method['isVoid']?'void':_dartType(method['type']??'')} ${method['name']}(${generateArgs(method['args'])});
+""";
+    }
+  }
+
+  generateArgs(List args) =>
+      args.map((x) => "${_dartType(x['type'])} ${x['name']}").join(',');
 }
