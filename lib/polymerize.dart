@@ -328,12 +328,12 @@ Future<String> _buildOne(
             bool native = reg.getField('native').toBoolValue();
 
             String tag = reg.getField('tagName').toStringValue();
-            String template = reg.getField('template').toStringValue();
+            String template = reg.getField('template')?.toStringValue();
             //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
 
             List<DartObject> uses = reg.getField('uses')?.toListValue() ?? [];
             String pathThis = path.join(
-                _moduleForUri(ce.source.uri, mapping: mapping), template);
+                _moduleForUri(ce.source.uri, mapping: mapping), template??'none.html');
             pathThis = path.dirname(pathThis);
 
             /*String reversePath = path.relative(
@@ -434,7 +434,7 @@ Future<String> _buildOne(
 
             // Trovo il file relativo all'element
             String templatePath;
-            String finalDest;
+            String finalDest = null;
             HtmlDocResume docResume;
             if (template != null) {
               templatePath = path.isAbsolute(template)
@@ -469,7 +469,7 @@ Future<String> _buildOne(
                   tag,
                   jsNamespace.split('.')..add(jsClass),
                   polymerElementPath(mapping)));
-            } else if (!native) {
+            } else if (!native && finalDest!=null) {
               // TODO : embed template here ?
               pre_dart.add(
                   "<link rel='import' href='${path.normalize(path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html'])))}'>");

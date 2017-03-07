@@ -141,8 +141,10 @@ class Generator {
 
   _generateWrappers(
       String dartPackageName, componentsRefs, String destPath) async {
-    await Future.wait(componentsRefs['components'].map((comp) =>
-        _generateWrapper(dartPackageName, comp, componentsRefs, destPath)));
+    inOutMap = <String, String>{};
+    for (Map comp in componentsRefs['components']) {
+      await _generateWrapper(dartPackageName, comp, componentsRefs, destPath);
+    }
 
     //print("Resulting mappings :${packageMappings}");
     _logger.info("Start writing results: \n");
@@ -150,6 +152,7 @@ class Generator {
     String libPath = path.join(destPath, 'lib');
     for (String p in analysisResults.keys) {
       relPath = p;
+      _logger.info("Processing ${relPath}");
       analysisResult = analysisResults[p];
       _currentBowerRef = _bowerRefsByPath[p];
 
@@ -216,9 +219,8 @@ class _ {
     //    "[${componentName}]: ${component['includes']} - ${component['excludes']} => ${paths}");
 
     packageName = dartPackageName;
-    inOutMap = <String, String>{};
 
-    await Future.wait(paths.map((p) async {
+    for (String p in paths) {
       // Read and analyze the source doc
       //print("anal ${compDir}  ${p}");
       var res = await _analyze(p, compDir);
@@ -243,9 +245,9 @@ class _ {
       });
 
       if (mineBehaviors.isEmpty && mineElements.isEmpty) {
-        _logger.warning("${p} was empty");
+        _logger.warning("${p} contains no elements nor behaviors ...");
       }
-    }));
+    }
   }
 
   _outputFileFor(String p) =>
@@ -291,12 +293,13 @@ class _ {
     Map<String, Map> elements = analysisResult['elements'];
     if (elements == null || elements.isEmpty) return false;
     bool found = false;
-    await Future.wait(elements.keys.map((name) async {
+    for (String name in elements.keys) {
       var descr = elements[name];
-      if (!descr['main_file']) return;
+      if (!descr['main_file']) continue;
       found = true;
-      String res = _generateElement(namespace, name, _currentBowerRef, descr);
-    }));
+      await _writeDart(
+          destPath, _generateElement(namespace, name, _currentBowerRef, descr));
+    }
 
     return found;
   }
@@ -314,10 +317,10 @@ class _ {
 
     String res = _generateBehaviorHeader(
         namespace, elements.keys.first, _currentBowerRef);
-    await Future.wait(elements.keys.map((name) async {
+    for (String name in elements.keys) {
       var descr = elements[name];
       res += _generateBehavior(namespace, name, _currentBowerRef, descr);
-    }));
+    }
 
     await _writeDart(destPath, res);
     return true;

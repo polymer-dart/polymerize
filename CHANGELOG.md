@@ -1,3 +1,8 @@
+# 0.5.2
+
+ - fixed bug on generator
+ - support for embedded templates
+
 # 0.5.1
  
  - changed urls and references
