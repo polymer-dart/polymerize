@@ -1,3 +1,7 @@
+# 0.5.1
+ 
+ - changed urls and references
+
 # 0.5.0
 
  - added support for mixins
