@@ -1,3 +1,7 @@
+# 0.5.3
+
+ - added `bower_resolutions.yaml` optional ovverride for `polymerize init`
+
 # 0.5.2
 
  - fixed bug on generator
