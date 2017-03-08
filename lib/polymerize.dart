@@ -552,7 +552,7 @@ ${importBowers(bower_imports,from:path.dirname(mapping[packageName]))}
 ${importDeps(mapping,packageName)}
 ${pre_dart.join("\n")}
 <!-- Module Dart -->
-<script src='${path.basename(js.path)}' as='${mapping[packageName]}'></script>
+<script src='${path.basename(js.path)}' as='${_fixModuleName(mapping[packageName])}'></script>
 <!-- components reg -->
 ${post_dart.join("\n")}
 """);
@@ -566,6 +566,8 @@ ${post_dart.join("\n")}
   }
   return sum.path;
 }
+
+String _fixModuleName(String modName) => modName.startsWith('external/')?modName.substring(9):modName;
 
 /***
  * Analyze one HTML template
@@ -791,7 +793,7 @@ String htmlImportTemplate(
         Map reduxInfo,
         String jsClassName}) =>
     """<script>
-  require(['${path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName)}','${polymerElementPath(mapping)}/polymerize'],function(pkg,polymerize) {
+  require(['${_fixModuleName(path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName))}','${_fixModuleName(polymerElementPath(mapping))}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config,behaviors,reduxInfo)},${docResumeTemplate(resume)},${native});
 });
 </script>""";
@@ -799,7 +801,7 @@ String htmlImportTemplate(
 String nativePreloadScript(
         String tagName, List<String> classPath, String polymerElementPath) =>
     """<script>
- require(['${polymerElementPath}/native_import'],function(util) {
+ require(['${_fixModuleName(polymerElementPath)}/native_import'],function(util) {
    util.importNative('${tagName}',${classPath.map((s) => '\'${s}\'').join(',')});
  });
 </script>""";
@@ -897,7 +899,7 @@ String _moduleForLibrary(Source source, {Map<String, String> mapping}) {
       throw "Source should be in package format :${source.fullName}";
     }
 
-    return "${_moduleForPackage(m.group(1), mapping: mapping)}/${m.group(1)}";
+    return "${_fixModuleName(_moduleForPackage(m.group(1), mapping: mapping))}/${m.group(1)}";
   }
 
   throw 'Imported file "${source.uri}" was not found as a summary or source '
