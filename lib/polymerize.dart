@@ -1010,6 +1010,7 @@ main(List<String> args) async {
     ..addCommand(
         'init',
         new ArgParser()
+          ..addOption('bower-resolutions',defaultsTo: "bower_resolutions.yaml",abbr:'B',help:'(Optional) Bower resolutions file')
           ..addOption('dart-bin-path',
               defaultsTo: findDartSDKHome().path, help: 'dart sdk path')
           ..addOption('rules-version',
