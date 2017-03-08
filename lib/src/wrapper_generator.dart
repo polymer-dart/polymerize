@@ -88,6 +88,7 @@ class Generator {
     //var relPath = "src/${relPath}";
 
     analysisResults[relPath] = analysisResult;
+    _logger.finest("Analyzed ${analysisResults.length} files");
 
     return analysisResult;
   }
@@ -143,27 +144,31 @@ class Generator {
       String dartPackageName, componentsRefs, String destPath) async {
     inOutMap = <String, String>{};
     for (Map comp in componentsRefs['components']) {
-      await _generateWrapper(dartPackageName, comp, componentsRefs, destPath);
+      await _analyzeComponent(dartPackageName, comp, componentsRefs, destPath);
     }
 
     //print("Resulting mappings :${packageMappings}");
-    _logger.info("Start writing results: \n");
+    _logger.info(
+        "Start writing results for ${analysisResults.keys.length} files: \n");
+    List<String> paths = new List.from(analysisResults.keys);
+    _logger.finest("Files to generate [${paths.length}] : ${paths}");
 
     String libPath = path.join(destPath, 'lib');
-    for (String p in analysisResults.keys) {
+    for (String p in paths) {
       relPath = p;
-      _logger.info("Processing ${relPath}");
+      _logger.fine("Processing ${relPath}");
       analysisResult = analysisResults[p];
       _currentBowerRef = _bowerRefsByPath[p];
 
-      bool hadElements =
-          await _generateElements(componentsRefs['namespace'], libPath);
-      bool hadBehaviors =
-          await _generateBehaviors(componentsRefs['namespace'], libPath);
-      if (!hadElements && !hadBehaviors) {
-        await _writeDart(
-            libPath,
-            """
+      try {
+        bool hadElements =
+            await _generateElements(componentsRefs['namespace'], libPath);
+        bool hadBehaviors =
+            await _generateBehaviors(componentsRefs['namespace'], libPath);
+        if (!hadElements && !hadBehaviors) {
+          await _writeDart(
+              libPath,
+              """
 import 'package:polymer_element/polymer_element.dart' show BowerImport;
 
 ${importBehaviors(relPath,'_')}
@@ -175,6 +180,9 @@ class _ {
 
 }
 """);
+        }
+      } catch (error, stack) {
+        _logger.severe("While processing ${p}", error, stack);
       }
     }
   }
@@ -200,7 +208,7 @@ class _ {
     return result;
   }
 
-  _generateWrapper(String dartPackageName, component, componentsRefs,
+  _analyzeComponent(String dartPackageName, component, componentsRefs,
       String destPath) async {
     String componentName = component['name'];
     //String componentRef = component['ref'];
@@ -223,6 +231,8 @@ class _ {
     for (String p in paths) {
       // Read and analyze the source doc
       //print("anal ${compDir}  ${p}");
+
+      _logger.info("Reading ${p}");
       var res = await _analyze(p, compDir);
       //print("RES: ${res}");
       _bowerRefsByPath[p] = component;
@@ -235,13 +245,13 @@ class _ {
       mineBehaviors.forEach((b) {
         // Fill the map
         packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
-        _logger.info("Analyzed ${b['name']}");
+        _logger.info("Found ${b['name']}");
       });
 
       mineElements.forEach((b) {
         // Fill the map
         packageMappings[b['name']] = 'package:${packageName}/${inOutMap[p]}';
-        _logger.info("Analyzed ${b['name']}");
+        _logger.info("Found ${b['name']}");
       });
 
       if (mineBehaviors.isEmpty && mineElements.isEmpty) {
@@ -326,11 +336,13 @@ class _ {
     return true;
   }
 
+  int _generatedFilesCount = 0;
+
   _writeDart(String destPath, String content) async {
     String p = path.join(destPath, inOutMap[relPath]);
     await new Directory(path.dirname(p)).create(recursive: true);
     await new File(p).writeAsString(content);
-    _logger.info("Wrote ${p}");
+    _logger.info("Wrote ${p} [${++_generatedFilesCount}]");
   }
 
   _generateElement(String namespace, String name, var bowerRef, Map descr) {

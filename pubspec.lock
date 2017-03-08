@@ -127,6 +127,12 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "3.1.1"
+  intl:
+    description:
+      name: intl
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.14.0"
   isolate:
     description:
       name: isolate
@@ -145,6 +151,12 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.11.3+1"
+  logging_handlers:
+    description:
+      name: logging_handlers
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.8.0"
   meta:
     description:
       name: meta

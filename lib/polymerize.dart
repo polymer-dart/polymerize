@@ -18,6 +18,7 @@ import 'package:resource/resource.dart' as res;
 import 'package:args/args.dart';
 import 'package:homedir/homedir.dart' as user;
 import 'package:logging/logging.dart' as log;
+import 'package:logging_handlers/logging_handlers_shared.dart';
 
 import 'package:polymerize/src/wrapper_generator.dart';
 import 'package:polymerize/src/bower_command.dart';
@@ -1028,9 +1029,7 @@ main(List<String> args) async {
           ..addOption('output', abbr: 'o', help: 'output bower file'));
 
   // Configure logger
-  log.Logger.root.onRecord.listen((log.LogRecord rec) {
-    print("${rec.message}");
-  });
+  log.Logger.root.onRecord.listen(new LogPrintHandler());
   log.Logger.root.level = log.Level.INFO;
 
   ArgResults results = parser.parse(args);

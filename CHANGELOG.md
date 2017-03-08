@@ -1,3 +1,7 @@
+# 0.5.4
+
+ - better error logging
+
 # 0.5.3
 
  - added `bower_resolutions.yaml` optional ovverride for `polymerize init`
