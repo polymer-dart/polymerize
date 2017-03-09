@@ -1,3 +1,7 @@
+# 0.6.0+1
+
+ - minor change to rules
+
 # 0.6.0
 
  - changed module name convention - please update `polymer_elements` and `html5` too
