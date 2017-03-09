@@ -7,8 +7,8 @@ This package is a community effort to bring support for **Polymer 2** and latest
 It features :
  - support for `polymer 2.0.0-rc.2` (web components 1.0)
  - using DDC to generate `ES6` output code
- - leverages [html5](https://github.com/dart-polymer/html5), a new html lib for Dart based on js interoperability only,
- - using [bazel](http://bazel.io) as build system (see also [rules](https://github.com/dart-polymer/bazel_polymerize_rules) )
+ - leverages [html5](https://github.com/polymer-dart/html5), a new html lib for Dart based on js interoperability only,
+ - using [bazel](http://bazel.io) as build system (see also [rules](https://github.com/polymer-dart/bazel_polymerize_rules) )
  - **dynamic load** of polymer components definitions through `imd` (require js implementation using html imports)
  - **interoperability** with other JS frameworks
  - **Incremental** build (dependencies are built only once, thanks to DDC modularity system and bazel build)
