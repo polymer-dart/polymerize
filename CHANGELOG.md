@@ -1,3 +1,7 @@
+# 0.6.0+2
+
+ - minor changes to readme
+
 # 0.6.0+1
 
  - minor change to rules
