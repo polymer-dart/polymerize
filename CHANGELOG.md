@@ -1,3 +1,7 @@
+# 0.6.1
+
+ - better error handling during setup phase
+
 # 0.6.0+2
 
  - minor changes to readme
