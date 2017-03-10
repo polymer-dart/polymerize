@@ -936,6 +936,7 @@ Directory findDartSDKHome() {
     return new Directory(Platform.environment['DART_HOME']);
   }
 
+  //print("res:${Platform.resolvedExecutable} exe:${Platform.executable} root:${Platform.packageRoot} cfg:${Platform.packageConfig} ");
   // Else tries with current executable
   return new File(Platform.resolvedExecutable).parent;
 }
@@ -1062,12 +1063,12 @@ main(List<String> args) async {
   }
 
   if (results.command?.name == 'pub') {
-    runPubMode(results.command);
+    await runPubMode(results.command);
     return;
   }
 
   if (results.command?.name == 'bower') {
-    runBowerMode(results.command);
+    await runBowerMode(results.command);
     return;
   }
 

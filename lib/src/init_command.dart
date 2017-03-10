@@ -5,7 +5,7 @@ import 'package:path/path.dart' as path;
 import 'package:polymerize/package_graph.dart';
 import 'package:yaml/yaml.dart';
 
-const String RULES_VERSION = 'v0.10.1';
+const String RULES_VERSION = 'v0.10.2';
 
 Iterable<PackageNode> _transitiveDeps(PackageNode n,
     {Set<PackageNode> visited}) sync* {
@@ -61,7 +61,6 @@ dart_library(
   name='${n.name}',
   deps= [${_depsFor(n,g.root)}],
   src_path='${n.location.toFilePath()}',
-  #pub_host = 'http://pub.drafintech.it:5001/api',
   package_name='${n.name}',
   version='${n.version}')
 """
@@ -82,7 +81,7 @@ _generateWorkspaceFile(PackageGraph g, String destDir, String rules_version, Str
 git_repository(
  name='polymerize',
  tag='${rules_version}',
- remote='https://github.com/dam0vm3nt/bazel_polymerize_rules')
+ remote='https://github.com/polymer-dart/bazel_polymerize_rules')
 
 # Load Polymerize rules
 load('@polymerize//:polymerize_workspace.bzl',
