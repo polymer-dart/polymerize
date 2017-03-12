@@ -136,7 +136,7 @@ After complilation everything will be found in the bazel output folder (`bazel-b
 ## TODO:
 
  - more polymer APIs
- - support for mixins
+ - ~~support for mixins~~
  - annotations for properties (computed props, etc.)
  - ~~support for external element wrappers~~
  - ~~support for auto gen HTML imports~~
