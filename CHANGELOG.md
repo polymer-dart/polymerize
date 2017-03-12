@@ -1,3 +1,7 @@
+# 0.7.0+1
+
+ - fixed rules version
+
 # 0.7.0
 
  - support for mixin in dart
