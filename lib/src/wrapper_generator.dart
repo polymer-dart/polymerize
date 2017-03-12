@@ -317,7 +317,6 @@ class _ {
   _generateBehaviors(String namespace, String destPath) async {
     Map<String, Map> elements = analysisResult['behaviors'];
     if (elements == null || elements.isEmpty) return false;
-    bool found = false;
 
     // Filter only elements
     elements = new Map.fromIterable(

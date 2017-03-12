@@ -33,6 +33,8 @@ const Map<ModuleFormat, String> _formatToString = const {
   ModuleFormat.legacy: 'legacy'
 };
 
+bool notNull(x) => x != null;
+
 const Map<String, ModuleFormat> _stringToFormat = const {
   'amd': ModuleFormat.amd,
   'es6': ModuleFormat.es6,
@@ -182,10 +184,9 @@ Future<String> _buildOne(
   Directory assetDir = new Directory(path.join(summaryDest.path, "assets"));
 
   List<BowerImport> bower_imports = <BowerImport>[];
-  List pre_dart = <String>[];
-  List post_dart = <String>[];
-  bool native_imported = false;
-  bool polymerize_imported = false;
+  List<String> pre_dart = <String>[];
+  List<String> post_dart = <String>[];
+  Options options = new Options();
 
   Map<String, String> maps = null;
   if (!useRepo || !(repo_js.existsSync()) || !repo_smap.existsSync()) {
@@ -322,179 +323,22 @@ Future<String> _buildOne(
 
           DartObject reg = getAnnotation(ce.metadata, isPolymerRegister);
           if (reg != null) {
-            Map config = collectConfig(moduleCompiler.context, ce);
-
-            String name = path.basenameWithoutExtension(e.name);
-
-            bool native = reg.getField('native').toBoolValue();
-
-            String tag = reg.getField('tagName').toStringValue();
-            String template = reg.getField('template')?.toStringValue();
-            //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
-
-            List<DartObject> uses = reg.getField('uses')?.toListValue() ?? [];
-            String pathThis = path.join(
-                _moduleForUri(ce.source.uri, mapping: mapping), template??'none.html');
-            pathThis = path.dirname(pathThis);
-
-            /*String reversePath = path.relative(
-                _moduleForUri(ce.source.uri, mapping: mapping),
-                from: pathThis);*/
-
-            String behaviorName(ClassElement intf, DartObject anno) {
-              DartObject libAnno = getAnnotation(intf.library.metadata, isJS);
-              String res = anno.getField('name').toStringValue();
-              if (libAnno == null) {
-                return res;
-              } else {
-                String pkg = libAnno.getField('name').toStringValue();
-                return "${pkg}.${res}";
-              }
-            }
-
-            bool notNull(x) => x != null;
-
-            List<String> toImport = [];
-            Set<String> behaviors = new Set()
-              ..addAll(ce.interfaces.map((InterfaceType intf) {
-                DartObject anno = getAnnotation(
-                    intf.element.metadata, anyOf([isPolymerBehavior, isJS]));
-                if (anno != null) {
-                  return behaviorName(intf.element, anno);
-                } else {
-                  return null;
-                }
-              }).where(notNull));
-
-            // Look for ReduxBehavior
-            Map reduxInfo = ce.interfaces.map((intf) {
-              ElementAnnotation anno =
-                  getElementAnnotation(intf.element.metadata, isStoreDef);
-              if (anno == null) {
-                return null;
-              }
-
-              //print("${anno.element.kind}");
-              if (anno.element.kind == ElementKind.GETTER) {
-                MethodElement m = anno.element;
-                String mod = _moduleForUri(m.source.uri, mapping: mapping);
-                List<String> p1 = path.split(m.source.uri.path).sublist(1);
-                p1[p1.length - 1] = path.basenameWithoutExtension(p1.last);
-                String p = p1.join('_');
-                //print(
-                //    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
-                return {
-                  'type': 'getter',
-                  'name': m.name,
-                  'source': p,
-                  'module': mod
-                };
-              }
-              DartObject reducer =
-                  anno.computeConstantValue().getField('reducer');
-              print("FOUND: ${reducer}");
-              return reducer;
-            }).firstWhere(notNull, orElse: () => {});
-
-            if (uses != null) {
-              // print("USES : ${uses}");
-              uses.forEach((DartObject obj) {
-                DartType dartType = obj.toTypeValue();
-                // print("TYPE : ${dartType.element}");
-                ClassElement ce2 = dartType.element;
-                // print("META : ${ce2.metadata}");
-                if (ce2 != null) {
-                  DartObject reg2 =
-                      getAnnotation(ce2.metadata, isPolymerRegister);
-                  if (reg2 != null) {
-                    String template2 =
-                        reg2.getField('template').toStringValue();
-                    if (template2 != null) {
-                      // print(
-                      //    "Template : ${template2} , ${ce2.library.identifier} ,${ce2.source.uri}");
-                      // Calc root path or this template
-
-                      String path2 = path.joinAll([
-                        _moduleForUri(ce2.source.uri, mapping: mapping),
-                        template2
-                      ]);
-
-                      String relPath2 = path.relative(path2, from: pathThis);
-                      // print("PATH ${path2} from ${pathThis}");
-                      // print("Path relative : ${relPath2}");
-                      toImport.add(relPath2);
-                    }
-                  }
-                }
-                // Lookup for an annotation
-                //DartObject anno2 = getAnnotation(obj.toCl, matches)
-              });
-            }
-
-            // NOTE : toImport is deprecated and no more used
-
-            // Trovo il file relativo all'element
-            String templatePath;
-            String finalDest = null;
-            HtmlDocResume docResume;
-            if (template != null) {
-              templatePath = path.isAbsolute(template)
-                  ? path.join(libPath, template)
-                  : path.join(path.dirname(e.source.fullName), template);
-
-              docResume =
-                  _analyzeHtmlTemplate(moduleCompiler.context, templatePath);
-
-              String rel = path.relative(templatePath, from: libPath);
-
-              //String destTemplate = path.join(assetDir.path, rel);
-
-              // adjust
-              templatePath = html_templates[rel];
-
-              finalDest = in_out_html[html_templates[rel]];
-            }
-
-            //print("ADJUSTED TEMPLATE : ${templatePath} -> ${finalDest}");
-
-            //if (templatePath!=null && new File(templatePath).existsSync()) {
-            //print("found ${templatePath} -> ${destTemplate}");
-
-            if (native) {
-              if (!native_imported) {
-                pre_dart.add(
-                    "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
-                native_imported = true;
-              }
-              pre_dart.add(nativePreloadScript(
-                  tag,
-                  jsNamespace.split('.')..add(jsClass),
-                  polymerElementPath(mapping)));
-            } else if (!native && finalDest!=null) {
-              // TODO : embed template here ?
-              pre_dart.add(
-                  "<link rel='import' href='${path.normalize(path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html'])))}'>");
-            }
-
-            if (!polymerize_imported) {
-              post_dart.add(
-                  "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
-              polymerize_imported = true;
-            }
-            post_dart.add(htmlImportTemplate(
-                template: template,
+            _generateElementStub(
+                pre_dart: pre_dart,
+                post_dart: post_dart,
+                options: options,
                 jsNamespace: jsNamespace,
-                jsClassName: jsClass,
+                jsClass: jsClass,
+                ce: ce,
+                e: e,
+                moduleCompiler: moduleCompiler,
+                reg: reg,
+                mapping: mapping,
+                libPath: libPath,
+                html_templates: html_templates,
+                in_out_html: in_out_html,
                 packageName: packageName,
-                name: name,
-                className: ce.name,
-                tagName: tag,
-                config: config,
-                resume: docResume,
-                reduxInfo: reduxInfo,
-                behaviors: behaviors,
-                native: native,
-                mapping: mapping));
+                bazelModeArgs: bazelModeArgs);
           }
         });
       });
@@ -567,7 +411,8 @@ ${post_dart.join("\n")}
   return sum.path;
 }
 
-String _fixModuleName(String modName) => modName.startsWith('external/')?modName.substring(9):modName;
+String _fixModuleName(String modName) =>
+    modName.startsWith('external/') ? modName.substring(9) : modName;
 
 /***
  * Analyze one HTML template
@@ -580,6 +425,132 @@ class HtmlDocResume {
 
   toString() =>
       "props : ${propertyPaths} , events : ${eventHandlers}, ele : ${customElementsRefs}";
+}
+
+class Options {
+  bool polymerize_imported = false;
+  bool native_imported = false;
+}
+
+void _generateElementStub(
+    {List<String> pre_dart,
+    List<String> post_dart,
+    ClassElement ce,
+    ModuleCompiler moduleCompiler,
+    DartObject reg,
+    Map<String, String> mapping,
+    String libPath,
+    CompilationUnitElement e,
+    Map<String, String> html_templates,
+    Map<String, String> in_out_html,
+    String packageName,
+    String jsClass,
+    String jsNamespace,
+    ArgResults bazelModeArgs,
+    Options options}) {
+  Map config = collectConfig(moduleCompiler.context, ce);
+
+  String name = path.basenameWithoutExtension(e.name);
+
+  bool native = reg.getField('native').toBoolValue();
+
+  String tag = reg.getField('tagName').toStringValue();
+  String template = reg.getField('template')?.toStringValue();
+  //print("${ce.name} -> Found Tag  : ${tag} [${template}]");
+
+  //List<DartObject> uses = reg.getField('uses')?.toListValue() ?? [];
+  String pathThis = path.join(
+      _moduleForUri(ce.source.uri, mapping: mapping), template ?? 'none.html');
+  pathThis = path.dirname(pathThis);
+
+  /*String reversePath = path.relative(
+      _moduleForUri(ce.source.uri, mapping: mapping),
+      from: pathThis);*/
+
+  // Look for ReduxBehavior
+  Map reduxInfo = ce.interfaces.map((intf) {
+    ElementAnnotation anno =
+        getElementAnnotation(intf.element.metadata, isStoreDef);
+    if (anno == null) {
+      return null;
+    }
+
+    //print("${anno.element.kind}");
+    if (anno.element.kind == ElementKind.GETTER) {
+      MethodElement m = anno.element;
+      String mod = _moduleForUri(m.source.uri, mapping: mapping);
+      List<String> p1 = path.split(m.source.uri.path).sublist(1);
+      p1[p1.length - 1] = path.basenameWithoutExtension(p1.last);
+      String p = p1.join('_');
+      //print(
+      //    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
+      return {'type': 'getter', 'name': m.name, 'source': p, 'module': mod};
+    }
+    DartObject reducer = anno.computeConstantValue().getField('reducer');
+    new log.Logger('builder').finest("FOUND: ${reducer}");
+    return reducer;
+  }).firstWhere(notNull, orElse: () => {});
+
+  // NOTE : toImport is deprecated and no more used
+
+  // Trovo il file relativo all'element
+  String templatePath;
+  String finalDest = null;
+  HtmlDocResume docResume;
+  if (template != null) {
+    templatePath = path.isAbsolute(template)
+        ? path.join(libPath, template)
+        : path.join(path.dirname(e.source.fullName), template);
+
+    docResume = _analyzeHtmlTemplate(moduleCompiler.context, templatePath);
+
+    String rel = path.relative(templatePath, from: libPath);
+
+    //String destTemplate = path.join(assetDir.path, rel);
+
+    // adjust
+    templatePath = html_templates[rel];
+
+    finalDest = in_out_html[html_templates[rel]];
+  }
+
+  //print("ADJUSTED TEMPLATE : ${templatePath} -> ${finalDest}");
+
+  //if (templatePath!=null && new File(templatePath).existsSync()) {
+  //print("found ${templatePath} -> ${destTemplate}");
+
+  if (native) {
+    if (!options.native_imported) {
+      pre_dart.add(
+          "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/native_import.html'>");
+      options.native_imported = true;
+    }
+    pre_dart.add(nativePreloadScript(tag, jsNamespace.split('.')..add(jsClass),
+        polymerElementPath(mapping)));
+  } else if (!native && finalDest != null) {
+    // TODO : embed template here ?
+    pre_dart.add(
+        "<link rel='import' href='${path.normalize(path.relative(finalDest,from:path.dirname(bazelModeArgs['output_html'])))}'>");
+  }
+
+  if (!options.polymerize_imported) {
+    post_dart.add(
+        "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
+    options.polymerize_imported = true;
+  }
+  post_dart.add(htmlImportTemplate(
+      template: template,
+      jsNamespace: jsNamespace,
+      jsClassName: jsClass,
+      packageName: packageName,
+      name: name,
+      className: ce.name,
+      tagName: tag,
+      config: config,
+      resume: docResume,
+      reduxInfo: reduxInfo,
+      native: native,
+      mapping: mapping));
 }
 
 HtmlDocResume _analyzeHtmlTemplate(
@@ -691,10 +662,33 @@ Map collectConfig(AnalysisContext context, ClassElement ce) {
     }
   });
 
+  String behaviorName(ClassElement intf, DartObject anno) {
+    DartObject libAnno = getAnnotation(intf.library.metadata, isJS);
+    String res = anno.getField('name').toStringValue();
+    if (libAnno == null) {
+      return res;
+    } else {
+      String pkg = libAnno.getField('name').toStringValue();
+      return "${pkg}.${res}";
+    }
+  }
+
+  Set<String> behaviors = new Set()
+    ..addAll(ce.interfaces.map((InterfaceType intf) {
+      DartObject anno = getAnnotation(
+          intf.element.metadata, anyOf([isPolymerBehavior, isJS]));
+      if (anno != null) {
+        return behaviorName(intf.element, anno);
+      } else {
+        return null;
+      }
+    }).where(notNull));
+
   return {
     'observers': observers,
     'properties': properties,
-    'reduxActions': reduxActions
+    'reduxActions': reduxActions,
+    'behaviors': behaviors
   };
 }
 
@@ -789,12 +783,11 @@ String htmlImportTemplate(
         Map<String, String> mapping,
         HtmlDocResume resume,
         String jsNamespace,
-        Set<String> behaviors,
         Map reduxInfo,
         String jsClassName}) =>
     """<script>
   require(['${_fixModuleName(path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName))}','${_fixModuleName(polymerElementPath(mapping))}/polymerize'],function(pkg,polymerize) {
-  polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config,behaviors,reduxInfo)},${docResumeTemplate(resume)},${native});
+  polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config,reduxInfo)},${docResumeTemplate(resume)},${native});
 });
 </script>""";
 
@@ -806,12 +799,12 @@ String nativePreloadScript(
  });
 </script>""";
 
-String configTemplate(Map config, Set behaviors, Map reduxInfo) =>
+String configTemplate(Map config, Map reduxInfo) =>
     (config == null || config.isEmpty)
         ? "null"
         : """{
     observers:[${config['observers'].map((x) => '"${x}"').join(',')}],
-    behaviors:[${behaviors.map((x) => 'window.${x}').join(',')}],
+    behaviors:[${config['behaviors'].map((x) => 'window.${x}').join(',')}],
     reduxActions:[${config['reduxActions'].map((x) => '"${x}"').join(',')}],
     reduxInfo:{ source : "${reduxInfo['source']??''}", module: "${reduxInfo['module']??''}", name:"${reduxInfo['name']??''}"},
     properties: {
@@ -1014,7 +1007,10 @@ main(List<String> args) async {
     ..addCommand(
         'init',
         new ArgParser()
-          ..addOption('bower-resolutions',defaultsTo: "bower_resolutions.yaml",abbr:'B',help:'(Optional) Bower resolutions file')
+          ..addOption('bower-resolutions',
+              defaultsTo: "bower_resolutions.yaml",
+              abbr: 'B',
+              help: '(Optional) Bower resolutions file')
           ..addOption('dart-bin-path',
               defaultsTo: findDartSDKHome().path, help: 'dart sdk path')
           ..addOption('rules-version',
