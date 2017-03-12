@@ -339,6 +339,27 @@ Future<String> _buildOne(
                 in_out_html: in_out_html,
                 packageName: packageName,
                 bazelModeArgs: bazelModeArgs);
+          } else {
+            // If there isn't a `PolymerRegister` means we're defining a Dart Behavior
+            reg = getAnnotation(ce.metadata, isPolymerBehavior);
+            if (reg != null) {
+              _generateBehaviorStub(
+                  pre_dart: pre_dart,
+                  post_dart: post_dart,
+                  options: options,
+                  jsNamespace: jsNamespace,
+                  jsClass: jsClass,
+                  ce: ce,
+                  e: e,
+                  moduleCompiler: moduleCompiler,
+                  reg: reg,
+                  mapping: mapping,
+                  libPath: libPath,
+                  html_templates: html_templates,
+                  in_out_html: in_out_html,
+                  packageName: packageName,
+                  bazelModeArgs: bazelModeArgs);
+            }
           }
         });
       });
@@ -430,6 +451,41 @@ class HtmlDocResume {
 class Options {
   bool polymerize_imported = false;
   bool native_imported = false;
+}
+
+void _generateBehaviorStub(
+    {List<String> pre_dart,
+    List<String> post_dart,
+    ClassElement ce,
+    ModuleCompiler moduleCompiler,
+    DartObject reg,
+    Map<String, String> mapping,
+    String libPath,
+    CompilationUnitElement e,
+    Map<String, String> html_templates,
+    Map<String, String> in_out_html,
+    String packageName,
+    String jsClass,
+    String jsNamespace,
+    ArgResults bazelModeArgs,
+    Options options}) {
+  Map config = collectConfig(moduleCompiler.context, ce);
+
+  // Import utility module if needed
+  if (!options.polymerize_imported) {
+    print('Packagename :${packageName} , mapping:${mapping}');
+    post_dart.add(
+        "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
+    options.polymerize_imported = true;
+  }
+
+  String unitName  = path.basenameWithoutExtension(e.name);
+  String name = reg.getField('name').toStringValue();
+
+  // Define behavior
+  post_dart.add(defineBehaviorTemplate(
+      behaviorName:name,config:config,
+      packageName: packageName, mapping: mapping, name: unitName,className:ce.name));
 }
 
 void _generateElementStub(
@@ -788,6 +844,20 @@ String htmlImportTemplate(
     """<script>
   require(['${_fixModuleName(path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName))}','${_fixModuleName(polymerElementPath(mapping))}/polymerize'],function(pkg,polymerize) {
   polymerize.register(pkg.${name}.${className},'${tagName}',${configTemplate(config,reduxInfo)},${docResumeTemplate(resume)},${native});
+});
+</script>""";
+
+String defineBehaviorTemplate({
+  String packageName,
+  String name,
+  Map config,
+  String className,
+  Map<String, String> mapping,
+  String behaviorName,
+}) =>
+    """<script>
+  require(['${_fixModuleName(path.normalize(_moduleForPackage(packageName,mapping:mapping)+'/'+packageName))}','${_fixModuleName(polymerElementPath(mapping))}/polymerize'],function(pkg,behavior) {
+  behavior.defineBehavior('${behaviorName}',pkg.${name}.${className},${configTemplate(config,{})});
 });
 </script>""";
 

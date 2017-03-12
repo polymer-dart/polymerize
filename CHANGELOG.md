@@ -1,3 +1,7 @@
+# 0.7.0
+
+ - support for mixin in dart
+
 # 0.6.1
 
  - better error handling during setup phase
