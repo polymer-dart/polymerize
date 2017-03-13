@@ -1,3 +1,8 @@
+# 0.7.1
+
+ - updated to DDC-2017031301
+ - added option to override JS name in generated wrapper
+
 # 0.7.0+1
 
  - fixed rules version

@@ -473,7 +473,7 @@ void _generateBehaviorStub(
 
   // Import utility module if needed
   if (!options.polymerize_imported) {
-    print('Packagename :${packageName} , mapping:${mapping}');
+    //print('Packagename :${packageName} , mapping:${mapping}');
     post_dart.add(
         "<link rel='import' href='${relativePolymerElementPath(packageName,mapping)}/polymerize.html'>");
     options.polymerize_imported = true;

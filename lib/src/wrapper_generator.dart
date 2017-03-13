@@ -307,8 +307,13 @@ class _ {
       var descr = elements[name];
       if (!descr['main_file']) continue;
       found = true;
-      await _writeDart(
-          destPath, _generateElement(namespace, name, _currentBowerRef, descr));
+      String jsName = name;
+      Map overrides = (_currentBowerRef['overrides'] ?? {})[name] ?? {};
+
+      jsName = overrides[r'$name'] ?? name;
+      
+      await _writeDart(destPath,
+          _generateElement(namespace, jsName, name, _currentBowerRef, descr));
     }
 
     return found;
@@ -344,7 +349,8 @@ class _ {
     _logger.info("Wrote ${p} [${++_generatedFilesCount}]");
   }
 
-  _generateElement(String namespace, String name, var bowerRef, Map descr) {
+  _generateElement(
+      String namespace, String jsName, String name, var bowerRef, Map descr) {
     _importPrefixes = {};
     return """
 @JS('${namespace}')
@@ -358,7 +364,7 @@ ${importBehaviors(relPath,name)}
 
 ${generateComment(descr['description'])}
 
-@JS('${name}')
+@JS('${jsName}')
 @PolymerRegister('${descr['name']}',native:true)
 @BowerImport(ref:'${bowerRef['ref']}',import:"${relPath}",name:'${bowerRef['name']}')
 abstract class ${name} extends PolymerElement ${withBehaviors(relPath,name,descr)} {

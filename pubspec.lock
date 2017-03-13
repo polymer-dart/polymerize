@@ -76,9 +76,9 @@ packages:
   dev_compiler:
     description:
       name: dev_compiler
-      url: "http://pub.dart-polymer.com"
+      url: "https://pub.dart-polymer.com"
     source: hosted
-    version: "0.2.0-unofficial.2017022101"
+    version: "0.2.0-unofficial.2017031301"
   fixnum:
     description:
       name: fixnum

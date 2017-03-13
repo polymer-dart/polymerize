@@ -2,7 +2,7 @@ name: polymerize
 author: Vittorio Ballestra <vittorio.ballestra@gmail.com>
 homepage: https://dart-polymer.com
 description: An Polymer 2.x support for Dart/DDC
-version: 0.7.0+1
+version: 0.7.1
 environment:
    sdk: ">=1.8.0 <2.0.0"
 
@@ -10,8 +10,8 @@ dependencies:
  dev_compiler:
   hosted:
    name: dev_compiler
-   url: "http://pub.dart-polymer.com"
-  version:  0.2.0-unofficial.2017022101
+   url: "https://pub.dart-polymer.com"
+  version:  0.2.0-unofficial.2017031301
 #  version:  0.2.0-unofficial.2017020101
 #  version: 0.2.0-unofficial.2016111201
 #  path: ../sdk/pkg/dev_compiler
