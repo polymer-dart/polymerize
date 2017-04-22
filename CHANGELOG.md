@@ -1,3 +1,7 @@
+# 0.7.1+1
+ 
+ - locked analyzer version until we upgrade DDC library (https://github.com/polymer-dart/todo_ddc/issues/5)
+
 # 0.7.1
 
  - updated to DDC-2017031301
