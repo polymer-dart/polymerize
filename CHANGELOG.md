@@ -1,3 +1,8 @@
+# 0.7.2
+
+ - upgrade to SDK v. 1.23.0
+ - support for dart property getters and setters
+ 
 # 0.7.1+1
  
  - locked analyzer version until we upgrade DDC library (https://github.com/polymer-dart/todo_ddc/issues/5)

@@ -5,7 +5,7 @@ import 'package:path/path.dart' as path;
 import 'package:polymerize/package_graph.dart';
 import 'package:yaml/yaml.dart';
 
-const String RULES_VERSION = 'v0.10.5';
+const String RULES_VERSION = 'v0.11.0';
 
 Iterable<PackageNode> _transitiveDeps(PackageNode n,
     {Set<PackageNode> visited}) sync* {

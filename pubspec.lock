@@ -6,7 +6,7 @@ packages:
       name: analyzer
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.30.0-alpha.1"
+    version: "0.30.0-alpha.3"
   archive:
     description:
       name: archive
@@ -78,7 +78,7 @@ packages:
       name: dev_compiler
       url: "https://pub.dart-polymer.com"
     source: hosted
-    version: "0.2.0-unofficial.2017031301"
+    version: "0.2.0-unofficial.2017042201"
   fixnum:
     description:
       name: fixnum
@@ -90,7 +90,7 @@ packages:
       name: front_end
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.1.0-alpha.1"
+    version: "0.1.0-alpha.2"
   func:
     description:
       name: func
@@ -145,6 +145,12 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "0.6.1"
+  kernel:
+    description:
+      name: kernel
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "0.2.0"
   logging:
     description:
       name: logging

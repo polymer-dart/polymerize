@@ -237,6 +237,7 @@ Future<String> _buildOne(
               ..addOption('supermixin')
               ..addOption('no-implicit-casts')
               ..addOption('no-implicit-dynamic')
+              ..addOption('package-default-analysis-options')
               ..addOption('strong')
               ..addOption('D'),
             {
