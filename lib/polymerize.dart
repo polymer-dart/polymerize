@@ -24,7 +24,9 @@ import 'package:polymerize/src/wrapper_generator.dart';
 import 'package:polymerize/src/bower_command.dart';
 import 'package:polymerize/src/init_command.dart';
 import 'package:polymerize/src/pub_command.dart';
+import 'package:polymerize/src/build_command.dart' as build_cmd;
 import 'package:args/src/arg_results.dart';
+import 'package:polymerize/src/utils.dart';
 
 const Map<ModuleFormat, String> _formatToString = const {
   ModuleFormat.amd: 'amd',
@@ -652,7 +654,7 @@ _extractRefs(HtmlDocResume resume, dom.Element element) {
 
 final RegExp _propRefRE = new RegExp(r"(\{\{|\[\[)!?([^}]+)(\}\}|\]\])");
 
-final RegExp _funcCallRE = new RegExp(r'([^()]+)\(([^)]+\)');
+final RegExp _funcCallRE = new RegExp(r'([^()]+)\(([^)]+)\)');
 
 Iterable<String> _extractRefsFromString(String element) =>
     _propRefRE.allMatches(element).map((x) => x.group(2));
@@ -749,66 +751,10 @@ Map collectConfig(AnalysisContext context, ClassElement ce) {
   };
 }
 
-final Uri POLYMER_REGISTER_URI =
-    Uri.parse('package:polymer_element/polymer_element.dart');
-final Uri JS_URI = Uri.parse('package:js/js.dart');
-
-bool isPolymerRegister(DartObject o) =>
-    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
-    (o.type.name == 'PolymerRegister');
-
-bool isPolymerBehavior(DartObject o) =>
-    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
-    (o.type.name == 'PolymerBehavior');
-
-bool isStoreDef(DartObject o) =>
-    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
-    (o.type.name == 'StoreDef');
-
 typedef bool matcher(DartObject x);
 
 matcher anyOf(List<matcher> matches) =>
     (DartObject o) => matches.any((m) => m(o));
-
-bool isJS(DartObject o) =>
-    (o.type.element.librarySource.uri == JS_URI) && (o.type.name == 'JS');
-
-bool isBowerImport(DartObject o) =>
-    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
-    (o.type.name == 'BowerImport');
-
-bool isDefine(DartObject o) =>
-    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
-    (o.type.name == 'Define');
-
-bool isObserve(DartObject o) =>
-    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
-    (o.type.name == 'Observe');
-
-bool isReduxActionFactory(DartObject o) =>
-    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
-    (o.type.name == 'ReduxActionFactory');
-
-bool isProperty(DartObject o) =>
-    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
-    (o.type.name == 'Property');
-
-bool isNotify(DartObject o) =>
-    (o.type.element.librarySource.uri == POLYMER_REGISTER_URI) &&
-    (o.type.name == 'Notify');
-
-DartObject getAnnotation(
-        Iterable<ElementAnnotation> metadata, //
-        bool matches(DartObject x)) =>
-    metadata
-        .map((an) => an.computeConstantValue())
-        .firstWhere(matches, orElse: () => null);
-
-ElementAnnotation getElementAnnotation(
-        Iterable<ElementAnnotation> metadata, //
-        bool matches(DartObject x)) =>
-    metadata.firstWhere((an) => matches(an.computeConstantValue()),
-        orElse: () => null);
 
 String webComponentTemplate(
         {String template,
@@ -1096,7 +1042,13 @@ main(List<String> args) async {
           ..addOption("resolution-value", abbr: "R", allowMultiple: true)
           ..addOption("use-bower",
               allowMultiple: true, abbr: 'u', help: 'use bower')
-          ..addOption('output', abbr: 'o', help: 'output bower file'));
+          ..addOption('output', abbr: 'o', help: 'output bower file'))
+    ..addCommand(
+      "build",
+      new ArgParser()
+        ..addOption('package-name',abbr:'p')
+        ..addOption('source',abbr:'s',allowMultiple: true)
+    );
 
   // Configure logger
   log.Logger.root.onRecord.listen(new LogPrintHandler());
@@ -1126,6 +1078,11 @@ main(List<String> args) async {
 
   if (results.command?.name == 'bazel') {
     runInBazelMode(sourcePath, destPath, repoPath, fmt, results.command);
+    return;
+  }
+
+  if (results.command?.name == 'build') {
+    build_cmd.build(results.command['package-name'], results.command['source']);
     return;
   }
 
