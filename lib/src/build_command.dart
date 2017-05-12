@@ -5,6 +5,7 @@ import 'package:build/build.dart';
 import 'package:build_runner/build_runner.dart' as build_runner;
 import 'package:code_builder/code_builder.dart' as code_builder;
 import 'package:polymerize/src/utils.dart';
+import 'dart:io';
 
 class DartStubBuilder extends Builder {
   @override
@@ -14,6 +15,7 @@ class DartStubBuilder extends Builder {
     //StringBuffer buf = new StringBuffer();
     code_builder.LibraryBuilder libBuilder = new code_builder.LibraryBuilder();
     code_builder.MethodBuilder registerBuilder = new code_builder.MethodBuilder("register");
+    libBuilder.addDirective(new code_builder.ImportBuilder(inputLib.source.shortName, prefix: "_lib"));
     libBuilder.addMember(registerBuilder);
 
     inputLib.unit.declarations.forEach((ce) {
@@ -21,8 +23,6 @@ class DartStubBuilder extends Builder {
         ce.element.metadata.forEach((e) => print(e.element.name));
         DartObject registerAnnotation = getAnnotation(ce.element.metadata, isPolymerRegister);
         if (registerAnnotation == null) {
-          registerBuilder.addStatement(new code_builder.StatementBuilder.raw((scope) => "print('skipped');"));
-          print("ANNOTATIONS : ${ce.element.metadata.map((e) => e.computeConstantValue().type.element.source.uri).join("/")}");
           return;
         }
         String tagName = registerAnnotation.getField('tagName').toStringValue();
@@ -30,7 +30,7 @@ class DartStubBuilder extends Builder {
         registerBuilder
           ..addStatements([
             new code_builder.StatementBuilder.raw((scope) {
-              return "polymerize(${ce.element.name},'${tagName}');";
+              return "polymerize(_lib.${ce.element.name},'${tagName}');";
             })
           ]);
       }
@@ -45,9 +45,13 @@ class DartStubBuilder extends Builder {
       };
 }
 
-Future build(String package, List<String> inputFiles) {
+typedef String UriResolver(Uri uri);
+
+Future build(String package, List<String> inputFiles, Map<Uri,String> uriMap) async {
+
   build_runner.PhaseGroup phaseGroup = new build_runner.PhaseGroup();
   phaseGroup.newPhase()..addAction(new DartStubBuilder(), new build_runner.InputSet(package, inputFiles));
+  await build_runner.build(phaseGroup);
 
-  return build_runner.build(phaseGroup);
+  // Then build
 }
