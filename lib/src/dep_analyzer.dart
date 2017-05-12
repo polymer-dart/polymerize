@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'dart:convert';
 import 'package:analyzer/analyzer.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
@@ -14,7 +15,7 @@ import 'package:yaml/yaml.dart' as yaml;
 import 'dart:io' as io;
 import 'package:logging/logging.dart' as log;
 
-log.Logger _logger = new log.Logger('deps');
+log.Logger _logger = new log.Logger('deps')..level = log.Level.FINE;
 
 class InternalContext {
   PackageResolver _packageResolver;
@@ -51,10 +52,13 @@ class DependencyAnalyzer {
   String packageRoot;
   Map _pubspec;
   InternalContext _ctx;
-  Map<String, Set<String>> depsByTarget = {};
+  Map<TargetDesc, Set<TargetDesc>> depsByTarget = {};
 
   Set<String> importedPackages = new Set();
+
   String get rootPath => _ctx._rootPath;
+
+  String get packageName => _pubspec['name'];
 
   DependencyAnalyzer._(this.packageRoot, this._ctx);
 
@@ -71,12 +75,18 @@ class DependencyAnalyzer {
   static final RegExp re = new RegExp(r"^([^:]+):([^/]+)/(.+)\.dart$");
 
   Future analyze(String file) async {
-    _logger.fine("PARSING ${file}");
+    _logger.finest("PARSING ${file}");
     var absolutePath = pathos.absolute(file);
     var source = _ctx._analysisContext.sourceFactory.forUri(pathos.toUri(absolutePath).toString());
 
     CompilationUnit cu = _ctx._analysisContext.parseCompilationUnit(source);
     FindImports fu = new FindImports()..visitAllNodes(cu);
+    TargetDesc currentTarget = TargetDesc.fromPaths(
+        packageName: this.packageName,
+        packageRoot: packageRoot,
+        packageRelativePath: pathos.withoutExtension(pathos.relative(file, from: pathos.join(packageRoot, 'lib'))),
+        rootPath: rootPath);
+    depsByTarget[currentTarget] = new Set();
 
     Iterable<Future> futures = fu.uris.map((u) async {
       String workspace_name;
@@ -94,7 +104,8 @@ class DependencyAnalyzer {
             throw "Unknown uri prefix : ${m[1]}";
           } else {
             String otherPackageRoot = await _ctx._packageResolver.packagePath(m[2]);
-            importedPackages.add(pathos.canonicalize(otherPackageRoot));
+            if (m[2]!=packageName)
+              importedPackages.add(pathos.canonicalize(otherPackageRoot));
 
             targetDesc = TargetDesc.fromPaths(packageRelativePath: m[3], rootPath: rootPath, packageRoot: otherPackageRoot, packageName: m[2]);
           }
@@ -104,17 +115,11 @@ class DependencyAnalyzer {
 
           String rel = pathos.relative(resolved, from: pathos.join(packageRoot, "lib"));
 
-          targetDesc = TargetDesc.fromPaths(packageRelativePath: rel, rootPath: rootPath, packageRoot: packageRoot, packageName: _pubspec['name']);
+          targetDesc = TargetDesc.fromPaths(packageRelativePath: rel, rootPath: rootPath, packageRoot: packageRoot, packageName: this.packageName);
         }
       }
 
-      TargetDesc currentTarget = TargetDesc.fromPaths(
-          packageName: _pubspec['name'],
-          packageRoot: packageRoot,
-          packageRelativePath: pathos.withoutExtension(pathos.relative(file, from: pathos.join(packageRoot, 'lib'))),
-          rootPath: rootPath);
-
-      depsByTarget.putIfAbsent(currentTarget.js, () => new Set<String>()).add(targetDesc.js);
+      depsByTarget[currentTarget].add(targetDesc);
     });
     return Future.wait(futures);
   }
@@ -138,13 +143,17 @@ class WorkspaceBuilder {
   String _rootPath;
   String _mainPackagePath;
   InternalContext _ctx;
-  Map<String, DependencyAnalyzer> _analyzers = {};
+  Map<String, Future<DependencyAnalyzer>> _analyzersFutures = {};
   WorkspaceBuilder._(this._rootPath, this._mainPackagePath);
 
   static Future<WorkspaceBuilder> create(String rootPath, String mainPackagePath) async {
     WorkspaceBuilder b = new WorkspaceBuilder._(pathos.canonicalize(rootPath), pathos.canonicalize(mainPackagePath));
 
+    _logger.finest("Start build workspace for ${rootPath}");
+
     await b.build(mainPackagePath);
+
+    _logger.finest("Workspace builder created width ${b._allPackages.length} packages.");
 
     return b;
   }
@@ -153,45 +162,119 @@ class WorkspaceBuilder {
     _ctx = await InternalContext.create(_rootPath);
 
     packagePath = pathos.canonicalize(packagePath);
-    _logger.fine("BUILDING ${packagePath}");
-    DependencyAnalyzer res = _analyzers[packagePath];
-    if (res == null) {
-      res = await analyzePackage(_rootPath, packagePath, _ctx);
-      _analyzers[packagePath] = res;
-
+    Future<DependencyAnalyzer> resFuture = _analyzersFutures.putIfAbsent(packagePath, () async {
+      _logger.fine("ANALYZING ${packagePath}");
+      DependencyAnalyzer res = await analyzePackage(_rootPath, packagePath, _ctx);
+      _allPackages.add(packagePath);
       // Recur on imported packages
+      _logger.finest("${packagePath} -> ${res.importedPackages}");
       await Future.wait(res.importedPackages.map((p) => build(p)));
-    }
-    return res;
+      _logger.finest("Done ANALYZING ${packagePath}");
+      return res;
+    });
+
+    return resFuture;
   }
 
-  get mainAnalyzer => this[_mainPackagePath];
+  Set<String> _allPackages = new Set();
+  /**
+   * Generate the build for a package
+   */
+  Stream<String> generateBuildFile(String packagePath) async* {
+    DependencyAnalyzer dep = await _analyzersFutures[packagePath];
 
-  DependencyAnalyzer operator [](String packagePath) => _analyzers[pathos.canonicalize(packagePath)];
+    for (TargetDesc tgt in dep.depsByTarget.keys) {
+      yield* _generateBuildFileForTarget(dep, tgt);
+      yield "";
+    }
+  }
+
+  Stream<String> _generateBuildFileForTarget(DependencyAnalyzer dep, TargetDesc target) async* {
+    yield "dart_file(";
+    yield " name = '${target.target}.js',";
+    yield " deps = [";
+    for (String dep in (dep.depsByTarget[target].toList()..sort((x, y) => x.js.compareTo(y.js))).map((x) => "'${x.relativeTo(target)}.js'")) {
+      yield "   ${dep},";
+    }
+    yield " ])";
+  }
+
+  Future generateBuildFiles() async {
+    String destBasePath = pathos.join(_rootPath, '.polymerize');
+
+    io.Directory destBaseDir = new io.Directory(destBasePath);
+    if (destBaseDir.existsSync()) {
+      destBaseDir.deleteSync(recursive: true);
+    }
+    destBaseDir.createSync();
+
+    for (String package in _allPackages) {
+      DependencyAnalyzer dep = await _analyzersFutures[package];
+
+      String buildFilePath = pathos.join(destBasePath, "BUILD.${dep.packageName}");
+
+      try {
+        _logger.fine("building ${buildFilePath}");
+        await write(buildFilePath, generateBuildFile(package));
+      } catch (error, stack) {
+        _logger.severe("problem while writing ${dep.packageName} build file", error, stack);
+      }
+    }
+  }
+}
+
+Future write(String dest, Stream<String> lines) async {
+  io.File f = new io.File(dest);
+  io.IOSink sink = f.openWrite();
+  await writeSink(lines, sink);
+  await sink.close();
+}
+
+Future writeSink(Stream<String> lines, io.IOSink sink) async {
+  return sink.addStream(lines.map((x) => "${x}\n").transform(UTF8.encoder));
 }
 
 class TargetDesc {
   final String workspace_name;
+  final String packageName;
   final String target;
 
-  const TargetDesc([this.workspace_name, this.target]);
+  const TargetDesc({this.workspace_name: "//", this.packageName: "", this.target});
 
-  static const SDK_TARGET = const TargetDesc("@polymerize//:", 'dart_sdk');
+  static const SDK_TARGET = const TargetDesc(workspace_name: '@polymerize//', target: 'dart_sdk');
 
-  String get js => "${workspace_name}${target}.js";
+  String get baseLabel => '${workspace_name}${packageName}:${target}';
+
+  String get js => "${baseLabel}.js";
+
+  get hashCode => baseLabel.hashCode;
+  bool operator ==(var other) => other is TargetDesc && this.baseLabel == other.baseLabel;
 
   static TargetDesc fromPaths({String packageRoot, String packageRelativePath, String rootPath, String packageName}) {
     String workspace_name;
+    String packagePath;
     String target;
     if (pathos.isWithin(rootPath, packageRoot)) {
-      workspace_name = ":";
-      target = pathos.join(pathos.relative(packageRoot, from: rootPath), packageRelativePath);
+      workspace_name = "//";
+      packagePath = pathos.relative(packageRoot, from: rootPath);
+      target = packageRelativePath;
     } else {
-      workspace_name = "@${packageName}//:";
+      workspace_name = "@${packageName}//";
+      packagePath = "";
       target = packageRelativePath;
     }
 
-    return new TargetDesc(workspace_name, target);
+    return new TargetDesc(workspace_name: workspace_name, packageName: packagePath, target: target);
+  }
+
+  String relativeTo(TargetDesc root) {
+    if (root.workspace_name != this.workspace_name) {
+      return baseLabel;
+    } else if (this.packageName != root.packageName) {
+      return baseLabel;
+    } else {
+      return target;
+    }
   }
 }
 

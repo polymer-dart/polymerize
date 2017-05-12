@@ -891,6 +891,7 @@ main(List<String> args) async {
     ..addCommand('test');
 
   // Configure logger
+  log.hierarchicalLoggingEnabled = true;
   log.Logger.root.onRecord.listen(new LogPrintHandler());
   log.Logger.root.level = log.Level.INFO;
 
@@ -928,13 +929,19 @@ main(List<String> args) async {
 
   if (results.command?.name == 'test') {
     //build_cmd.build(results.command['package-name'], results.command['source']);
-    print("P:${results.command.arguments[0]}");
-    String root = path.absolute(results.command.arguments[0]);
-    String package = path.absolute(results.command.arguments[1]);
-    WorkspaceBuilder builder = await WorkspaceBuilder.create(root, package);
 
-    print("dep: ${builder.mainAnalyzer.depsByTarget}");
-
+    Chain.capture(() async {
+      String root = path.absolute(results.command.arguments[0]);
+      String package = path.absolute(results.command.arguments[1]);
+      WorkspaceBuilder builder = await WorkspaceBuilder.create(root, package);
+      await builder.generateBuildFiles();
+    }, onError: (error, Chain chain) {
+      if (error is BuildError) {
+        logger.severe("BUILD ERROR : \n${error}", error);
+      } else {
+        logger.severe("ERROR: ${error}\n AT: ${chain.terse}", error);
+      }
+    });
     return;
   }
 
