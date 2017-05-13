@@ -888,7 +888,8 @@ main(List<String> args) async {
           ..addOption("use-bower", allowMultiple: true, abbr: 'u', help: 'use bower')
           ..addOption('output', abbr: 'o', help: 'output bower file'))
     ..addCommand("build", new ArgParser()..addOption('package-name', abbr: 'p')..addOption('source', abbr: 's', allowMultiple: true))
-    ..addCommand('test');
+    ..addCommand('test')
+    ..addCommand('dart_file', new ArgParser()..addOption('summary', abbr: 's', allowMultiple: true)..addOption('input', abbr: 'i')..addOption('output', abbr: 'o'));
 
   // Configure logger
   log.hierarchicalLoggingEnabled = true;
@@ -924,6 +925,24 @@ main(List<String> args) async {
 
   if (results.command?.name == 'build') {
     //build_cmd.build(results.command['package-name'], results.command['source']);
+    return;
+  }
+
+  if (results.command?.name == 'dart_file') {
+    List l;
+    ProcessResult res = await Process.run(
+        '${findDartSDKHome().path}/dartdevc',
+        []
+          ..addAll(['--module-root=bazel-out/local-fastbuild/bin'])
+          ..addAll(results.command['summary'].isEmpty?[]:results.command['summary'].map((s) => ['-s', s]).reduce((a, b) => []..addAll(a)..addAll(b)))
+          ..addAll(['-o', results.command['output']])
+          ..add(results.command['input']));
+    if (res.exitCode!=0) {
+      //logger.severe("Error during build :${res.stdout} ${res.stderr}");
+      throw "ERROR : ${res.stdout} - ${res.stderr}";
+    }
+    //new File(results.command['output'])
+    //    .writeAsStringSync('dartdevc ${(results.command['summary']??[]).map((x) => "-s ${x}").join(' ')} -o ${results.command['output']} ${results.command['input']}');
     return;
   }
 

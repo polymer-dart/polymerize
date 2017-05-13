@@ -104,8 +104,7 @@ class DependencyAnalyzer {
             throw "Unknown uri prefix : ${m[1]}";
           } else {
             String otherPackageRoot = await _ctx._packageResolver.packagePath(m[2]);
-            if (m[2]!=packageName)
-              importedPackages.add(pathos.canonicalize(otherPackageRoot));
+            if (m[2] != packageName) importedPackages.add(pathos.canonicalize(otherPackageRoot));
 
             targetDesc = TargetDesc.fromPaths(packageRelativePath: m[3], rootPath: rootPath, packageRoot: otherPackageRoot, packageName: m[2]);
           }
@@ -181,6 +180,9 @@ class WorkspaceBuilder {
    * Generate the build for a package
    */
   Stream<String> generateBuildFile(String packagePath) async* {
+    yield 'load("@polymerize//:polymerize.bzl", "dart_file")';
+    yield "";
+    yield "def build():";
     DependencyAnalyzer dep = await _analyzersFutures[packagePath];
 
     for (TargetDesc tgt in dep.depsByTarget.keys) {
@@ -190,13 +192,15 @@ class WorkspaceBuilder {
   }
 
   Stream<String> _generateBuildFileForTarget(DependencyAnalyzer dep, TargetDesc target) async* {
-    yield "dart_file(";
-    yield " name = '${target.target}.js',";
-    yield " deps = [";
-    for (String dep in (dep.depsByTarget[target].toList()..sort((x, y) => x.js.compareTo(y.js))).map((x) => "'${x.relativeTo(target)}.js'")) {
-      yield "   ${dep},";
+    yield "  dart_file(";
+    yield "   name = '${target.target}',";
+    yield "   dart_sources = ['lib/${target.target}.dart'],";
+    yield "   dart_source_uri = 'package:${dep.packageName}/${target.target}.dart',";
+    yield "   deps = [";
+    for (String dep in (dep.depsByTarget[target].toList()..sort((x, y) => x.js.compareTo(y.js))).map((x) => "'${x.relativeTo(target)}'")) {
+      yield "     ${dep},";
     }
-    yield " ])";
+    yield "  ])";
   }
 
   Future generateBuildFiles() async {
@@ -211,7 +215,7 @@ class WorkspaceBuilder {
     for (String package in _allPackages) {
       DependencyAnalyzer dep = await _analyzersFutures[package];
 
-      String buildFilePath = pathos.join(destBasePath, "BUILD.${dep.packageName}");
+      String buildFilePath = pathos.join(destBasePath, "BUILD.${dep.packageName}.bzl");
 
       try {
         _logger.fine("building ${buildFilePath}");
@@ -220,6 +224,9 @@ class WorkspaceBuilder {
         _logger.severe("problem while writing ${dep.packageName} build file", error, stack);
       }
     }
+
+    // Create BUILD PATH FOR THIS WORKSPACE
+    await write(pathos.join(destBasePath, "BUILD"), new Stream.fromIterable(['package(default_visibility = ["//visibility:public"])']));
   }
 }
 
