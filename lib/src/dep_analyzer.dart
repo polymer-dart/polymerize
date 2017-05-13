@@ -6,11 +6,11 @@ import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:analyzer/src/dart/sdk/sdk.dart';
 import 'package:analyzer/src/generated/engine.dart';
-import 'package:analyzer/src/generated/sdk.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:glob/glob.dart';
 import 'package:package_resolver/package_resolver.dart';
 import 'package:path/path.dart' as pathos;
+import 'package:polymerize/package_graph.dart';
 import 'package:yaml/yaml.dart' as yaml;
 import 'dart:io' as io;
 import 'package:logging/logging.dart' as log;
@@ -24,8 +24,10 @@ class InternalContext {
   AnalysisContext _analysisContext;
 
   ResourceProvider _resourceProvider = PhysicalResourceProvider.INSTANCE;
-  DartSdk _sdk;
+  FolderBasedDartSdk _sdk;
   String _rootPath;
+
+  PackageGraph _pkgGraph;
 
   InternalContext._(this._rootPath);
 
@@ -45,6 +47,8 @@ class InternalContext {
       ..sourceFactory = new SourceFactory([new ResourceUriResolver(_resourceProvider), new DartUriResolver(_sdk)]);
 
     _packageResolver = await PackageResolver.loadConfig(pathos.join(_rootPath, ".packages"));
+
+    _pkgGraph = new PackageGraph.forPath(_rootPath);
   }
 }
 
@@ -61,6 +65,8 @@ class DependencyAnalyzer {
   String get packageName => _pubspec['name'];
 
   DependencyAnalyzer._(this.packageRoot, this._ctx);
+
+  bool get external => !(pathos.isWithin(rootPath, packageRoot) || rootPath == packageRoot);
 
   Future init() async {
     _pubspec = yaml.loadYaml(_ctx._resourceProvider.getFile(pathos.join(packageRoot, "pubspec.yaml")).readAsStringSync());
@@ -88,34 +94,30 @@ class DependencyAnalyzer {
         rootPath: rootPath);
     depsByTarget[currentTarget] = new Set();
 
-    Iterable<Future> futures = fu.uris.map((u) async {
+    Iterable<Future> futures = fu.uris.where((u) => !u.startsWith('dart:')).map((u) async {
       String workspace_name;
       String target;
       TargetDesc targetDesc;
 
-      if (u.startsWith('dart:')) {
-        targetDesc = TargetDesc.SDK_TARGET;
-      } else {
-        Match m = re.matchAsPrefix(u);
+      Match m = re.matchAsPrefix(u);
 
-        if (m != null) {
-          // an absolute url
-          if (m[1] != 'package') {
-            throw "Unknown uri prefix : ${m[1]}";
-          } else {
-            String otherPackageRoot = await _ctx._packageResolver.packagePath(m[2]);
-            if (m[2] != packageName) importedPackages.add(pathos.canonicalize(otherPackageRoot));
-
-            targetDesc = TargetDesc.fromPaths(packageRelativePath: m[3], rootPath: rootPath, packageRoot: otherPackageRoot, packageName: m[2]);
-          }
+      if (m != null) {
+        // an absolute url
+        if (m[1] != 'package') {
+          throw "Unknown uri prefix : ${m[1]}";
         } else {
-          // a relative path (relative to current file);
-          String resolved = pathos.withoutExtension(pathos.join(pathos.dirname(file), u));
+          String otherPackageRoot = await _ctx._packageResolver.packagePath(m[2]);
+          if (m[2] != packageName) importedPackages.add(pathos.canonicalize(otherPackageRoot));
 
-          String rel = pathos.relative(resolved, from: pathos.join(packageRoot, "lib"));
-
-          targetDesc = TargetDesc.fromPaths(packageRelativePath: rel, rootPath: rootPath, packageRoot: packageRoot, packageName: this.packageName);
+          targetDesc = TargetDesc.fromPaths(packageRelativePath: m[3], rootPath: rootPath, packageRoot: otherPackageRoot, packageName: m[2]);
         }
+      } else {
+        // a relative path (relative to current file);
+        String resolved = pathos.withoutExtension(pathos.join(pathos.dirname(file), u));
+
+        String rel = pathos.relative(resolved, from: pathos.join(packageRoot, "lib"));
+
+        targetDesc = TargetDesc.fromPaths(packageRelativePath: rel, rootPath: rootPath, packageRoot: packageRoot, packageName: this.packageName);
       }
 
       depsByTarget[currentTarget].add(targetDesc);
@@ -157,6 +159,8 @@ class WorkspaceBuilder {
     return b;
   }
 
+  Map<TargetDesc, DependencyAnalyzer> depByTarget = <TargetDesc, DependencyAnalyzer>{};
+
   Future<DependencyAnalyzer> build(String packagePath) async {
     _ctx = await InternalContext.create(_rootPath);
 
@@ -165,6 +169,8 @@ class WorkspaceBuilder {
       _logger.fine("ANALYZING ${packagePath}");
       DependencyAnalyzer res = await analyzePackage(_rootPath, packagePath, _ctx);
       _allPackages.add(packagePath);
+      res.depsByTarget.keys.forEach((t) => depByTarget[t] = res);
+
       // Recur on imported packages
       _logger.finest("${packagePath} -> ${res.importedPackages}");
       await Future.wait(res.importedPackages.map((p) => build(p)));
@@ -180,10 +186,14 @@ class WorkspaceBuilder {
    * Generate the build for a package
    */
   Stream<String> generateBuildFile(String packagePath) async* {
-    yield 'load("@polymerize//:polymerize.bzl", "dart_file")';
+    yield 'load("@polymerize//:polymerize.bzl", "dart_file","export_dart_sdk")';
     yield "";
     yield "def build():";
     DependencyAnalyzer dep = await _analyzersFutures[packagePath];
+
+    if (packagePath == _mainPackagePath) {
+      yield "  export_dart_sdk(name ='dart_sdk')";
+    }
 
     for (TargetDesc tgt in dep.depsByTarget.keys) {
       yield* _generateBuildFileForTarget(dep, tgt);
@@ -197,10 +207,29 @@ class WorkspaceBuilder {
     yield "   dart_sources = ['lib/${target.target}.dart'],";
     yield "   dart_source_uri = 'package:${dep.packageName}/${target.target}.dart',";
     yield "   deps = [";
-    for (String dep in (dep.depsByTarget[target].toList()..sort((x, y) => x.js.compareTo(y.js))).map((x) => "'${x.relativeTo(target)}'")) {
+    for (String dep in (new List.from(new Set()..addAll(_transitiveDependencies(target)))..sort((x, y) => x.js.compareTo(y.js))).map((x) => "'${x.relativeTo(target)}'")) {
       yield "     ${dep},";
     }
     yield "  ])";
+  }
+
+  Iterable<TargetDesc> _transitiveDependencies(TargetDesc startTarget, {Set<TargetDesc> visited}) sync* {
+    // Lookup a dep for this target
+    if (visited == null) {
+      visited = new Set();
+    }
+    ;
+
+    if (visited.contains(startTarget)) {
+      return;
+    }
+    visited.add(startTarget);
+
+    DependencyAnalyzer dep = depByTarget[startTarget];
+    for (TargetDesc child in dep.depsByTarget[startTarget]) {
+      yield child;
+      yield* _transitiveDependencies(child, visited: visited);
+    }
   }
 
   Future generateBuildFiles() async {
@@ -225,10 +254,165 @@ class WorkspaceBuilder {
       }
     }
 
-    // Create BUILD PATH FOR THIS WORKSPACE
+    // Create BUILD PATH FOR .polymerize WORKSPACE
     await write(pathos.join(destBasePath, "BUILD"), new Stream.fromIterable(['package(default_visibility = ["//visibility:public"])']));
+
+    // create INNER BUILD files
+    for (String package in _allPackages) {
+      DependencyAnalyzer dep = await _analyzersFutures[package];
+      if (dep.external) continue;
+
+      String buildFilePath = pathos.join(dep.packageRoot, "BUILD");
+
+      try {
+        _logger.fine("building ${buildFilePath}");
+        await write(buildFilePath, _generateMainBuildFile(package, dep));
+      } catch (error, stack) {
+        _logger.severe("problem while writing ${dep.packageName} build file", error, stack);
+      }
+    }
+
+    // Create WORKSPACE file
+
+    await write(pathos.join(destBasePath, "WORKSPACE.main.bzl"), generateWorkspaceBzl());
+
+    await write(pathos.join(_rootPath, 'WORKSPACE'), _generateMainWorspace());
+  }
+
+  Stream<String> _generateMainBuildFile(String path, DependencyAnalyzer dep) async* {
+    yield 'load("@build_files//:BUILD.${dep.packageName}.bzl","build")';
+    yield 'package(default_visibility = ["//visibility:public"])';
+    yield 'build()';
+
+    if (path == _mainPackagePath) {
+      yield "filegroup(name='all_js',srcs=['dart_sdk',${dep.depsByTarget.keys.map((t)=>"'${t.target}'").join(',')}])";
+    }
+  }
+
+  Stream<String> _generateMainWorspace() {
+    if (developHome != null)
+      return _stream("""
+local_repository(
+ name='polymerize',
+ path='${pathos.join(developHome,'bazel_polymerize_rules')}'
+)
+
+local_repository(
+ name='build_files',
+ path='.polymerize')
+
+load('@build_files//:WORKSPACE.main.bzl','load_repositories')
+
+load_repositories()
+  
+  """);
+    else
+      return _stream("""
+# Polymerize rules repository
+git_repository(
+ name='polymerize',
+ tag='${rules_version}',
+ remote='https://github.com/polymer-dart/bazel_polymerize_rules')    
+    """);
+  }
+
+  String developHome = '/home/vittorio/Develop/dart';
+  String rules_version = '0.9';
+  String get sdk_home => pathos.join(_ctx._sdk.directory.path, 'bin');
+
+  static Stream<String> _stream(String bigString, {int indent: 0}) =>
+      new Stream.fromIterable(bigString.split("\n").map((x) => new String.fromCharCodes(new List.generate(indent, (x) => ' '.codeUnits.first)) + x));
+
+  Stream<String> generateWorkspaceBzl() async* {
+    if (developHome == null) {
+      yield* _stream("""
+# Load Polymerize rules
+load('@polymerize//:polymerize_workspace.bzl',
+    'dart_library2',
+    'init_polymerize')
+
+def load_repositories() :
+   # Init
+   init_polymerize('${sdk_home}')
+
+
+   ##
+   ## All the dart libraries we depend on
+   ##""");
+
+      yield* _generateDeps();
+    } else {
+      yield* _stream("""
+# Load Polymerize rules
+load('@polymerize//:polymerize_workspace.bzl',
+    'dart_library2',
+    'init_local_polymerize')
+
+
+def load_repositories() :
+   # Init
+   init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
+    
+   ##
+   ## All the dart libraries we depend on
+   ##""");
+
+      yield* _generateDeps();
+    }
+  }
+
+  Stream<String> _generateDeps() async* {
+    for (String packageName in _allPackages) {
+      // If is external write
+      DependencyAnalyzer dep = await _analyzersFutures[packageName];
+
+      yield* _generateDepsForPackage(packageName, dep);
+    }
+  }
+
+  Stream<String> _generateDepsForPackage(String packagePath, DependencyAnalyzer dep) async* {
+    // Nothing to do if it is internal
+    if (pathos.isWithin(_rootPath, packagePath)) {
+      return;
+    }
+
+    PackageNode nd = _ctx._pkgGraph.allPackages[dep.packageName];
+
+    dartLibraryWriter writer = _dartLibraryWriters[nd.dependencyType];
+
+    if (writer != null) yield* _stream(writer(nd), indent: 3);
   }
 }
+
+/**
+ * Writers for external deps
+ */
+
+Map<PackageDependencyType, dartLibraryWriter> _dartLibraryWriters = <PackageDependencyType, dartLibraryWriter>{
+  PackageDependencyType.pub: (PackageNode n) => """
+dart_library2(
+  name='${n.name}',
+  package_name='${n.name}',
+  pub_host = '${n.source['description']['url']}/api',
+  version='${n.version}')
+""",
+  PackageDependencyType.github: (PackageNode n) => """git_repository(
+    name = "${n.name}",
+    remote = "${n.source['description']['url']}",
+    tag = "${n.source['description']['ref']}",
+)
+""",
+  PackageDependencyType.path: (PackageNode n) => """
+dart_library2(
+  name='${n.name}',
+  src_path='${n.location.toFilePath()}',
+  package_name='${n.name}',
+  version='${n.version}')
+""",
+  PackageDependencyType.root: null,
+};
+
+typedef String dartLibraryWriter(PackageNode nd);
 
 Future write(String dest, Stream<String> lines) async {
   io.File f = new io.File(dest);
@@ -248,7 +432,7 @@ class TargetDesc {
 
   const TargetDesc({this.workspace_name: "//", this.packageName: "", this.target});
 
-  static const SDK_TARGET = const TargetDesc(workspace_name: '@polymerize//', target: 'dart_sdk');
+  static const SDK_TARGET = const TargetDesc(workspace_name: '//', target: 'dart_sdk');
 
   String get baseLabel => '${workspace_name}${packageName}:${target}';
 

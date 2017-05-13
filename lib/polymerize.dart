@@ -889,7 +889,9 @@ main(List<String> args) async {
           ..addOption('output', abbr: 'o', help: 'output bower file'))
     ..addCommand("build", new ArgParser()..addOption('package-name', abbr: 'p')..addOption('source', abbr: 's', allowMultiple: true))
     ..addCommand('test')
-    ..addCommand('dart_file', new ArgParser()..addOption('summary', abbr: 's', allowMultiple: true)..addOption('input', abbr: 'i')..addOption('output', abbr: 'o'));
+    ..addCommand('dart_file', new ArgParser()..addOption('summary', abbr: 's', allowMultiple: true)..addOption('input', abbr: 'i')..addOption('output', abbr: 'o'))
+    ..addCommand('export_sdk',new ArgParser()..addOption('output',abbr:'o')..addOption('html',abbr:'h'));
+    
 
   // Configure logger
   log.hierarchicalLoggingEnabled = true;
@@ -925,6 +927,11 @@ main(List<String> args) async {
 
   if (results.command?.name == 'build') {
     //build_cmd.build(results.command['package-name'], results.command['source']);
+    return;
+  }
+
+  if (results.command?.name == 'export_sdk') {
+    await _exportSDK(results.command['output'], results.command['html']);
     return;
   }
 
