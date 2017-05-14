@@ -48,7 +48,7 @@ packages:
       name: build
       url: "https://pub.dart-polymer.com"
     source: hosted
-    version: "0.9.2"
+    version: "0.9.3"
   build_barback:
     description:
       name: build_barback

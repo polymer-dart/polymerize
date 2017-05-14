@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'dart:convert';
 import 'package:analyzer/analyzer.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:analyzer/src/dart/sdk/sdk.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:analyzer/source/pub_package_map_provider.dart';
+import 'package:analyzer/source/package_map_resolver.dart';
 import 'package:glob/glob.dart';
 import 'package:package_resolver/package_resolver.dart';
 import 'package:path/path.dart' as pathos;
@@ -40,13 +43,18 @@ class InternalContext {
   Future _init() async {
     _sdk = new FolderBasedDartSdk(_resourceProvider, FolderBasedDartSdk.defaultSdkDirectory(_resourceProvider));
 
+    ResourceUriResolver _resourceResolver = new ResourceUriResolver(_resourceProvider);
+
+    _packageResolver = await PackageResolver.loadConfig(pathos.join(_rootPath, ".packages"));
+
+    PubPackageMapProvider _pub = new PubPackageMapProvider(_resourceProvider,_sdk);
+    PackageMapUriResolver _pkgRes= new PackageMapUriResolver(_resourceProvider, _pub.computePackageMap(_resourceProvider.getFolder(_rootPath)).packageMap);
+
     _analysisContext = engine.createAnalysisContext()
       ..analysisOptions = (new AnalysisOptionsImpl()
         ..strongMode = true
         ..analyzeFunctionBodies = true)
-      ..sourceFactory = new SourceFactory([new ResourceUriResolver(_resourceProvider), new DartUriResolver(_sdk)]);
-
-    _packageResolver = await PackageResolver.loadConfig(pathos.join(_rootPath, ".packages"));
+      ..sourceFactory = new SourceFactory([new DartUriResolver(_sdk),_resourceResolver,_pkgRes]);
 
     _pkgGraph = new PackageGraph.forPath(_rootPath);
   }
@@ -83,9 +91,9 @@ class DependencyAnalyzer {
   Future analyze(String file) async {
     _logger.finest("PARSING ${file}");
     var absolutePath = pathos.absolute(file);
-    var source = _ctx._analysisContext.sourceFactory.forUri(pathos.toUri(absolutePath).toString());
+    //var source = _ctx._analysisContext.sourceFactory.forUri(pathos.toUri(absolutePath).toString());
 
-    CompilationUnit cu = _ctx._analysisContext.parseCompilationUnit(source);
+    CompilationUnit cu = parseDirectives(await new io.File(file).readAsString()); //  _ctx._analysisContext.parseCompilationUnit(source);
     FindImports fu = new FindImports()..visitAllNodes(cu);
     TargetDesc currentTarget = TargetDesc.fromPaths(
         packageName: this.packageName,
@@ -144,7 +152,7 @@ class WorkspaceBuilder {
   String _rootPath;
   String _mainPackagePath;
   InternalContext _ctx;
-  Map<String, Future<DependencyAnalyzer>> _analyzersFutures = {};
+  Map<String, DependencyAnalyzer> _analyzers = {};
   WorkspaceBuilder._(this._rootPath, this._mainPackagePath);
 
   static Future<WorkspaceBuilder> create(String rootPath, String mainPackagePath) async {
@@ -154,34 +162,43 @@ class WorkspaceBuilder {
 
     await b.build(mainPackagePath);
 
-    _logger.finest("Workspace builder created width ${b._allPackages.length} packages.");
+    _logger.finest("Workspace builder created width ${b._analyzers.length} packages.");
 
     return b;
   }
 
   Map<TargetDesc, DependencyAnalyzer> depByTarget = <TargetDesc, DependencyAnalyzer>{};
 
-  Future<DependencyAnalyzer> build(String packagePath) async {
+  Future<DependencyAnalyzer> build(String packagePath, [Map<String, Future<DependencyAnalyzer>> _analyzersFutures]) async {
+    if (_analyzersFutures == null) {
+      _analyzersFutures = new Map();
+    }
     _ctx = await InternalContext.create(_rootPath);
 
     packagePath = pathos.canonicalize(packagePath);
     Future<DependencyAnalyzer> resFuture = _analyzersFutures.putIfAbsent(packagePath, () async {
       _logger.fine("ANALYZING ${packagePath}");
       DependencyAnalyzer res = await analyzePackage(_rootPath, packagePath, _ctx);
-      _allPackages.add(packagePath);
+      //_allPackages.add(packagePath);
       res.depsByTarget.keys.forEach((t) => depByTarget[t] = res);
 
       // Recur on imported packages
       _logger.finest("${packagePath} -> ${res.importedPackages}");
-      await Future.wait(res.importedPackages.map((p) => build(p)));
+      await Future.wait(res.importedPackages.map((p) => build(p, _analyzersFutures)));
       _logger.finest("Done ANALYZING ${packagePath}");
+
+      _analyzers[packagePath] = res;
+
       return res;
     });
 
     return resFuture;
   }
 
-  Set<String> _allPackages = new Set();
+  //Set<String> _allPackages = new Set();
+
+  Iterable<String> get _allPackages => _analyzers.keys;
+
   /**
    * Generate the build for a package
    */
@@ -189,7 +206,7 @@ class WorkspaceBuilder {
     yield 'load("@polymerize//:polymerize.bzl", "dart_file","export_dart_sdk")';
     yield "";
     yield "def build():";
-    DependencyAnalyzer dep = await _analyzersFutures[packagePath];
+    DependencyAnalyzer dep = _analyzers[packagePath];
 
     if (packagePath == _mainPackagePath) {
       yield "  export_dart_sdk(name ='dart_sdk')";
@@ -205,12 +222,24 @@ class WorkspaceBuilder {
     yield "  dart_file(";
     yield "   name = '${target.target}',";
     yield "   dart_sources = ['lib/${target.target}.dart'],";
-    yield "   dart_source_uri = 'package:${dep.packageName}/${target.target}.dart',";
+    yield "   dart_source_uri = '${target.uri}',";
     yield "   deps = [";
     for (String dep in (new List.from(new Set()..addAll(_transitiveDependencies(target)))..sort((x, y) => x.js.compareTo(y.js))).map((x) => "'${x.relativeTo(target)}'")) {
       yield "     ${dep},";
     }
     yield "  ])";
+
+
+    // Analyze target and get any interesting thing
+
+    LibraryElement lib = resolve(target);
+
+    // TODO :
+    // Generare gli stub dart files da qualche parte oppure il task per farlo generare (e poi compilare e produrre il .mod.html come al solito)
+    // Generare i repository per i bower
+    // Generare le istruzioni per caricare file extra in HTML
+
+    //lib.importedLibraries.forEach((el)=>_logger.info("LIBRARIES FOR ${lib.location} : ${el.location}"));
   }
 
   Iterable<TargetDesc> _transitiveDependencies(TargetDesc startTarget, {Set<TargetDesc> visited}) sync* {
@@ -218,7 +247,6 @@ class WorkspaceBuilder {
     if (visited == null) {
       visited = new Set();
     }
-    ;
 
     if (visited.contains(startTarget)) {
       return;
@@ -232,6 +260,23 @@ class WorkspaceBuilder {
     }
   }
 
+  LibraryElement resolve(TargetDesc target, {Map<TargetDesc, LibraryElement> inProcess}) {
+    if (inProcess == null) {
+      inProcess = new Map();
+    }
+    return inProcess.putIfAbsent(target, () {
+      depByTarget[target].depsByTarget[target].forEach((t) => resolve(t, inProcess: inProcess));
+
+      // And finally resolve me
+
+      Uri uri = target.uri;
+      _logger.finest("Resolving : ${uri}");
+      Source src = _ctx._analysisContext.sourceFactory.forUri2(uri);
+      return _ctx._analysisContext.computeLibraryElement(src);
+
+    });
+  }
+
   Future generateBuildFiles() async {
     String destBasePath = pathos.join(_rootPath, '.polymerize');
 
@@ -242,7 +287,7 @@ class WorkspaceBuilder {
     destBaseDir.createSync();
 
     for (String package in _allPackages) {
-      DependencyAnalyzer dep = await _analyzersFutures[package];
+      DependencyAnalyzer dep = _analyzers[package];
 
       String buildFilePath = pathos.join(destBasePath, "BUILD.${dep.packageName}.bzl");
 
@@ -259,7 +304,7 @@ class WorkspaceBuilder {
 
     // create INNER BUILD files
     for (String package in _allPackages) {
-      DependencyAnalyzer dep = await _analyzersFutures[package];
+      DependencyAnalyzer dep = _analyzers[package];
       if (dep.external) continue;
 
       String buildFilePath = pathos.join(dep.packageRoot, "BUILD");
@@ -364,7 +409,7 @@ def load_repositories() :
   Stream<String> _generateDeps() async* {
     for (String packageName in _allPackages) {
       // If is external write
-      DependencyAnalyzer dep = await _analyzersFutures[packageName];
+      DependencyAnalyzer dep = _analyzers[packageName];
 
       yield* _generateDepsForPackage(packageName, dep);
     }
@@ -429,8 +474,9 @@ class TargetDesc {
   final String workspace_name;
   final String packageName;
   final String target;
+  final Uri uri;
 
-  const TargetDesc({this.workspace_name: "//", this.packageName: "", this.target});
+  const TargetDesc({this.workspace_name: "//", this.packageName: "", this.target, this.uri});
 
   static const SDK_TARGET = const TargetDesc(workspace_name: '//', target: 'dart_sdk');
 
@@ -445,7 +491,7 @@ class TargetDesc {
     String workspace_name;
     String packagePath;
     String target;
-    if (pathos.isWithin(rootPath, packageRoot)) {
+    if (pathos.isWithin(rootPath, packageRoot) || rootPath == packageRoot) {
       workspace_name = "//";
       packagePath = pathos.relative(packageRoot, from: rootPath);
       target = packageRelativePath;
@@ -455,13 +501,13 @@ class TargetDesc {
       target = packageRelativePath;
     }
 
-    return new TargetDesc(workspace_name: workspace_name, packageName: packagePath, target: target);
+    return new TargetDesc(
+        workspace_name: workspace_name, packageName: packagePath, target: target,
+        uri: Uri.parse('package:${packageName}/${packageRelativePath}.dart'));
   }
 
   String relativeTo(TargetDesc root) {
-    if (root.workspace_name != this.workspace_name) {
-      return baseLabel;
-    } else if (this.packageName != root.packageName) {
+    if (root.workspace_name != this.workspace_name || this.packageName != root.packageName) {
       return baseLabel;
     } else {
       return target;
