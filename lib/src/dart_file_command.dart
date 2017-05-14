@@ -12,7 +12,7 @@ Future ddcBuild(ArgResults command) async {
       '${findDartSDKHome().path}/dartdevc',
       []
         ..addAll(['--module-root=bazel-out/local-fastbuild/bin'])
-        ..addAll(command['summary'].isEmpty?[]:command['summary'].map((s) => ['-s', s]).reduce((a, b) => []..addAll(a)..addAll(b)))
+        ..addAll(command['summary'].isEmpty ? [] : command['summary'].map((s) => ['-s', s]).reduce((a, b) => []..addAll(a)..addAll(b)))
         ..addAll(['-o', command['output']])
         ..add(command['input']));
 
@@ -20,14 +20,18 @@ Future ddcBuild(ArgResults command) async {
   File html = new File(command['html']);
   IOSink sink = html.openWrite();
   await sink.addStream(() async* {
-    for(String dep in command['dep'] ?? <String>[]) {
+    yield "<link rel='import' href='${path.relative('bazel-out/local-fastbuild/bin/dart_sdk.mod.html',from:command['html'])}'>\n";
+    for (String dep in command['dep'] ?? <String>[]) {
       yield "<link rel='import' href='${path.relative(dep,from:path.dirname(command['html']))}'>\n";
     }
-    yield "<script src='${path.relative(command['output'],from:path.dirname(command['html']))}'>\n";
-  }().transform(UTF8.encoder));
+    yield "<script "
+        "src='${path.relative(command['output'],from:path.dirname(command['html']))}' "
+        "as='${path.withoutExtension(path.relative(command['output'],from: 'bazel-out/local-fastbuild/bin'))}'>\n";
+  }()
+      .transform(UTF8.encoder));
   await sink.close();
 
-  if (res.exitCode!=0) {
+  if (res.exitCode != 0) {
     //logger.severe("Error during build :${res.stdout} ${res.stderr}");
     throw "ERROR : ${res.stdout} - ${res.stderr}";
   }
