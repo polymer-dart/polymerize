@@ -35,7 +35,8 @@ Future runPubMode(ArgResults params) async {
 
   Archive a = new TarDecoder().decodeBytes(allBytes);
 
-  a.files.forEach((f) {
+  // Do NOT copy the BUILD file too.
+  a.files.where((f)=>f.name!="BUILD").forEach((f) {
     new File(path.join(params['dest'], f.name))
       ..createSync(recursive: true)
       ..writeAsBytesSync(f.content);

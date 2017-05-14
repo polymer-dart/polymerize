@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 
@@ -39,3 +40,13 @@ ElementAnnotation getElementAnnotation(
         Iterable<ElementAnnotation> metadata, //
         bool matches(DartObject x)) =>
     metadata.firstWhere((an) => matches(an.computeConstantValue()), orElse: () => null);
+
+Directory findDartSDKHome() {
+  if (Platform.environment['DART_HOME'] != null) {
+    return new Directory(Platform.environment['DART_HOME']);
+  }
+
+  //print("res:${Platform.resolvedExecutable} exe:${Platform.executable} root:${Platform.packageRoot} cfg:${Platform.packageConfig} ");
+  // Else tries with current executable
+  return new File(Platform.resolvedExecutable).parent;
+}

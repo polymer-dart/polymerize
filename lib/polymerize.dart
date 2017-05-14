@@ -15,6 +15,7 @@ import 'package:polymerize/package_graph.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+import 'package:polymerize/src/dart_file_command.dart';
 import 'package:polymerize/src/dep_analyzer.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'package:resource/resource.dart' as res;
@@ -812,16 +813,6 @@ String _moduleForUri(Uri uri, {Map<String, String> mapping}) {
   return _moduleForPackage(m.group(1), mapping: mapping);
 }
 
-Directory findDartSDKHome() {
-  if (Platform.environment['DART_HOME'] != null) {
-    return new Directory(Platform.environment['DART_HOME']);
-  }
-
-  //print("res:${Platform.resolvedExecutable} exe:${Platform.executable} root:${Platform.packageRoot} cfg:${Platform.packageConfig} ");
-  // Else tries with current executable
-  return new File(Platform.resolvedExecutable).parent;
-}
-
 main(List<String> args) async {
   String homePath = user.homeDirPath;
   if (homePath == null) {
@@ -889,9 +880,9 @@ main(List<String> args) async {
           ..addOption('output', abbr: 'o', help: 'output bower file'))
     ..addCommand("build", new ArgParser()..addOption('package-name', abbr: 'p')..addOption('source', abbr: 's', allowMultiple: true))
     ..addCommand('test')
-    ..addCommand('dart_file', new ArgParser()..addOption('summary', abbr: 's', allowMultiple: true)..addOption('input', abbr: 'i')..addOption('output', abbr: 'o'))
-    ..addCommand('export_sdk',new ArgParser()..addOption('output',abbr:'o')..addOption('html',abbr:'h'));
-    
+    ..addCommand('dart_file',
+        new ArgParser()..addOption('summary', abbr: 's', allowMultiple: true)..addOption('input', abbr: 'i')..addOption('dep',abbr:'d',allowMultiple: true)..addOption('output', abbr: 'o')..addOption('html', abbr: 'h'))
+    ..addCommand('export_sdk', new ArgParser()..addOption('output', abbr: 'o')..addOption('html', abbr: 'h'));
 
   // Configure logger
   log.hierarchicalLoggingEnabled = true;
@@ -936,20 +927,7 @@ main(List<String> args) async {
   }
 
   if (results.command?.name == 'dart_file') {
-    List l;
-    ProcessResult res = await Process.run(
-        '${findDartSDKHome().path}/dartdevc',
-        []
-          ..addAll(['--module-root=bazel-out/local-fastbuild/bin'])
-          ..addAll(results.command['summary'].isEmpty?[]:results.command['summary'].map((s) => ['-s', s]).reduce((a, b) => []..addAll(a)..addAll(b)))
-          ..addAll(['-o', results.command['output']])
-          ..add(results.command['input']));
-    if (res.exitCode!=0) {
-      //logger.severe("Error during build :${res.stdout} ${res.stderr}");
-      throw "ERROR : ${res.stdout} - ${res.stderr}";
-    }
-    //new File(results.command['output'])
-    //    .writeAsStringSync('dartdevc ${(results.command['summary']??[]).map((x) => "-s ${x}").join(' ')} -o ${results.command['output']} ${results.command['input']}');
+    await ddcBuild(results.command);
     return;
   }
 
