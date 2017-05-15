@@ -70,22 +70,5 @@ Future _generateInitMethods(
   }
 }
 
-Future _addHtmlImport(GeneratorContext ctx, CompilationUnit cu, code_builder.LibraryBuilder libBuilder, code_builder.MethodBuilder initModuleBuilder, IOSink htmlHeader) async {
-  for (AstNode m in cu.sortedDirectivesAndDeclarations) {
-    List<ElementAnnotation> anno;
-    if (m is Declaration) {
-      anno = m.element?.metadata;
-    } else if (m is Directive) {
-      anno = m.element?.metadata;
-    }
-    if (anno==null) {
-      continue;
-    }
-    DartObject html = getAnnotation(anno, isHtmlImport);
-    if (html != null) {
-      String relPath = html.getField('path').toStringValue();
-
-      htmlHeader.writeln("<link rel='import' href='${relPath}'>");
-    }
-  }
-}
+Future _addHtmlImport(GeneratorContext ctx, CompilationUnit cu, code_builder.LibraryBuilder libBuilder, code_builder.MethodBuilder initModuleBuilder, IOSink htmlHeader) async =>
+    allFirstLevelAnnotation(cu, isHtmlImport).map((o) => o.getField('path').toStringValue()).forEach((relPath) => htmlHeader.writeln("<link rel='import' href='${relPath}'>"));

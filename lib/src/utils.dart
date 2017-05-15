@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:analyzer/analyzer.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 
@@ -21,7 +22,7 @@ bool isPolymerElementHtmlImportUri(Uri u) => u == POLYMER_HTML_IMPORT_URI;
 
 bool isJS(DartObject o) => (isJsUri(o.type.element.librarySource.uri)) && (o.type.name == 'JS');
 
-bool isBowerImport(DartObject o) => (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'BowerImport');
+bool isBowerImport(DartObject o) => o!=null && (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'BowerImport');
 
 bool isDefine(DartObject o) => (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'Define');
 
@@ -42,6 +43,24 @@ bool isStoreDef(DartObject o) => (isPolymerElementUri(o.type.element.librarySour
 bool isInit(DartObject o) => o != null && (isPolymerElementInitUri(o.type.element.librarySource.uri)) && (o.type.name == 'Init');
 
 bool isHtmlImport(DartObject o) => o != null && (isPolymerElementHtmlImportUri(o.type.element.librarySource.uri)) && (o.type.name == 'HtmlImport');
+
+Iterable<DartObject> allFirstLevelAnnotation(CompilationUnit cu, bool matches(DartObject x)) sync* {
+  for (AstNode m in cu.sortedDirectivesAndDeclarations) {
+    List<ElementAnnotation> anno;
+    if (m is Declaration) {
+      anno = m.element?.metadata;
+    } else if (m is Directive) {
+      anno = m.element?.metadata;
+    }
+    if (anno==null) {
+      continue;
+    }
+    DartObject html = getAnnotation(anno, matches);
+    if (html != null) {
+      yield html;
+    }
+  }
+}
 
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //

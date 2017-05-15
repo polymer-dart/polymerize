@@ -15,6 +15,7 @@ import 'package:polymerize/package_graph.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+import 'package:polymerize/src/bower_library.dart';
 import 'package:polymerize/src/dart_file_command.dart';
 import 'package:polymerize/src/dep_analyzer.dart';
 import 'package:stack_trace/stack_trace.dart';
@@ -899,6 +900,7 @@ _main(List<String> args) async {
           ..addOption('develop', help: "enable polymerize develop mode, with repo home at the given path"))
     ..addCommand('test')
     ..addCommand('copy', new ArgParser()..addOption('list', abbr: 'l')..addOption('src', abbr: 's', allowMultiple: true)..addOption('dest', abbr: 'd', allowMultiple: true))
+    ..addCommand('bower_library')
     ..addCommand(
         'dart_file',
         new ArgParser()
@@ -954,23 +956,31 @@ _main(List<String> args) async {
     return;
   }
 
+  if (results.command?.name=='bower_library') {
+    await createBowerLibrary(results.command.rest.first);
+    return;
+  }
+
   if (results.command?.name == 'copy') {
     List<String> src = results.command['src'];
     List<String> dst = results.command['dest'];
     String listFile = results.command['list'];
-    IOSink listSink = new File(listFile).openWrite();
+    IOSink listSink;
+    if (listFile!=null) listSink= new File(listFile).openWrite();
 
     Iterator<String> dstI = dst.iterator;
 
     for (String s in src) {
       String d = (dstI..moveNext()).current;
 
-      listSink.writeln("${s} -> ${d}");
+      if (listSink!=null)
+        listSink.writeln("${s} -> ${d}");
       await new Directory(path.dirname(d)).create(recursive: true);
       await new File(s).copy(d);
     }
 
-    await listSink.close();
+    if (listSink!=null)
+      await listSink.close();
 
     return;
   }

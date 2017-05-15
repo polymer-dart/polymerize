@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'dart:convert';
 import 'package:analyzer/analyzer.dart';
+import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
@@ -14,6 +15,7 @@ import 'package:glob/glob.dart';
 import 'package:package_resolver/package_resolver.dart';
 import 'package:path/path.dart' as pathos;
 import 'package:polymerize/package_graph.dart';
+import 'package:polymerize/src/utils.dart';
 import 'package:yaml/yaml.dart' as yaml;
 import 'dart:io' as io;
 import 'package:logging/logging.dart' as log;
@@ -256,7 +258,14 @@ copy_to_bin_dir(
     yield "   name = '${target.target}',";
     yield "   dart_sources = ['lib/${target.target}.dart'],";
     yield "   dart_source_uri = '${target.uri}',";
-    yield "   other_deps= ['//external:dart_sdk'],  ";
+    yield "   other_deps= ['//external:dart_sdk',";
+
+    for (String str in new Set.from(_extractBowerLibraryForPackage(dep.packageRoot, dep).map((dep)=>"     '@bower//:assets/${dep['import']}',"))) {
+      yield str;
+    }
+
+
+    yield "    ],  ";
     yield "   deps = [";
     for (String dep in (new List.from(new Set()..addAll(_transitiveDependencies(target)))..sort((x, y) => x.js.compareTo(y.js))).map((x) => "'${x.relativeTo(target)}'")) {
       yield "     ${dep},";
@@ -423,7 +432,7 @@ bind(name = "dart_sdk",actual = "//:dart_sdk")
       yield* _stream("""
 # Load Polymerize rules
 load('@polymerize//:polymerize_workspace.bzl',
-    'dart_library2',
+    'dart_library2','bower_library',
     'init_polymerize')
 
 # Init
@@ -439,7 +448,7 @@ init_polymerize('${sdk_home}')
       yield* _stream("""
 # Load Polymerize rules
 load('@polymerize//:polymerize_workspace.bzl',
-    'dart_library2',
+    'dart_library2','bower_library',
     'init_local_polymerize')
 
 
@@ -460,6 +469,44 @@ init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
       DependencyAnalyzer dep = _analyzers[packageName];
 
       yield* _generateDepsForPackage(packageName, dep);
+    }
+
+    yield "bower_library(name='bower', bower_repo='${pathos.absolute('.polymerize/bower')}')";
+
+    // Gather info to create the bower file
+    Map bower = {
+      'name': _analyzers[_mainPackagePath].packageName,
+      'dependencies': {},
+      "resolutions": {
+        // TODO: handle resolutions
+        "polymer": "2.0.0-rc.7"
+      }
+    };
+
+    for (String packageName in _allPackages) {
+      // If is external write
+      DependencyAnalyzer dep = _analyzers[packageName];
+      _extractBowerLibraryForPackage(packageName, dep).forEach((Map dep) => bower['dependencies'].addAll({dep['name']: dep['ref']}));
+    }
+    _logger.info("FINAL BOWER : ${bower}");
+
+    io.File f = new io.File(pathos.join('.polymerize', 'bower', 'bower.json'));
+    await f.parent.create(recursive: true);
+    await f.writeAsString(JSON.encode(bower));
+  }
+
+  Iterable<Map> _extractBowerLibraryForPackage(String packagePath, DependencyAnalyzer dep) sync* {
+    // Lookup any annotation of type BowerImport
+
+    for (TargetDesc tgt in dep.depsByTarget.keys) {
+      Source src = _ctx.analysisContext.sourceFactory.forUri2(tgt.uri);
+      CompilationUnit cu = _ctx.analysisContext.resolveCompilationUnit2(src, src);
+      _logger.finest("Checking ${cu?.element?.location}");
+      for (DartObject anno in allFirstLevelAnnotation(cu, isBowerImport)) {
+        // Create bower_library
+        _logger.finest("FOUND :${anno}");
+        yield {'name': anno.getField('name').toStringValue(), 'ref': anno.getField('ref').toStringValue(), 'import': anno.getField('import').toStringValue()};
+      }
     }
   }
 
