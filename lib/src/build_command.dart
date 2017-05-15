@@ -21,7 +21,11 @@ Future build(ArgResults command) async {
     root = command.rest.single;
   }
 
-  _logger.info("Updating build files ...");
+  if (develop_path!=null) {
+    _logger.info("Updating build files ... (DEVELOP_MODE=${develop_path}, dart=${dart_bin_path})");
+  } else {
+    _logger.info("Updating build files ... (rules=${rules_version}, dart=${dart_bin_path})");
+  }
   WorkspaceBuilder builder = await WorkspaceBuilder.create(root, root,
                                                            dart_bin_path: dart_bin_path,
                                                            rules_version: rules_version,
