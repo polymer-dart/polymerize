@@ -888,7 +888,8 @@ main(List<String> args) async {
           ..addOption('input', abbr: 'i')
           ..addOption('dep', abbr: 'd', allowMultiple: true)
           ..addOption('output', abbr: 'o')
-          ..addOption('html', abbr: 'h'))
+          ..addOption('html', abbr: 'h')
+          ..addCommand('generate', new ArgParser()..addOption('generate', abbr: 'g')..addOption('input', abbr: 'i')))
     ..addCommand('export_sdk', new ArgParser()..addOption('output', abbr: 'o')..addOption('html', abbr: 'h'));
 
   // Configure logger

@@ -21,11 +21,15 @@ Iterable<String> summaryOpts(List<String> summaries) sync* {
 
 String toLibraryName(String uri) {
   Uri u = Uri.parse(uri);
-  return u.pathSegments.map((x) => x.replaceAll('.', "_")).join("_")+"_G";
+  return u.pathSegments.map((x) => x.replaceAll('.', "_")).join("_") + "_G";
 }
 
-
 Future ddcBuild(ArgResults command) async {
+  if (command.command?.name == 'generate') {
+    await _generate(command.command);
+    return;
+  }
+
   List l;
 
   List<String> summariesPaths = command['summary'];
@@ -37,21 +41,6 @@ Future ddcBuild(ArgResults command) async {
 
   String genUri = inputUri.replaceFirst(new RegExp(r".dart$"), "_g.dart");
 
-  // Per ora genera in modo molto semplice
-  IOSink sinkDart = new File(genPath).openWrite();
-  await sinkDart.addStream(() async* {
-    yield "library ${toLibraryName(inputUri)};\n\n";
-    yield "import '${inputUri}';\n";
-    yield "\n";
-    yield "initModule() {\n";
-    // TODO : write register code for each polymer element
-    yield "  // TODO: write code here\n";
-    yield "}\n";
-  }()
-                           .transform(UTF8.encoder));
-  sinkDart.close();
-
-
   ProcessResult res = await Process.run(
       '${findDartSDKHome().path}/dartdevc',
       []
@@ -59,7 +48,8 @@ Future ddcBuild(ArgResults command) async {
         ..addAll(summaryOpts(summariesPaths))
         ..addAll(['-o', outputPath])
         ..add('--url-mapping=${genUri},${genPath}')
-        ..add(inputUri)..add(genUri));
+        ..add(inputUri)
+        ..add(genUri));
 
   // And generate an html too
   File html = new File(htmlPath);
@@ -67,7 +57,10 @@ Future ddcBuild(ArgResults command) async {
 
   String htmlDir = path.dirname(htmlPath);
 
-  String moduleName = path.withoutExtension(path.relative(outputPath,from: BAZEL_BASE_DIR));
+  // TODO : SPlIT IN DIFFERENT ACTIONS
+  // Bazel can optimize when only one of those artifact is to be generated
+
+  String moduleName = path.withoutExtension(path.relative(outputPath, from: BAZEL_BASE_DIR));
 
   await sink.addStream(() async* {
     yield "<link rel='import' href='${path.relative('${BAZEL_BASE_DIR}/dart_sdk.mod.html',from:htmlDir)}'>\n";
@@ -90,4 +83,23 @@ Future ddcBuild(ArgResults command) async {
     //logger.severe("Error during build :${res.stdout} ${res.stderr}");
     throw "ERROR : ${res.stdout} - ${res.stderr}";
   }
+}
+
+Future _generate(ArgResults command) async {
+  String inputUri = command['input'];
+  String genPath = command['generate'];
+
+  // Per ora genera in modo molto semplice
+  IOSink sinkDart = new File(genPath).openWrite();
+  await sinkDart.addStream(() async* {
+    yield "library ${toLibraryName(inputUri)};\n\n";
+    yield "import '${inputUri}';\n";
+    yield "\n";
+    yield "initModule() {\n";
+    // TODO : write register code for each polymer element
+    yield "  // TODO: write code here\n";
+    yield "}\n";
+  }()
+      .transform(UTF8.encoder));
+  await sinkDart.close();
 }
