@@ -107,7 +107,6 @@ Future _generateHtml(ArgResults command) async {
   String moduleName = path.withoutExtension(path.relative(outputPath, from: BAZEL_BASE_DIR));
 
   await sink.addStream(() async* {
-    yield "<link rel='import' href='${path.relative('${BAZEL_BASE_DIR}/dart_sdk.mod.html',from:htmlDir)}'>\n";
     for (String dep in depsPaths) {
       yield "<link rel='import' href='${path.relative(dep,from:htmlDir)}'>\n";
     }

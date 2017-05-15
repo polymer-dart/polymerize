@@ -223,6 +223,7 @@ class WorkspaceBuilder {
     yield "   name = '${target.target}',";
     yield "   dart_sources = ['lib/${target.target}.dart'],";
     yield "   dart_source_uri = '${target.uri}',";
+    yield "   other_deps= ['//external:dart_sdk'],  ";
     yield "   deps = [";
     for (String dep in (new List.from(new Set()..addAll(_transitiveDependencies(target)))..sort((x, y) => x.js.compareTo(y.js))).map((x) => "'${x.relativeTo(target)}'")) {
       yield "     ${dep},";
@@ -334,14 +335,24 @@ class WorkspaceBuilder {
     }
   }
 
-  Stream<String> _generateMainWorspace() {
+  Stream<String> _generateMainWorspace() async* {
     if (developHome != null)
-      return _stream("""
+      yield* _stream("""
 local_repository(
  name='polymerize',
  path='${pathos.join(developHome,'bazel_polymerize_rules')}'
-)
+) 
+""");
+    else
+      yield* _stream("""
+# Polymerize rules repository
+git_repository(
+ name='polymerize',
+ tag='${rules_version}',
+ remote='https://github.com/polymer-dart/bazel_polymerize_rules')    
+""");
 
+    yield* _stream("""
 local_repository(
  name='build_files',
  path='.polymerize')
@@ -349,16 +360,11 @@ local_repository(
 load('@build_files//:WORKSPACE.main.bzl','load_repositories')
 
 load_repositories()
-  
-  """);
-    else
-      return _stream("""
-# Polymerize rules repository
-git_repository(
- name='polymerize',
- tag='${rules_version}',
- remote='https://github.com/polymer-dart/bazel_polymerize_rules')    
-    """);
+
+bind(name = "dart_sdk",actual = "//:dart_sdk")
+
+""");
+
   }
 
   String developHome = '/home/vittorio/Develop/dart';
