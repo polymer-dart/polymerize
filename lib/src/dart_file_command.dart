@@ -96,7 +96,7 @@ Future _generateHtml(ArgResults command) async {
         "src='${path.relative(outputPath,from:htmlDir)}' "
         "as='${moduleName}'></script>\n";
     yield "<script>\n";
-    yield " require('${moduleName}',function(module) {\n";
+    yield " require(['${moduleName}'],function(module) {\n";
     yield "   module.${path.withoutExtension(Uri.parse(genUri).pathSegments.last)}.initModule();\n";
     yield " });\n";
     yield "</script>\n";
