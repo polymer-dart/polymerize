@@ -47,14 +47,14 @@ class InternalContext {
 
     _packageResolver = await PackageResolver.loadConfig(pathos.join(_rootPath, ".packages"));
 
-    PubPackageMapProvider _pub = new PubPackageMapProvider(_resourceProvider,_sdk);
-    PackageMapUriResolver _pkgRes= new PackageMapUriResolver(_resourceProvider, _pub.computePackageMap(_resourceProvider.getFolder(_rootPath)).packageMap);
+    PubPackageMapProvider _pub = new PubPackageMapProvider(_resourceProvider, _sdk);
+    PackageMapUriResolver _pkgRes = new PackageMapUriResolver(_resourceProvider, _pub.computePackageMap(_resourceProvider.getFolder(_rootPath)).packageMap);
 
     _analysisContext = engine.createAnalysisContext()
       ..analysisOptions = (new AnalysisOptionsImpl()
         ..strongMode = true
         ..analyzeFunctionBodies = true)
-      ..sourceFactory = new SourceFactory([new DartUriResolver(_sdk),_resourceResolver,_pkgRes]);
+      ..sourceFactory = new SourceFactory([new DartUriResolver(_sdk), _resourceResolver, _pkgRes]);
 
     _pkgGraph = new PackageGraph.forPath(_rootPath);
   }
@@ -230,7 +230,6 @@ class WorkspaceBuilder {
     }
     yield "  ])";
 
-
     // Analyze target and get any interesting thing
 
     LibraryElement lib = resolve(target);
@@ -274,7 +273,6 @@ class WorkspaceBuilder {
       _logger.finest("Resolving : ${uri}");
       Source src = _ctx._analysisContext.sourceFactory.forUri2(uri);
       return _ctx._analysisContext.computeLibraryElement(src);
-
     });
   }
 
@@ -320,7 +318,7 @@ class WorkspaceBuilder {
 
     // Create WORKSPACE file
 
-    await write(pathos.join(destBasePath, "WORKSPACE.main.bzl"), generateWorkspaceBzl());
+    //await write(pathos.join(destBasePath, "WORKSPACE.main.bzl"), generateWorkspaceBzl());
 
     await write(pathos.join(_rootPath, 'WORKSPACE'), _generateMainWorspace());
   }
@@ -356,15 +354,13 @@ git_repository(
 local_repository(
  name='build_files',
  path='.polymerize')
-
-load('@build_files//:WORKSPACE.main.bzl','load_repositories')
-
-load_repositories()
-
-bind(name = "dart_sdk",actual = "//:dart_sdk")
-
 """);
 
+    yield* generateWorkspaceBzl();
+
+    yield* _stream("""
+bind(name = "dart_sdk",actual = "//:dart_sdk")
+""");
   }
 
   String developHome = '/home/vittorio/Develop/dart';
@@ -382,14 +378,13 @@ load('@polymerize//:polymerize_workspace.bzl',
     'dart_library2',
     'init_polymerize')
 
-def load_repositories() :
-   # Init
-   init_polymerize('${sdk_home}')
+# Init
+init_polymerize('${sdk_home}')
 
 
-   ##
-   ## All the dart libraries we depend on
-   ##""");
+##
+## All the dart libraries we depend on
+##""");
 
       yield* _generateDeps();
     } else {
@@ -400,13 +395,12 @@ load('@polymerize//:polymerize_workspace.bzl',
     'init_local_polymerize')
 
 
-def load_repositories() :
-   # Init
-   init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
-    
-   ##
-   ## All the dart libraries we depend on
-   ##""");
+# Init
+init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
+
+##
+## All the dart libraries we depend on
+##""");
 
       yield* _generateDeps();
     }
@@ -431,7 +425,7 @@ def load_repositories() :
 
     dartLibraryWriter writer = _dartLibraryWriters[nd.dependencyType];
 
-    if (writer != null) yield* _stream(writer(nd), indent: 3);
+    if (writer != null) yield* _stream(writer(nd));
   }
 }
 
@@ -507,9 +501,7 @@ class TargetDesc {
       target = packageRelativePath;
     }
 
-    return new TargetDesc(
-        workspace_name: workspace_name, packageName: packagePath, target: target,
-        uri: Uri.parse('package:${packageName}/${packageRelativePath}.dart'));
+    return new TargetDesc(workspace_name: workspace_name, packageName: packagePath, target: target, uri: Uri.parse('package:${packageName}/${packageRelativePath}.dart'));
   }
 
   String relativeTo(TargetDesc root) {
