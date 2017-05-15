@@ -880,8 +880,15 @@ main(List<String> args) async {
           ..addOption('output', abbr: 'o', help: 'output bower file'))
     ..addCommand("build", new ArgParser()..addOption('package-name', abbr: 'p')..addOption('source', abbr: 's', allowMultiple: true))
     ..addCommand('test')
-    ..addCommand('dart_file',
-        new ArgParser()..addOption('summary', abbr: 's', allowMultiple: true)..addOption('input', abbr: 'i')..addOption('dep',abbr:'d',allowMultiple: true)..addOption('output', abbr: 'o')..addOption('html', abbr: 'h'))
+    ..addCommand(
+        'dart_file',
+        new ArgParser()
+          ..addOption('generate', abbr: 'g')
+          ..addOption('summary', abbr: 's', allowMultiple: true)
+          ..addOption('input', abbr: 'i')
+          ..addOption('dep', abbr: 'd', allowMultiple: true)
+          ..addOption('output', abbr: 'o')
+          ..addOption('html', abbr: 'h'))
     ..addCommand('export_sdk', new ArgParser()..addOption('output', abbr: 'o')..addOption('html', abbr: 'h'));
 
   // Configure logger
