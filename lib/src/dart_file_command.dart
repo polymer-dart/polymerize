@@ -24,20 +24,22 @@ String toLibraryName(String uri) {
   return u.pathSegments.map((x) => x.replaceAll('.', "_")).join("_") + "_G";
 }
 
+/**
+ * Builds the library and the generated file in a single module or executes subcommands (html and generate)
+ */
 Future ddcBuild(ArgResults command) async {
   if (command.command?.name == 'generate') {
     await _generate(command.command);
     return;
+  } else if (command.command?.name == 'html') {
+    await _generateHtml(command.command);
+    return;
   }
-
-  List l;
 
   List<String> summariesPaths = command['summary'];
   String outputPath = command['output'];
-  String htmlPath = command['html'];
   String inputUri = command['input'];
   String genPath = command['generate'];
-  List<String> depsPaths = command['dep'] ?? <String>[];
 
   String genUri = inputUri.replaceFirst(new RegExp(r".dart$"), "_g.dart");
 
@@ -50,6 +52,48 @@ Future ddcBuild(ArgResults command) async {
         ..add('--url-mapping=${genUri},${genPath}')
         ..add(inputUri)
         ..add(genUri));
+
+  if (res.exitCode != 0) {
+    //logger.severe("Error during build :${res.stdout} ${res.stderr}");
+    throw "ERROR : ${res.stdout} - ${res.stderr}";
+  }
+}
+
+/**
+ * Will generate code to initialize the module
+ */
+Future _generate(ArgResults command) async {
+  String inputUri = command['input'];
+  String genPath = command['generate'];
+
+  // Per ora genera in modo molto semplice
+  IOSink sinkDart = new File(genPath).openWrite();
+  await sinkDart.addStream(() async* {
+    yield "library ${toLibraryName(inputUri)};\n\n";
+    yield "import '${inputUri}';\n";
+    yield "\n";
+    yield "initModule() {\n";
+    // TODO : write register code for each polymer element
+    yield "  // TODO: write code here\n";
+    yield "}\n";
+  }()
+      .transform(UTF8.encoder));
+  await sinkDart.close();
+}
+
+/**
+ * Will generate a stub HTML that :
+ *  1. will load the JS
+ *  2. will execute the `initModule` method on the generated package
+ *
+ */
+Future _generateHtml(ArgResults command) async {
+  String outputPath = command['output'];
+  String htmlPath = command['html'];
+  String inputUri = command['input'];
+  List<String> depsPaths = command['dep'] ?? <String>[];
+
+  String genUri = inputUri.replaceFirst(new RegExp(r".dart$"), "_g.dart");
 
   // And generate an html too
   File html = new File(htmlPath);
@@ -78,28 +122,4 @@ Future ddcBuild(ArgResults command) async {
   }()
       .transform(UTF8.encoder));
   await sink.close();
-
-  if (res.exitCode != 0) {
-    //logger.severe("Error during build :${res.stdout} ${res.stderr}");
-    throw "ERROR : ${res.stdout} - ${res.stderr}";
-  }
-}
-
-Future _generate(ArgResults command) async {
-  String inputUri = command['input'];
-  String genPath = command['generate'];
-
-  // Per ora genera in modo molto semplice
-  IOSink sinkDart = new File(genPath).openWrite();
-  await sinkDart.addStream(() async* {
-    yield "library ${toLibraryName(inputUri)};\n\n";
-    yield "import '${inputUri}';\n";
-    yield "\n";
-    yield "initModule() {\n";
-    // TODO : write register code for each polymer element
-    yield "  // TODO: write code here\n";
-    yield "}\n";
-  }()
-      .transform(UTF8.encoder));
-  await sinkDart.close();
 }
