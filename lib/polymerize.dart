@@ -814,6 +814,18 @@ String _moduleForUri(Uri uri, {Map<String, String> mapping}) {
 }
 
 main(List<String> args) async {
+  Chain.capture(() async {
+    await _main(args);
+  }, onError: (error, Chain chain) {
+    if (error is BuildError) {
+      logger.severe("BUILD ERROR : \n${error}", error);
+    } else {
+      logger.severe("ERROR: ${error}\n AT: ${chain.terse}", error);
+    }
+  });
+}
+
+_main(List<String> args) async {
   String homePath = user.homeDirPath;
   if (homePath == null) {
     homePath = "/tmp";
@@ -878,9 +890,15 @@ main(List<String> args) async {
           ..addOption("resolution-value", abbr: "R", allowMultiple: true)
           ..addOption("use-bower", allowMultiple: true, abbr: 'u', help: 'use bower')
           ..addOption('output', abbr: 'o', help: 'output bower file'))
-    ..addCommand("build", new ArgParser()..addOption('package-name', abbr: 'p')..addOption('source', abbr: 's', allowMultiple: true))
+    ..addCommand(
+        "build",
+        new ArgParser()
+          ..addOption('bower-resolutions', defaultsTo: "bower_resolutions.yaml", abbr: 'B', help: '(Optional) Bower resolutions file')
+          ..addOption('dart-bin-path', defaultsTo: findDartSDKHome().path, help: 'dart sdk path')
+          ..addOption('rules-version', abbr: 'R', defaultsTo: RULES_VERSION, help: 'Bazel rules version')
+          ..addOption('develop', help: "enable polymerize develop mode, with repo home at the given path"))
     ..addCommand('test')
-    ..addCommand('copy', new ArgParser()..addOption('list', abbr: 'l')..addOption('src',abbr:'s',allowMultiple:true)..addOption('dest', abbr: 'd',allowMultiple: true))
+    ..addCommand('copy', new ArgParser()..addOption('list', abbr: 'l')..addOption('src', abbr: 's', allowMultiple: true)..addOption('dest', abbr: 'd', allowMultiple: true))
     ..addCommand(
         'dart_file',
         new ArgParser()
@@ -888,9 +906,15 @@ main(List<String> args) async {
           ..addOption('summary', abbr: 's', allowMultiple: true)
           ..addOption('input', abbr: 'i')
           ..addOption('output', abbr: 'o')
-          ..addCommand('generate', new ArgParser()..addOption('temp',abbr:'t')..addOption('generate', abbr: 'g')..addOption('input', abbr: 'i'))
-          ..addCommand('html',
-              new ArgParser()..addOption('input', abbr: 'i')..addOption('temp',abbr:'t')..addOption('dep', abbr: 'd', allowMultiple: true)..addOption('output', abbr: 'o')..addOption('html', abbr: 'h')))
+          ..addCommand('generate', new ArgParser()..addOption('temp', abbr: 't')..addOption('generate', abbr: 'g')..addOption('input', abbr: 'i'))
+          ..addCommand(
+              'html',
+              new ArgParser()
+                ..addOption('input', abbr: 'i')
+                ..addOption('temp', abbr: 't')
+                ..addOption('dep', abbr: 'd', allowMultiple: true)
+                ..addOption('output', abbr: 'o')
+                ..addOption('html', abbr: 'h')))
     ..addCommand('export_sdk', new ArgParser()..addOption('output', abbr: 'o')..addOption('html', abbr: 'h'));
 
   // Configure logger
@@ -926,7 +950,7 @@ main(List<String> args) async {
   }
 
   if (results.command?.name == 'build') {
-    //build_cmd.build(results.command['package-name'], results.command['source']);
+    await build_cmd.build(results.command);
     return;
   }
 
@@ -963,19 +987,10 @@ main(List<String> args) async {
 
   if (results.command?.name == 'test') {
     //build_cmd.build(results.command['package-name'], results.command['source']);
-
-    Chain.capture(() async {
-      String root = path.absolute(results.command.arguments[0]);
-      String package = path.absolute(results.command.arguments[1]);
-      WorkspaceBuilder builder = await WorkspaceBuilder.create(root, package);
-      await builder.generateBuildFiles();
-    }, onError: (error, Chain chain) {
-      if (error is BuildError) {
-        logger.severe("BUILD ERROR : \n${error}", error);
-      } else {
-        logger.severe("ERROR: ${error}\n AT: ${chain.terse}", error);
-      }
-    });
+    String root = path.absolute(results.command.arguments[0]);
+    String package = path.absolute(results.command.arguments[1]);
+    WorkspaceBuilder builder = await WorkspaceBuilder.create(root, package);
+    await builder.generateBuildFiles();
     return;
   }
 
@@ -1009,15 +1024,7 @@ main(List<String> args) async {
     return;
   }
 
-  Chain.capture(() {
-    _buildAll(sourcePath, destPath == null ? null : new Directory(destPath), fmt, repoPath);
-  }, onError: (error, Chain chain) {
-    if (error is BuildError) {
-      logger.severe("BUILD ERROR : \n${error}", error);
-    } else {
-      logger.severe("ERROR: ${error}\n AT: ${chain.terse}", error);
-    }
-  });
+  _buildAll(sourcePath, destPath == null ? null : new Directory(destPath), fmt, repoPath);
 }
 
 const Map _HEADERS = const {"Content-Type": "application/json"};

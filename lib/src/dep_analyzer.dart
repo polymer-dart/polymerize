@@ -29,15 +29,16 @@ class InternalContext {
   ResourceProvider _resourceProvider = PhysicalResourceProvider.INSTANCE;
   FolderBasedDartSdk _sdk;
   String _rootPath;
+  String _dart_bin_path;
 
   PackageGraph _pkgGraph;
 
-  InternalContext._(this._rootPath);
+  InternalContext._(this._rootPath, this._dart_bin_path);
 
   AnalysisContext get analysisContext => _analysisContext;
 
-  static Future<InternalContext> create(String rootPath) async {
-    InternalContext ctx = new InternalContext._(rootPath);
+  static Future<InternalContext> create(String rootPath, [String dart_bin_path]) async {
+    InternalContext ctx = new InternalContext._(rootPath, dart_bin_path);
     await ctx._init();
     return ctx;
   }
@@ -54,7 +55,13 @@ class InternalContext {
   }
 
   Future _init() async {
-    _sdk = new FolderBasedDartSdk(_resourceProvider, FolderBasedDartSdk.defaultSdkDirectory(_resourceProvider));
+    Folder sdk_folder;
+    if (_dart_bin_path == null) {
+      sdk_folder = FolderBasedDartSdk.defaultSdkDirectory(_resourceProvider);
+    } else {
+      sdk_folder = _resourceProvider.getFolder(pathos.dirname(_dart_bin_path));
+    }
+    _sdk = new FolderBasedDartSdk(_resourceProvider, sdk_folder);
 
     ResourceUriResolver _resourceResolver = new ResourceUriResolver(_resourceProvider);
 
@@ -164,12 +171,14 @@ Future<DependencyAnalyzer> analyzePackage(String rootPath, String packageRoot, I
 class WorkspaceBuilder {
   String _rootPath;
   String _mainPackagePath;
+  String _dart_bin_path;
   InternalContext _ctx;
   Map<String, DependencyAnalyzer> _analyzers = {};
-  WorkspaceBuilder._(this._rootPath, this._mainPackagePath);
+  WorkspaceBuilder._(this._rootPath, this._mainPackagePath, this.developHome, this.rules_version, this._dart_bin_path);
 
-  static Future<WorkspaceBuilder> create(String rootPath, String mainPackagePath) async {
-    WorkspaceBuilder b = new WorkspaceBuilder._(pathos.canonicalize(rootPath), pathos.canonicalize(mainPackagePath));
+  static Future<WorkspaceBuilder> create(String rootPath, String mainPackagePath,
+      {String dart_bin_path, String develop_path, String rules_version, String bower_resolutions}) async {
+    WorkspaceBuilder b = new WorkspaceBuilder._(pathos.canonicalize(rootPath), pathos.canonicalize(mainPackagePath), develop_path, rules_version, dart_bin_path);
 
     _logger.finest("Start build workspace for ${rootPath}");
 
@@ -186,7 +195,10 @@ class WorkspaceBuilder {
     if (_analyzersFutures == null) {
       _analyzersFutures = new Map();
     }
-    _ctx = await InternalContext.create(_rootPath);
+
+    if (_ctx == null) {
+      _ctx = await InternalContext.create(_rootPath, _dart_bin_path);
+    }
 
     packagePath = pathos.canonicalize(packagePath);
     Future<DependencyAnalyzer> resFuture = _analyzersFutures.putIfAbsent(packagePath, () async {
@@ -230,11 +242,13 @@ class WorkspaceBuilder {
       yield "";
     }
 
-    yield* _stream("""
+    yield* _stream(
+        """
 copy_to_bin_dir(
    name='copy_resources',
    resources= native.glob(['lib/**/*','web/**/*'],exclude=['**/*.dart']))
-""",indent: 2);
+""",
+        indent: 2);
   }
 
   Stream<String> _generateBuildFileForTarget(DependencyAnalyzer dep, TargetDesc target) async* {
@@ -258,11 +272,9 @@ copy_to_bin_dir(
     // Generare le istruzioni per caricare file extra in HTML
 
     // LibraryElement lib = resolve(target);
-
-
   }
 
-    //lib.importedLibraries.forEach((el)=>_logger.info("LIBRARIES FOR ${lib.location} : ${el.location}"));
+  //lib.importedLibraries.forEach((el)=>_logger.info("LIBRARIES FOR ${lib.location} : ${el.location}"));
 
   Iterable<TargetDesc> _transitiveDependencies(TargetDesc startTarget, {Set<TargetDesc> visited}) sync* {
     // Lookup a dep for this target
@@ -351,10 +363,10 @@ copy_to_bin_dir(
     yield 'build()';
 
     toPath(DependencyAnalyzer d) {
-      if(d.external) {
+      if (d.external) {
         return "'@${d.packageName}//:copy_resources'";
       } else {
-        if (d.packageRoot==_mainPackagePath) {
+        if (d.packageRoot == _mainPackagePath) {
           return "'//:copy_resources'";
         }
 
@@ -366,7 +378,6 @@ copy_to_bin_dir(
       yield "filegroup(name='all_js',srcs=['dart_sdk',${dep.depsByTarget.keys.map((t)=>"'${t.target}'").join(',')}])";
 
       yield "filegroup(name='copy',srcs=[${_analyzers.values.map(toPath).join((','))}])";
-
     }
   }
 

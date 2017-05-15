@@ -1,57 +1,31 @@
 import 'dart:async';
-import 'package:analyzer/dart/constant/value.dart';
-import 'package:analyzer/dart/element/element.dart';
-import 'package:build/build.dart';
-import 'package:build_runner/build_runner.dart' as build_runner;
-import 'package:code_builder/code_builder.dart' as code_builder;
-import 'package:polymerize/src/utils.dart';
 import 'dart:io';
+import 'package:args/args.dart';
+import 'package:path/path.dart' as path;
+import 'package:polymerize/src/dep_analyzer.dart';
 
-class DartStubBuilder extends Builder {
-  @override
-  Future build(BuildStep buildStep) async {
-    Resolver resolver = await buildStep.resolver;
-    LibraryElement inputLib = resolver.getLibrary(buildStep.inputId);
-    //StringBuffer buf = new StringBuffer();
-    code_builder.LibraryBuilder libBuilder = new code_builder.LibraryBuilder();
-    code_builder.MethodBuilder registerBuilder = new code_builder.MethodBuilder("register");
-    libBuilder.addDirective(new code_builder.ImportBuilder(inputLib.source.shortName, prefix: "_lib"));
-    libBuilder.addMember(registerBuilder);
+Future build(ArgResults command) async {
+  String bower_resolutions_path = command['bower-resolutions'];
+  String dart_bin_path = command['dart-bin-path'];
+  String rules_version = command['rules-version'];
+  String develop_path = command['develop'];
 
-    inputLib.unit.declarations.forEach((ce) {
-      if (ce.element.kind == ElementKind.CLASS) {
-        ce.element.metadata.forEach((e) => print(e.element.name));
-        DartObject registerAnnotation = getAnnotation(ce.element.metadata, isPolymerRegister);
-        if (registerAnnotation == null) {
-          return;
-        }
-        String tagName = registerAnnotation.getField('tagName').toStringValue();
 
-        registerBuilder
-          ..addStatements([
-            new code_builder.StatementBuilder.raw((scope) {
-              return "polymerize(_lib.${ce.element.name},'${tagName}');";
-            })
-          ]);
-      }
-    });
-    AssetId dest = buildStep.inputId.changeExtension(".reg.dart");
-    await buildStep.writeAsString(dest, code_builder.prettyToSource(libBuilder.buildAst()));
+  String root;
+  if (command.rest.isEmpty) {
+    root = path.current;
+  } else {
+    root = command.rest.single;
   }
+  WorkspaceBuilder builder = await WorkspaceBuilder.create(root, root,
+                                                           dart_bin_path: dart_bin_path,
+                                                           rules_version: rules_version,
+                                                           develop_path: develop_path,
+                                                           bower_resolutions: bower_resolutions_path);
 
-  @override
-  Map<String, List<String>> get buildExtensions => {
-        ".dart": [".reg.dart"]
-      };
-}
+  await builder.generateBuildFiles();
 
-typedef String UriResolver(Uri uri);
+  // Then run bazel
 
-Future build(String package, List<String> inputFiles, Map<Uri,String> uriMap) async {
-
-  build_runner.PhaseGroup phaseGroup = new build_runner.PhaseGroup();
-  phaseGroup.newPhase()..addAction(new DartStubBuilder(), new build_runner.InputSet(package, inputFiles));
-  await build_runner.build(phaseGroup);
-
-  // Then build
+  await Process.run('bazel',['build',':all']);
 }
