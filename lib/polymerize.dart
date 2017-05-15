@@ -880,6 +880,7 @@ main(List<String> args) async {
           ..addOption('output', abbr: 'o', help: 'output bower file'))
     ..addCommand("build", new ArgParser()..addOption('package-name', abbr: 'p')..addOption('source', abbr: 's', allowMultiple: true))
     ..addCommand('test')
+    ..addCommand('copy', new ArgParser()..addOption('list', abbr: 'l')..addOption('src',abbr:'s',allowMultiple:true)..addOption('dest', abbr: 'd',allowMultiple: true))
     ..addCommand(
         'dart_file',
         new ArgParser()
@@ -926,6 +927,27 @@ main(List<String> args) async {
 
   if (results.command?.name == 'build') {
     //build_cmd.build(results.command['package-name'], results.command['source']);
+    return;
+  }
+
+  if (results.command?.name == 'copy') {
+    List<String> src = results.command['src'];
+    List<String> dst = results.command['dest'];
+    String listFile = results.command['list'];
+    IOSink listSink = new File(listFile).openWrite();
+
+    Iterator<String> dstI = dst.iterator;
+
+    for (String s in src) {
+      String d = (dstI..moveNext()).current;
+
+      listSink.writeln("${s} -> ${d}");
+      await new Directory(path.dirname(d)).create(recursive: true);
+      await new File(s).copy(d);
+    }
+
+    await listSink.close();
+
     return;
   }
 

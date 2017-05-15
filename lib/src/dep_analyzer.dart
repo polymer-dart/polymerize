@@ -216,7 +216,7 @@ class WorkspaceBuilder {
    * Generate the build for a package
    */
   Stream<String> generateBuildFile(String packagePath) async* {
-    yield 'load("@polymerize//:polymerize.bzl", "dart_file","export_dart_sdk")';
+    yield 'load("@polymerize//:polymerize.bzl", "dart_file","export_dart_sdk","copy_to_bin_dir")';
     yield "";
     yield "def build():";
     DependencyAnalyzer dep = _analyzers[packagePath];
@@ -229,6 +229,12 @@ class WorkspaceBuilder {
       yield* _generateBuildFileForTarget(dep, tgt);
       yield "";
     }
+
+    yield* _stream("""
+copy_to_bin_dir(
+   name='copy_resources',
+   resources= native.glob(['lib/**/*','web/**/*'],exclude=['**/*.dart']))
+""",indent: 2);
   }
 
   Stream<String> _generateBuildFileForTarget(DependencyAnalyzer dep, TargetDesc target) async* {
@@ -344,8 +350,23 @@ class WorkspaceBuilder {
     yield 'package(default_visibility = ["//visibility:public"])';
     yield 'build()';
 
+    toPath(DependencyAnalyzer d) {
+      if(d.external) {
+        return "'@${d.packageName}//:copy_resources'";
+      } else {
+        if (d.packageRoot==_mainPackagePath) {
+          return "'//:copy_resources'";
+        }
+
+        return "'//${pathos.relative(d.packageRoot,from:d.rootPath)}:copy_resources'";
+      }
+    }
+
     if (path == _mainPackagePath) {
       yield "filegroup(name='all_js',srcs=['dart_sdk',${dep.depsByTarget.keys.map((t)=>"'${t.target}'").join(',')}])";
+
+      yield "filegroup(name='copy',srcs=[${_analyzers.values.map(toPath).join((','))}])";
+
     }
   }
 
