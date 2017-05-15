@@ -34,10 +34,23 @@ class InternalContext {
 
   InternalContext._(this._rootPath);
 
+  AnalysisContext get analysisContext => _analysisContext;
+
   static Future<InternalContext> create(String rootPath) async {
     InternalContext ctx = new InternalContext._(rootPath);
     await ctx._init();
     return ctx;
+  }
+
+  LibraryElement getLibraryElement(String inputUri) {
+    Source src = _analysisContext.sourceFactory.forUri(inputUri);
+    return _analysisContext.computeLibraryElement(src);
+  }
+
+  CompilationUnit getCompilationUnit(String inputUri) {
+    LibraryElement le = getLibraryElement(inputUri);
+    Source src = _analysisContext.sourceFactory.forUri2(le.source.uri);
+    return _analysisContext.resolveCompilationUnit(src, le);
   }
 
   Future _init() async {
