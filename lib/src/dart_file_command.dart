@@ -67,6 +67,8 @@ Future ddcBuild(ArgResults command) async {
 
   String htmlDir = path.dirname(htmlPath);
 
+  String moduleName = path.withoutExtension(path.relative(outputPath,from: BAZEL_BASE_DIR));
+
   await sink.addStream(() async* {
     yield "<link rel='import' href='${path.relative('${BAZEL_BASE_DIR}/dart_sdk.mod.html',from:htmlDir)}'>\n";
     for (String dep in depsPaths) {
@@ -74,7 +76,12 @@ Future ddcBuild(ArgResults command) async {
     }
     yield "<script "
         "src='${path.relative(outputPath,from:htmlDir)}' "
-        "as='${path.withoutExtension(path.relative(outputPath,from: BAZEL_BASE_DIR))}'>\n";
+        "as='${moduleName}'></script>\n";
+    yield "<script>\n";
+    yield " require('${moduleName}',function(module) {\n";
+    yield "   module.${path.withoutExtension(Uri.parse(genUri).pathSegments.last)}.initModule();\n";
+    yield " });\n";
+    yield "</script>\n";
   }()
       .transform(UTF8.encoder));
   await sink.close();
