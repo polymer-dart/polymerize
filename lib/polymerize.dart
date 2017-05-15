@@ -888,9 +888,9 @@ main(List<String> args) async {
           ..addOption('summary', abbr: 's', allowMultiple: true)
           ..addOption('input', abbr: 'i')
           ..addOption('output', abbr: 'o')
-          ..addCommand('generate', new ArgParser()..addOption('generate', abbr: 'g')..addOption('input', abbr: 'i'))
+          ..addCommand('generate', new ArgParser()..addOption('temp',abbr:'t')..addOption('generate', abbr: 'g')..addOption('input', abbr: 'i'))
           ..addCommand('html',
-              new ArgParser()..addOption('input', abbr: 'i')..addOption('dep', abbr: 'd', allowMultiple: true)..addOption('output', abbr: 'o')..addOption('html', abbr: 'h')))
+              new ArgParser()..addOption('input', abbr: 'i')..addOption('temp',abbr:'t')..addOption('dep', abbr: 'd', allowMultiple: true)..addOption('output', abbr: 'o')..addOption('html', abbr: 'h')))
     ..addCommand('export_sdk', new ArgParser()..addOption('output', abbr: 'o')..addOption('html', abbr: 'h'));
 
   // Configure logger

@@ -61,8 +61,9 @@ Future ddcBuild(ArgResults command) async {
 Future _generate(ArgResults command) async {
   String inputUri = command['input'];
   String genPath = command['generate'];
+  String htmlTemp = command['temp'];
 
-  await generateCode(inputUri, genPath);
+  await generateCode(inputUri, genPath,htmlTemp);
 }
 
 /**
@@ -75,6 +76,7 @@ Future _generateHtml(ArgResults command) async {
   String outputPath = command['output'];
   String htmlPath = command['html'];
   String inputUri = command['input'];
+  String htmlTemp = command['temp'];
   List<String> depsPaths = command['dep'] ?? <String>[];
 
   String genUri = inputUri.replaceFirst(new RegExp(r".dart$"), "_g.dart");
@@ -91,6 +93,9 @@ Future _generateHtml(ArgResults command) async {
 
 
   await sink.addStream(() async* {
+    File f = new File(htmlTemp);
+    yield await f.readAsString();
+    await f.delete();
     for (String dep in depsPaths) {
       yield "<link rel='import' href='${path.relative(dep,from:htmlDir)}'>\n";
     }

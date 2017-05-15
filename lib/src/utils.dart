@@ -9,11 +9,15 @@ final Uri JS_ASSET_URI = Uri.parse('asset:js/lib/js.dart');
 
 final Uri POLYMER_INIT_URI = Uri.parse('package:polymerize_common/init.dart');
 
+final Uri POLYMER_HTML_IMPORT_URI = Uri.parse('package:polymerize_common/html_import.dart');
+
 bool isJsUri(Uri u) => u == JS_ASSET_URI || u == JS_URI;
 
 bool isPolymerElementUri(Uri u) => u == POLYMER_REGISTER_ASSET_URI || u == POLYMER_REGISTER_URI;
 
 bool isPolymerElementInitUri(Uri u) => u == POLYMER_INIT_URI;
+
+bool isPolymerElementHtmlImportUri(Uri u) => u == POLYMER_HTML_IMPORT_URI;
 
 bool isJS(DartObject o) => (isJsUri(o.type.element.librarySource.uri)) && (o.type.name == 'JS');
 
@@ -36,6 +40,8 @@ bool isPolymerBehavior(DartObject o) => (isPolymerElementUri(o.type.element.libr
 bool isStoreDef(DartObject o) => (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'StoreDef');
 
 bool isInit(DartObject o) => o != null && (isPolymerElementInitUri(o.type.element.librarySource.uri)) && (o.type.name == 'Init');
+
+bool isHtmlImport(DartObject o) => o != null && (isPolymerElementHtmlImportUri(o.type.element.librarySource.uri)) && (o.type.name == 'HtmlImport');
 
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //
