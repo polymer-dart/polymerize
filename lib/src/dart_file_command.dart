@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:args/args.dart';
+import 'package:polymerize/src/code_generator.dart';
 import 'package:polymerize/src/utils.dart';
 import 'package:path/path.dart' as path;
 
@@ -19,10 +20,7 @@ Iterable<String> summaryOpts(List<String> summaries) sync* {
   }
 }
 
-String toLibraryName(String uri) {
-  Uri u = Uri.parse(uri);
-  return u.pathSegments.map((x) => x.replaceAll('.', "_")).join("_") + "_G";
-}
+
 
 /**
  * Builds the library and the generated file in a single module or executes subcommands (html and generate)
@@ -66,19 +64,7 @@ Future _generate(ArgResults command) async {
   String inputUri = command['input'];
   String genPath = command['generate'];
 
-  // Per ora genera in modo molto semplice
-  IOSink sinkDart = new File(genPath).openWrite();
-  await sinkDart.addStream(() async* {
-    yield "library ${toLibraryName(inputUri)};\n\n";
-    yield "import '${inputUri}';\n";
-    yield "\n";
-    yield "initModule() {\n";
-    // TODO : write register code for each polymer element
-    yield "  // TODO: write code here\n";
-    yield "}\n";
-  }()
-      .transform(UTF8.encoder));
-  await sinkDart.close();
+  await generateCode(inputUri,genPath);
 }
 
 /**

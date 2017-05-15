@@ -18,7 +18,7 @@ import 'package:yaml/yaml.dart' as yaml;
 import 'dart:io' as io;
 import 'package:logging/logging.dart' as log;
 
-log.Logger _logger = new log.Logger('deps')..level = log.Level.FINE;
+log.Logger _logger = new log.Logger('deps')..level = log.Level.INFO;
 
 class InternalContext {
   PackageResolver _packageResolver;
@@ -232,15 +232,18 @@ class WorkspaceBuilder {
 
     // Analyze target and get any interesting thing
 
-    LibraryElement lib = resolve(target);
+    // TODO : Se serve .. ancora da capire
 
-    // TODO :
     // Generare gli stub dart files da qualche parte oppure il task per farlo generare (e poi compilare e produrre il .mod.html come al solito)
     // Generare i repository per i bower
     // Generare le istruzioni per caricare file extra in HTML
 
-    //lib.importedLibraries.forEach((el)=>_logger.info("LIBRARIES FOR ${lib.location} : ${el.location}"));
+    // LibraryElement lib = resolve(target);
+
+
   }
+
+    //lib.importedLibraries.forEach((el)=>_logger.info("LIBRARIES FOR ${lib.location} : ${el.location}"));
 
   Iterable<TargetDesc> _transitiveDependencies(TargetDesc startTarget, {Set<TargetDesc> visited}) sync* {
     // Lookup a dep for this target
