@@ -100,10 +100,6 @@ Future _generateHtml(ArgResults command) async {
   IOSink sink = html.openWrite();
 
   String htmlDir = path.dirname(htmlPath);
-
-  // TODO : SPlIT IN DIFFERENT ACTIONS
-  // Bazel can optimize when only one of those artifact is to be generated
-
   String moduleName = path.withoutExtension(path.relative(outputPath, from: BAZEL_BASE_DIR));
 
   await sink.addStream(() async* {
