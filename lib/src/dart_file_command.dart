@@ -20,8 +20,6 @@ Iterable<String> summaryOpts(List<String> summaries) sync* {
   }
 }
 
-
-
 /**
  * Builds the library and the generated file in a single module or executes subcommands (html and generate)
  */
@@ -64,7 +62,7 @@ Future _generate(ArgResults command) async {
   String inputUri = command['input'];
   String genPath = command['generate'];
 
-  await generateCode(inputUri,genPath);
+  await generateCode(inputUri, genPath);
 }
 
 /**
@@ -88,6 +86,10 @@ Future _generateHtml(ArgResults command) async {
   String htmlDir = path.dirname(htmlPath);
   String moduleName = path.withoutExtension(path.relative(outputPath, from: BAZEL_BASE_DIR));
 
+  toModuleName(String uri) =>
+    Uri.parse(uri).pathSegments.sublist(1).map((x)=>path.withoutExtension(x)).join("__");
+
+
   await sink.addStream(() async* {
     for (String dep in depsPaths) {
       yield "<link rel='import' href='${path.relative(dep,from:htmlDir)}'>\n";
@@ -97,7 +99,7 @@ Future _generateHtml(ArgResults command) async {
         "as='${moduleName}'></script>\n";
     yield "<script>\n";
     yield " require(['${moduleName}'],function(module) {\n";
-    yield "   module.${path.withoutExtension(Uri.parse(genUri).pathSegments.last)}.initModule();\n";
+    yield "   module.${toModuleName(genUri)}.initModule();\n";
     yield " });\n";
     yield "</script>\n";
   }()
