@@ -46,6 +46,7 @@ Future ddcBuild(ArgResults command) async {
         ..addAll(summaryOpts(summariesPaths))
         ..addAll(['-o', outputPath])
         ..add('--url-mapping=${genUri},${genPath}')
+        //..add('--inline-source-map')
         ..add(inputUri)
         ..add(genUri));
 
@@ -102,11 +103,7 @@ Future _generateHtml(ArgResults command) async {
     yield "<script "
         "src='${path.relative(outputPath,from:htmlDir)}' "
         "as='${moduleName}'></script>\n";
-    yield "<script>\n";
-    yield " require(['${moduleName}'],function(module) {\n";
-    yield "   module.${toModuleName(genUri)}.initModule();\n";
-    yield " });\n";
-    yield "</script>\n";
+    yield "<script>require(['${moduleName}'],(module) =>  module.${toModuleName(genUri)}.initModule());</script>\n";
   }()
       .transform(UTF8.encoder));
   await sink.close();

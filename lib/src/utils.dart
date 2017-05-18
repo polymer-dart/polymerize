@@ -34,7 +34,7 @@ bool isProperty(DartObject o) => (isPolymerElementUri(o.type.element.librarySour
 
 bool isNotify(DartObject o) => (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'Notify');
 
-bool isPolymerRegister(DartObject o) => (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'PolymerRegister');
+bool isPolymerRegister(DartObject o) => o!=null && (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'PolymerRegister');
 
 bool isPolymerBehavior(DartObject o) => (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'PolymerBehavior');
 

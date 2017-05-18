@@ -387,6 +387,8 @@ copy_to_bin_dir(
       yield "filegroup(name='all_js',srcs=['dart_sdk',${dep.depsByTarget.keys.map((t)=>"'${t.target}'").join(',')}])";
 
       yield "filegroup(name='copy',srcs=[${_analyzers.values.map(toPath).join((','))}])";
+
+      yield "filegroup(name='app',srcs=['all_js','copy','@bower//:all_assets'])";
     }
   }
 
@@ -479,7 +481,7 @@ init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
       'dependencies': {},
       "resolutions": {
         // TODO: handle resolutions
-        "polymer": "2.0.0-rc.7"
+        "polymer": "2.0.0"
       }
     };
 
