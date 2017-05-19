@@ -260,10 +260,9 @@ copy_to_bin_dir(
     yield "   dart_source_uri = '${target.uri}',";
     yield "   other_deps= ['//external:dart_sdk',";
 
-    for (String str in new Set.from(_extractBowerLibraryForPackage(dep.packageRoot, dep).map((dep)=>"     '@bower//:${dep['import']}',"))) {
+    for (String str in new Set.from(_extractBowerLibraryForPackage(dep.packageRoot, dep).map((dep) => "     '@bower//:${dep['import']}',"))) {
       yield str;
     }
-
 
     yield "    ],  ";
     yield "   deps = [";
@@ -476,14 +475,18 @@ init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
     yield "bower_library(name='bower', bower_repo='${pathos.absolute('.polymerize/bower')}')";
 
     // Gather info to create the bower file
-    Map bower = {
-      'name': _analyzers[_mainPackagePath].packageName,
-      'dependencies': {},
-      "resolutions": {
+    Map bower = {'name': _analyzers[_mainPackagePath].packageName, 'dependencies': {}};
+
+    io.File resol = new io.File('bower_resolutions.yaml');
+    if ((await resol.exists())) {
+      Map yam = yaml.loadYaml(await resol.readAsString());
+      bower['resolutions'] = yam['resolutions'];
+    } else {
+      bower['resolutions'] = {
         // TODO: handle resolutions
         "polymer": "2.0.0"
-      }
-    };
+      };
+    }
 
     for (String packageName in _allPackages) {
       // If is external write
