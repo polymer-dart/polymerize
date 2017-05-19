@@ -65,7 +65,7 @@ Iterable<DartObject> allFirstLevelAnnotation(CompilationUnit cu, bool matches(Da
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //
         bool matches(DartObject x)) =>
-    metadata.map((an) => an.computeConstantValue()).firstWhere(matches, orElse: () => null);
+    metadata.map((an) => an.computeConstantValue()).where(notNull).firstWhere(matches, orElse: () => null);
 
 ElementAnnotation getElementAnnotation(
         Iterable<ElementAnnotation> metadata, //
@@ -81,3 +81,10 @@ Directory findDartSDKHome() {
   // Else tries with current executable
   return new File(Platform.resolvedExecutable).parent;
 }
+
+
+typedef bool matcher(DartObject x);
+
+matcher anyOf(List<matcher> matches) => (DartObject o) => matches.any((m) => m(o));
+
+bool notNull(x) => x != null;

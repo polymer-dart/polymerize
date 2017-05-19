@@ -35,8 +35,6 @@ import 'package:polymerize/src/utils.dart';
 
 const Map<ModuleFormat, String> _formatToString = const {ModuleFormat.amd: 'amd', ModuleFormat.es6: 'es6', ModuleFormat.common: 'common', ModuleFormat.legacy: 'legacy'};
 
-bool notNull(x) => x != null;
-
 const Map<String, ModuleFormat> _stringToFormat = const {'amd': ModuleFormat.amd, 'es6': ModuleFormat.es6, 'common': ModuleFormat.common, 'legacy': ModuleFormat.legacy};
 
 log.Logger logger = new log.Logger("polymerize");
@@ -641,10 +639,6 @@ Map collectConfig(AnalysisContext context, ClassElement ce) {
 
   return {'observers': observers, 'properties': properties, 'reduxActions': reduxActions, 'behaviors': behaviors};
 }
-
-typedef bool matcher(DartObject x);
-
-matcher anyOf(List<matcher> matches) => (DartObject o) => matches.any((m) => m(o));
 
 String webComponentTemplate({String template, String packageName, String name, String className, String tagName}) => """<script>
   require(['${packageName}/${packageName}','polymer_element/polymerize'],function(pkg,polymerize) {
