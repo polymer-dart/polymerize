@@ -33,8 +33,8 @@ Future generateCode(String inputUri, String genPath, String htmlTemp) async {
 
   GeneratorContext getctx = new GeneratorContext(ctx, inputUri);
 
-  code_builder.LibraryBuilder libBuilder = new code_builder.LibraryBuilder(toLibraryName(inputUri));
-  libBuilder.addDirective(new code_builder.ImportBuilder(inputUri, prefix: "_lib"));
+  code_builder.Scope scope = new code_builder.Scope.dedupe();
+  code_builder.LibraryBuilder libBuilder = new code_builder.LibraryBuilder.scope(name:toLibraryName(inputUri),scope:scope);
   code_builder.MethodBuilder initModuleBuilder = new code_builder.MethodBuilder("initModule");
   libBuilder.addMember(initModuleBuilder);
 
@@ -51,7 +51,7 @@ Future generateCode(String inputUri, String genPath, String htmlTemp) async {
       })
     ]);
 
-  return new File(genPath).writeAsString(code_builder.prettyToSource(libBuilder.buildAst()));
+  return new File(genPath).writeAsString(code_builder.prettyToSource(libBuilder.buildAst(scope)));
 }
 
 /**
@@ -65,25 +65,28 @@ Future _generateInitMethods(
       FunctionElement functionElement = m.element;
       DartObject init = getAnnotation(m.element.metadata, isInit);
       if (init != null && functionElement.parameters.isEmpty) {
-        code_builder.ReferenceBuilder ref = code_builder.reference("_lib.${functionElement.name}");
+        code_builder.ReferenceBuilder ref = code_builder.reference(functionElement.name,ctx.inputUri);
         initModuleBuilder.addStatement(ref.call([]));
       }
     }
   }
 }
 
+const String POLYMERIZE_JS = 'package:polymer_element/polymerize_js.dart';
+const String JS_UTIL = 'package:js/js_util.dart';
+
 Future _generatePolymerRegister(
     GeneratorContext ctx, CompilationUnit cu, code_builder.LibraryBuilder libBuilder, code_builder.MethodBuilder initModuleBuilder, IOSink htmlHeader) async {
-  libBuilder.addDirective(new code_builder.ImportBuilder('package:polymer_element/polymerize_js.dart', prefix: 'polymerize'));
-  libBuilder.addDirective(new code_builder.ImportBuilder('package:js/js_util.dart', prefix: 'js_util'));
+  //libBuilder.addDirective(new code_builder.ImportBuilder('package:polymer_element/polymerize_js.dart', prefix: 'polymerize'));
+  //libBuilder.addDirective(new code_builder.ImportBuilder('package:js/js_util.dart', prefix: 'js_util'));
 
-  code_builder.TypeBuilder summaryType = new code_builder.TypeBuilder('polymerize.Summary');
+  code_builder.TypeBuilder summaryType = new code_builder.TypeBuilder('Summary', importFrom: POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder ref = code_builder.reference("polymerize.register");
+  code_builder.ReferenceBuilder ref = code_builder.reference("register",POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder defBehavior = code_builder.reference("polymerize.defineBehavior");
+  code_builder.ReferenceBuilder defBehavior = code_builder.reference("defineBehavior",POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder summaryFactory = code_builder.reference("polymerize.summary");
+  code_builder.ReferenceBuilder summaryFactory = code_builder.reference("summary",POLYMERIZE_JS);
 
   // lookup for annotation
   for (CompilationUnitMember m in cu.declarations) {
@@ -96,7 +99,7 @@ Future _generatePolymerRegister(
         bool native = register.getField('native').toBoolValue();
 
         if (!native) {
-          code_builder.ReferenceBuilder cls = code_builder.reference("_lib.${classElement.name}");
+          code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name,ctx.inputUri);
 
           code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(libBuilder, ctx.ctx.analysisContext, classElement);
 
@@ -112,7 +115,7 @@ Future _generatePolymerRegister(
       DartObject behavior = getAnnotation(m.element.metadata, isPolymerBehavior);
       if (behavior!=null) {
         String name = behavior.getField('name').toStringValue();
-        code_builder.ReferenceBuilder cls = code_builder.reference("_lib.${classElement.name}");
+        code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name,ctx.inputUri);
 
         code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(libBuilder, ctx.ctx.analysisContext, classElement);
 
@@ -123,12 +126,13 @@ Future _generatePolymerRegister(
 }
 
 code_builder.ExpressionBuilder collectConfig(code_builder.LibraryBuilder libBuilder, AnalysisContext context, ClassElement ce) {
-  code_builder.TypeBuilder configType = new code_builder.TypeBuilder("polymerize.Config");
+  code_builder.TypeBuilder configType = new code_builder.TypeBuilder("Config",importFrom: POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder jsifyRef = code_builder.reference('js_util.jsify', 'package:js/js_util.dart');
 
-  code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("polymerize.Property");
-  code_builder.TypeBuilder reduxPropertyType = new code_builder.TypeBuilder("polymerize.ReduxProperty");
+  code_builder.ReferenceBuilder jsifyRef = code_builder.reference('jsify', JS_UTIL);
+
+  code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("Property",importFrom: POLYMERIZE_JS);
+  code_builder.TypeBuilder reduxPropertyType = new code_builder.TypeBuilder("ReduxProperty",importFrom: POLYMERIZE_JS);
 
   List<code_builder.ExpressionBuilder> observers = [];
   List<code_builder.ExpressionBuilder> reduxActions = [];
@@ -200,9 +204,8 @@ code_builder.ExpressionBuilder collectConfig(code_builder.LibraryBuilder libBuil
 int count = 0;
 
 code_builder.ExpressionBuilder reduxInfoBuilder(code_builder.LibraryBuilder libBuilder, AnalysisContext ctx, ClassElement ce) {
-  code_builder.TypeBuilder reduxInfoRef = new code_builder.TypeBuilder("polymerize.ReduxInfo");
+  code_builder.TypeBuilder reduxInfoRef = new code_builder.TypeBuilder("ReduxInfo",importFrom: POLYMERIZE_JS);
 
-  Map<String, String> prefixes = {};
 
   return ce.interfaces.map((intf) {
     ElementAnnotation anno = getElementAnnotation(intf.element.metadata, isStoreDef);
@@ -216,13 +219,7 @@ code_builder.ExpressionBuilder reduxInfoBuilder(code_builder.LibraryBuilder libB
       //print(
       //    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
 
-      String prefix = prefixes.putIfAbsent(m.source.uri.toString(), () {
-        String res = '_imp${++count}';
-        libBuilder.addDirective(new code_builder.ImportBuilder(m.source.uri.toString(), prefix: res));
-        return res;
-      });
-
-      return reduxInfoRef.newInstance([], named: {'reducer': code_builder.reference("${prefix}.${m.name}").property('reducer')});
+      return reduxInfoRef.newInstance([], named: {'reducer': code_builder.reference(m.name,m.source.uri.toString()).property('reducer')});
     } else {
       /**
           DartObject reducer = anno.computeConstantValue().getField('reducer');
