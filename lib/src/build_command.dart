@@ -37,7 +37,7 @@ Future build(ArgResults command) async {
   // Then run bazel
 
   _logger.info("Running bazel ...");
-  Process bazel = await Process.start('bazel',['build',':all']);
+  Process bazel = await Process.start('bazel',['build','--strategy=Polymerize=worker',':all']);
   stdout.addStream(bazel.stdout);
   stderr.addStream(bazel.stderr);
 

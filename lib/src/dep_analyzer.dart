@@ -137,6 +137,9 @@ class DependencyAnalyzer {
           throw "Unknown uri prefix : ${m[1]}";
         } else {
           String otherPackageRoot = await _ctx._packageResolver.packagePath(m[2]);
+          if (otherPackageRoot==null) {
+            throw "Cannot resolve ${m[2]}";
+          }
           if (m[2] != packageName) importedPackages.add(pathos.canonicalize(otherPackageRoot));
 
           targetDesc = TargetDesc.fromPaths(packageRelativePath: m[3], rootPath: rootPath, packageRoot: otherPackageRoot, packageName: m[2]);
@@ -174,13 +177,14 @@ class WorkspaceBuilder {
   String _rootPath;
   String _mainPackagePath;
   String _dart_bin_path;
+  String _bower_resolutions_path;
   InternalContext _ctx;
   Map<String, DependencyAnalyzer> _analyzers = {};
-  WorkspaceBuilder._(this._rootPath, this._mainPackagePath, this.developHome, this.rules_version, this._dart_bin_path);
+  WorkspaceBuilder._(this._rootPath, this._mainPackagePath, this.developHome, this.rules_version, this._dart_bin_path,this._bower_resolutions_path);
 
   static Future<WorkspaceBuilder> create(String rootPath, String mainPackagePath,
       {String dart_bin_path, String develop_path, String rules_version, String bower_resolutions}) async {
-    WorkspaceBuilder b = new WorkspaceBuilder._(pathos.canonicalize(rootPath), pathos.canonicalize(mainPackagePath), develop_path, rules_version, dart_bin_path);
+    WorkspaceBuilder b = new WorkspaceBuilder._(pathos.canonicalize(rootPath), pathos.canonicalize(mainPackagePath), develop_path, rules_version, dart_bin_path,bower_resolutions);
 
     _logger.finest("Start build workspace for ${rootPath}");
 
@@ -477,7 +481,7 @@ init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
     // Gather info to create the bower file
     Map bower = {'name': _analyzers[_mainPackagePath].packageName, 'dependencies': {}};
 
-    io.File resol = new io.File('bower_resolutions.yaml');
+    io.File resol = new io.File(_bower_resolutions_path);
     if ((await resol.exists())) {
       Map yam = yaml.loadYaml(await resol.readAsString());
       bower['resolutions'] = yam['resolutions'];

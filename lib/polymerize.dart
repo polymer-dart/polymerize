@@ -18,16 +18,15 @@ import 'package:polymerize/src/pub_command.dart';
 import 'package:polymerize/src/build_command.dart' as build_cmd;
 import 'package:args/src/arg_results.dart';
 import 'package:polymerize/src/utils.dart';
+import 'package:bazel_worker/bazel_worker.dart';
 
-const String RULES_VERSION='';
+const String RULES_VERSION = '';
 
 Future _copyResource(String resx, String dest) async {
   res.Resource rsx = new res.Resource(resx);
   String content = await rsx.readAsString();
   return new File(dest).writeAsString(content);
 }
-
-
 
 /***
  * Analyze one HTML template
@@ -126,7 +125,8 @@ _main(List<String> args) async {
   }
 
   ArgParser parser = new ArgParser()
-    ..addOption('help', abbr: 'h', help: 'print usage')
+    ..addFlag('help', abbr: 'h', help: 'print usage')
+    ..addFlag('persistent_worker', help: 'run as a bazel worker')
     ..addCommand(
         'pub',
         new ArgParser()
@@ -168,7 +168,44 @@ _main(List<String> args) async {
   log.Logger.root.level = log.Level.INFO;
 
   ArgResults results = parser.parse(args);
+  bool workerMode = results['persistent_worker'];
+  if (results.rest.isNotEmpty && results.rest.first.startsWith("@")) {
+    String argFile = results.rest.first.substring(1);
+    results = parser.parse(await new File(argFile).readAsLines());
+  }
 
+  if (workerMode) {
+    return runWorker(parser);
+  } else {
+    return processRequestArgs(parser, results);
+  }
+}
+
+class AsyncPolymerizeWorker extends AsyncWorkerLoop {
+  ArgParser parser;
+
+  AsyncPolymerizeWorker(this.parser);
+
+  /// Must return a [Future<WorkResponse>], since this is an
+  /// [AsyncWorkerLoop].
+  Future<WorkResponse> performRequest(WorkRequest request) async {
+    try {
+      await processRequest(parser, request.arguments);
+      return new WorkResponse()..exitCode = EXIT_CODE_OK;
+    } catch (error) {
+      return new WorkResponse()..exitCode = EXIT_CODE_ERROR;
+    }
+  }
+}
+
+Future runWorker(ArgParser parser) => new AsyncPolymerizeWorker(parser).run();
+
+Future processRequest(ArgParser parser, List<String> args) {
+  ArgResults results = parser.parse(args);
+  return processRequestArgs(parser, results);
+}
+
+Future processRequestArgs(ArgParser parser, ArgResults results) async {
   if (results['help']) {
     print("polymerize <CMD> <options>\n${parser.usage}\n");
     parser.commands.keys.forEach((cmd) {

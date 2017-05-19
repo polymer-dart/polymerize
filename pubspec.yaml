@@ -9,6 +9,7 @@ environment:
 dependencies:
  build: ^0.9.1
  build_runner: ^0.3.2
+ bazel_worker: "^0.1.4"
  code_builder: ^1.0.2
  dev_compiler:
   hosted:

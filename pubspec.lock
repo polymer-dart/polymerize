@@ -24,7 +24,7 @@ packages:
       name: async
       url: "https://pub.dart-polymer.com"
     source: hosted
-    version: "1.13.2"
+    version: "1.13.3"
   barback:
     description:
       name: barback
@@ -84,7 +84,7 @@ packages:
       name: code_transformers
       url: "https://pub.dart-polymer.com"
     source: hosted
-    version: "0.5.1+2"
+    version: "0.5.1+3"
   collection:
     description:
       name: collection
@@ -252,7 +252,7 @@ packages:
       name: pool
       url: "https://pub.dart-polymer.com"
     source: hosted
-    version: "1.3.0"
+    version: "1.3.1"
   protobuf:
     description:
       name: protobuf
@@ -294,7 +294,7 @@ packages:
       name: source_span
       url: "https://pub.dart-polymer.com"
     source: hosted
-    version: "1.3.1"
+    version: "1.4.0"
   stack_trace:
     description:
       name: stack_trace
