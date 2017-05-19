@@ -827,33 +827,7 @@ _main(List<String> args) async {
   }
 
   ArgParser parser = new ArgParser()
-    ..addSeparator("generic options")
-    ..addFlag('emit-output', abbr: 'e', negatable: true, defaultsTo: true, help: 'Should emit output')
-    ..addOption('output', abbr: 'o', defaultsTo: 'out', help: 'output directory')
-    ..addOption('repo', defaultsTo: path.join(homePath, '.polymerize'), help: 'Repository path (defaults to "\$HOME/.polymerize")')
-    ..addOption('source', abbr: 's', defaultsTo: Directory.current.path, help: 'source package path')
-    ..addOption('module-format',
-        abbr: 'm', allowed: ModuleFormat.values.map((ModuleFormat x) => _formatToString[x]), defaultsTo: _formatToString[ModuleFormat.amd], help: 'module format')
-    ..addFlag('help', abbr: 'h', negatable: false, help: 'showHelp')
-    ..addCommand(
-        'bazel',
-        new ArgParser()
-          ..addSeparator("bazel build helper")
-          ..addOption('base_path', abbr: 'b', help: 'base package path')
-          ..addOption("bower-needs", help: 'where to export bower needs')
-          ..addOption('export-sdk', help: 'do export sdk')
-          ..addOption('export-sdk-html', help: 'do export sdk HTML')
-          ..addOption('export-requirejs', help: 'do export requirejs')
-          ..addOption('export-require_html', help: 'do export requirehtml')
-          ..addOption('source', abbr: 's', allowMultiple: true, help: 'dart source file')
-          ..addOption('mapping', abbr: 'M', allowMultiple: true, help: 'external package mapping')
-          ..addOption('template_out', abbr: 'T', help: 'html templates rule')
-          ..addOption('summary', abbr: 'm', allowMultiple: true, help: 'dart summary file')
-          ..addOption('output', abbr: 'o', help: 'output file')
-          ..addOption('output_html', help: 'output html wrapper')
-          ..addOption('output_summary', abbr: 'x', help: 'output summary file')
-          ..addOption('package_name', abbr: 'p', help: 'the package name')
-          ..addOption('package_version', abbr: 'v', help: 'the package version'))
+    ..addOption('help',abbr:'h',help:'print usage')
     ..addCommand(
         'pub',
         new ArgParser()
@@ -863,36 +837,12 @@ _main(List<String> args) async {
           ..addOption('dest', abbr: 'd', help: 'destination')
           ..addOption('pub-host', abbr: 'H', help: 'pub host url'))
     ..addCommand(
-        'generate-wrapper',
-        new ArgParser()
-          ..addSeparator("component wrapper generator")
-          ..addOption('component-refs', help: 'Components references yaml')
-          ..addOption('dest-path', help: 'Destination path')
-          ..addOption('bower-needs-map', allowMultiple: true, help: 'bower needs')
-          ..addOption('package-name', abbr: 'p', help: 'dest dart package name')
-          ..addFlag('help', help: 'help on generate'))
-    ..addCommand(
-        'init',
-        new ArgParser()
-          ..addOption('bower-resolutions', defaultsTo: "bower_resolutions.yaml", abbr: 'B', help: '(Optional) Bower resolutions file')
-          ..addOption('dart-bin-path', defaultsTo: findDartSDKHome().path, help: 'dart sdk path')
-          ..addOption('rules-version', abbr: 'R', defaultsTo: RULES_VERSION, help: 'Bazel rules version')
-          ..addOption('develop', help: "enable polymerize develop mode, with repo home at the given path"))
-    ..addCommand(
-        "bower",
-        new ArgParser()
-          ..addOption("resolution-key", abbr: "r", allowMultiple: true)
-          ..addOption("resolution-value", abbr: "R", allowMultiple: true)
-          ..addOption("use-bower", allowMultiple: true, abbr: 'u', help: 'use bower')
-          ..addOption('output', abbr: 'o', help: 'output bower file'))
-    ..addCommand(
         "build",
         new ArgParser()
           ..addOption('bower-resolutions', defaultsTo: "bower_resolutions.yaml", abbr: 'B', help: '(Optional) Bower resolutions file')
           ..addOption('dart-bin-path', defaultsTo: findDartSDKHome().path, help: 'dart sdk path')
           ..addOption('rules-version', abbr: 'R', defaultsTo: RULES_VERSION, help: 'Bazel rules version')
           ..addOption('develop', help: "enable polymerize develop mode, with repo home at the given path"))
-    ..addCommand('test')
     ..addCommand('copy', new ArgParser()..addOption('list', abbr: 'l')..addOption('src', abbr: 's', allowMultiple: true)..addOption('dest', abbr: 'd', allowMultiple: true))
     ..addCommand('bower_library')
     ..addCommand(
@@ -925,23 +875,6 @@ _main(List<String> args) async {
     parser.commands.keys.forEach((cmd) {
       print("polymerize ${cmd}\n${parser.commands[cmd].usage}\n");
     });
-    return;
-  }
-
-  String sourcePath = results['source'];
-
-  String destPath = results['output'];
-
-  if (false == results['emit-output']) {
-    destPath = null;
-  }
-
-  String repoPath = results['repo'];
-
-  ModuleFormat fmt = _stringToFormat[results['module-format']];
-
-  if (results.command?.name == 'bazel') {
-    runInBazelMode(sourcePath, destPath, repoPath, fmt, results.command);
     return;
   }
 
@@ -989,46 +922,10 @@ _main(List<String> args) async {
     return;
   }
 
-  if (results.command?.name == 'test') {
-    //build_cmd.build(results.command['package-name'], results.command['source']);
-    String root = path.absolute(results.command.arguments[0]);
-    String package = path.absolute(results.command.arguments[1]);
-    WorkspaceBuilder builder = await WorkspaceBuilder.create(root, package);
-    await builder.generateBuildFiles();
-    return;
-  }
-
   if (results.command?.name == 'pub') {
     await runPubMode(results.command);
     return;
   }
-
-  if (results.command?.name == 'bower') {
-    await runBowerMode(results.command);
-    return;
-  }
-
-  if (results.command?.name == 'init') {
-    runInit(results.command);
-    return;
-  }
-
-  if (results.command?.name == 'generate-wrapper') {
-    if (results.command['help']) {
-      print("generate-wrapper usage :\n${parser.commands['generate-wrapper'].usage}");
-      return;
-    }
-    try {
-      await new Generator().runGenerateWrapper(results.command);
-    } on String catch (error) {
-      if (error == "HELP") {
-        print("USAGE: ${parser.commands[results.command.name].usage}");
-      }
-    }
-    return;
-  }
-
-  _buildAll(sourcePath, destPath == null ? null : new Directory(destPath), fmt, repoPath);
 }
 
 const Map _HEADERS = const {"Content-Type": "application/json"};
