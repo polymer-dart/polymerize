@@ -260,7 +260,7 @@ copy_to_bin_dir(
     yield "   dart_source_uri = '${target.uri}',";
     yield "   other_deps= ['//external:dart_sdk',";
 
-    for (String str in new Set.from(_extractBowerLibraryForPackage(dep.packageRoot, dep).map((dep)=>"     '@bower//:assets/${dep['import']}',"))) {
+    for (String str in new Set.from(_extractBowerLibraryForPackage(dep.packageRoot, dep).map((dep)=>"     '@bower//:${dep['import']}',"))) {
       yield str;
     }
 

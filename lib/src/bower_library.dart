@@ -31,7 +31,7 @@ Future createBowerLibrary(String repo) async {
       continue;
     }
     String path = pathos.relative(ent.path,from:bower_components.path);
-    String asset = "assets/${path}";
+    String asset = "${path}";
     assets.add("'//:${asset}'");
     sink.writeln('simple_asset( name="${asset}", path=["//:bower_components/${path}"] )');
   }

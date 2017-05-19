@@ -96,7 +96,7 @@ Future _generatePolymerRegister(
         if (!native) {
           code_builder.ReferenceBuilder cls = code_builder.reference("_lib.${functionElement.name}");
 
-          code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx.ctx.analysisContext, functionElement);
+          code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(libBuilder, ctx.ctx.analysisContext, functionElement);
 
           initModuleBuilder.addStatement(
               ref.call([cls, code_builder.literal(tagName), configExpressionBuilder, summaryFactory.call([]), code_builder.literal(false), code_builder.literal(template)]));
@@ -109,11 +109,10 @@ Future _generatePolymerRegister(
   }
 }
 
-code_builder.ExpressionBuilder collectConfig(AnalysisContext context, ClassElement ce) {
+code_builder.ExpressionBuilder collectConfig(code_builder.LibraryBuilder libBuilder, AnalysisContext context, ClassElement ce) {
   code_builder.TypeBuilder configType = new code_builder.TypeBuilder("polymerize.Config");
-  code_builder.TypeBuilder reduxInfo = new code_builder.TypeBuilder("polymerize.ReduxInfo");
 
-  code_builder.ReferenceBuilder jsifyRef = code_builder.reference('js_util.jsify','package:js/js_util.dart');
+  code_builder.ReferenceBuilder jsifyRef = code_builder.reference('js_util.jsify', 'package:js/js_util.dart');
 
   code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("polymerize.Property");
 
@@ -175,8 +174,44 @@ code_builder.ExpressionBuilder collectConfig(AnalysisContext context, ClassEleme
     'properties': jsifyRef.call([code_builder.map(properties)]),
     'reduxActions': code_builder.list(reduxActions),
     'behaviors': code_builder.list(behaviors),
-    'reduxInfo' : reduxInfo.newInstance([])
+    'reduxInfo': reduxInfoBuilder(libBuilder, context, ce)
   });
+}
+
+int count = 0;
+
+code_builder.ExpressionBuilder reduxInfoBuilder(code_builder.LibraryBuilder libBuilder, AnalysisContext ctx, ClassElement ce) {
+  code_builder.TypeBuilder reduxInfoRef = new code_builder.TypeBuilder("polymerize.ReduxInfo");
+
+  Map<String, String> prefixes = {};
+
+  return ce.interfaces.map((intf) {
+    ElementAnnotation anno = getElementAnnotation(intf.element.metadata, isStoreDef);
+    if (anno == null) {
+      return null;
+    }
+
+    //print("${anno.element.kind}");
+    if (anno.element.kind == ElementKind.GETTER) {
+      MethodElement m = anno.element;
+      //print(
+      //    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
+
+      String prefix = prefixes.putIfAbsent(m.source.uri.toString(), () {
+        String res = '_imp${++count}';
+        libBuilder.addDirective(new code_builder.ImportBuilder(m.source.uri.toString(), prefix: res));
+        return res;
+      });
+
+      return reduxInfoRef.newInstance([], named: {'reducer': code_builder.reference("${prefix}.${m.name}").property('reducer')});
+    } else {
+      /**
+          DartObject reducer = anno.computeConstantValue().getField('reducer');
+          return reducer;
+       */
+      return null;
+    }
+  }).firstWhere(notNull, orElse: () => reduxInfoRef.newInstance([]));
 }
 
 Future _addHtmlImport(GeneratorContext ctx, CompilationUnit cu, code_builder.LibraryBuilder libBuilder, code_builder.MethodBuilder initModuleBuilder, IOSink htmlHeader) async =>
