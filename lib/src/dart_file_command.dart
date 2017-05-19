@@ -7,6 +7,9 @@ import 'package:polymerize/src/code_generator.dart';
 import 'package:polymerize/src/utils.dart';
 import 'package:path/path.dart' as path;
 
+import 'package:bazel_worker/bazel_worker.dart';
+import 'package:bazel_worker/driver.dart';
+
 const String BAZEL_BASE_DIR = 'bazel-out/local-fastbuild/bin';
 
 Iterable<String> summaryOpts(List<String> summaries) sync* {
@@ -39,8 +42,7 @@ Future ddcBuild(ArgResults command) async {
 
   String genUri = inputUri.replaceFirst(new RegExp(r".dart$"), "_g.dart");
 
-  ProcessResult res = await Process.run(
-      '${findDartSDKHome().path}/dartdevc',
+  int exitCode = await ddc(
       []
         ..addAll(['--module-root=${BAZEL_BASE_DIR}'])
         ..addAll(summaryOpts(summariesPaths))
@@ -50,11 +52,26 @@ Future ddcBuild(ArgResults command) async {
         ..add(inputUri)
         ..add(genUri));
 
-  if (res.exitCode != 0) {
+  if (exitCode != 0) {
     //logger.severe("Error during build :${res.stdout} ${res.stderr}");
-    throw "ERROR : ${res.stdout} - ${res.stderr}";
+    throw "ERROR COMPILING ${inputUri}";
   }
+
+
+
 }
+
+Future<int> ddc(List<String> args) async => (await driver.doWork(new WorkRequest()..arguments.addAll(args))).exitCode;
+
+BazelWorkerDriver _driver = new BazelWorkerDriver(() =>Process.start('${findDartSDKHome().path}/dartdevc', ['--persistent_worker']));
+
+BazelWorkerDriver get driver {
+  if (_driver == null) {
+    _driver =  new BazelWorkerDriver(() =>Process.start('${findDartSDKHome().path}/dartdevc', ['--persistent_worker']));
+  }
+  return _driver;
+}
+
 
 /**
  * Will generate code to initialize the module
