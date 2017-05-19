@@ -10,63 +10,69 @@ import 'package:code_builder/code_builder.dart' as code_builder;
 import 'package:polymerize/src/dep_analyzer.dart';
 import 'package:polymerize/src/utils.dart';
 
-String toLibraryName(String uri) {
-  Uri u = Uri.parse(uri);
-  return u.pathSegments.map((x) => x.replaceAll('.', "_")).join("_") + "_G";
-}
-
-typedef Future CodeGenerator(GeneratorContext ctx, CompilationUnit cu, code_builder.LibraryBuilder libBuilder, code_builder.MethodBuilder initModuleBuilder, IOSink htmlHeader);
+typedef Future CodeGenerator(GeneratorContext ctx);
 
 List<CodeGenerator> _codeGenerators = [_generateInitMethods, _generatePolymerRegister, _addHtmlImport];
 
 class GeneratorContext {
   InternalContext ctx;
   String inputUri;
+  String genPath;
 
-  GeneratorContext(this.ctx, this.inputUri);
+  CompilationUnit cu;
+  code_builder.LibraryBuilder libBuilder;
+  code_builder.MethodBuilder initModuleBuilder;
+  IOSink _htmlHeader;
+  code_builder.Scope scope;
+
+  void addImportHtml(String path) {
+    _htmlHeader.writeln("<link rel='import' href='${path}'>");
+  }
+
+  GeneratorContext(this.ctx, this.inputUri, String htmlTemp, this.genPath) {
+    cu = ctx.getCompilationUnit(inputUri);
+
+    scope = new code_builder.Scope.dedupe();
+    libBuilder = new code_builder.LibraryBuilder.scope(scope: scope);
+    initModuleBuilder = new code_builder.MethodBuilder("initModule");
+    libBuilder.addMember(initModuleBuilder);
+
+    _htmlHeader = new File(htmlTemp).openWrite();
+  }
+
+  Future _finish() async {
+    await _htmlHeader.close();
+
+    initModuleBuilder.addStatement(code_builder.returnVoid);
+
+    return new File(genPath).writeAsString(code_builder.prettyToSource(libBuilder.buildAst(scope)));
+  }
+
+  Future generateCode() async {
+    await Future.wait(_codeGenerators.map((gen) => gen(this)));
+    return _finish();
+  }
 }
 
 Future generateCode(String inputUri, String genPath, String htmlTemp) async {
   InternalContext ctx = await InternalContext.create('.');
+  GeneratorContext getctx = new GeneratorContext(ctx, inputUri, htmlTemp, genPath);
 
-  CompilationUnit cu = ctx.getCompilationUnit(inputUri);
-
-  GeneratorContext getctx = new GeneratorContext(ctx, inputUri);
-
-  code_builder.Scope scope = new code_builder.Scope.dedupe();
-  code_builder.LibraryBuilder libBuilder = new code_builder.LibraryBuilder.scope(name:toLibraryName(inputUri),scope:scope);
-  code_builder.MethodBuilder initModuleBuilder = new code_builder.MethodBuilder("initModule");
-  libBuilder.addMember(initModuleBuilder);
-
-  IOSink htmlTempSink = new File(htmlTemp).openWrite();
-
-  await Future.wait(_codeGenerators.map((gen) => gen(getctx, cu, libBuilder, initModuleBuilder, htmlTempSink)));
-
-  await htmlTempSink.close();
-
-  initModuleBuilder
-    ..addStatements([
-      new code_builder.StatementBuilder.raw((scope) {
-        return "return;";
-      })
-    ]);
-
-  return new File(genPath).writeAsString(code_builder.prettyToSource(libBuilder.buildAst(scope)));
+  return getctx.generateCode();
 }
 
 /**
  * Look for INIT METHODS
  */
 
-Future _generateInitMethods(
-    GeneratorContext ctx, CompilationUnit cu, code_builder.LibraryBuilder libBuilder, code_builder.MethodBuilder initModuleBuilder, IOSink htmlHeader) async {
-  for (CompilationUnitMember m in cu.declarations) {
+Future _generateInitMethods(GeneratorContext ctx) async {
+  for (CompilationUnitMember m in ctx.cu.declarations) {
     if (m.element?.kind == ElementKind.FUNCTION) {
       FunctionElement functionElement = m.element;
       DartObject init = getAnnotation(m.element.metadata, isInit);
       if (init != null && functionElement.parameters.isEmpty) {
-        code_builder.ReferenceBuilder ref = code_builder.reference(functionElement.name,ctx.inputUri);
-        initModuleBuilder.addStatement(ref.call([]));
+        code_builder.ReferenceBuilder ref = code_builder.reference(functionElement.name, ctx.inputUri);
+        ctx.initModuleBuilder.addStatement(ref.call([]));
       }
     }
   }
@@ -75,21 +81,17 @@ Future _generateInitMethods(
 const String POLYMERIZE_JS = 'package:polymer_element/polymerize_js.dart';
 const String JS_UTIL = 'package:js/js_util.dart';
 
-Future _generatePolymerRegister(
-    GeneratorContext ctx, CompilationUnit cu, code_builder.LibraryBuilder libBuilder, code_builder.MethodBuilder initModuleBuilder, IOSink htmlHeader) async {
-  //libBuilder.addDirective(new code_builder.ImportBuilder('package:polymer_element/polymerize_js.dart', prefix: 'polymerize'));
-  //libBuilder.addDirective(new code_builder.ImportBuilder('package:js/js_util.dart', prefix: 'js_util'));
+Future _generatePolymerRegister(GeneratorContext ctx) async {
+  //code_builder.TypeBuilder summaryType = new code_builder.TypeBuilder('Summary', importFrom: POLYMERIZE_JS);
 
-  code_builder.TypeBuilder summaryType = new code_builder.TypeBuilder('Summary', importFrom: POLYMERIZE_JS);
+  code_builder.ReferenceBuilder ref = code_builder.reference("register", POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder ref = code_builder.reference("register",POLYMERIZE_JS);
+  code_builder.ReferenceBuilder defBehavior = code_builder.reference("defineBehavior", POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder defBehavior = code_builder.reference("defineBehavior",POLYMERIZE_JS);
-
-  code_builder.ReferenceBuilder summaryFactory = code_builder.reference("summary",POLYMERIZE_JS);
+  code_builder.ReferenceBuilder summaryFactory = code_builder.reference("summary", POLYMERIZE_JS);
 
   // lookup for annotation
-  for (CompilationUnitMember m in cu.declarations) {
+  for (CompilationUnitMember m in ctx.cu.declarations) {
     if (m.element?.kind == ElementKind.CLASS) {
       ClassElement classElement = m.element;
       DartObject register = getAnnotation(m.element.metadata, isPolymerRegister);
@@ -99,40 +101,39 @@ Future _generatePolymerRegister(
         bool native = register.getField('native').toBoolValue();
 
         if (!native) {
-          code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name,ctx.inputUri);
+          code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name, ctx.inputUri);
 
-          code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(libBuilder, ctx.ctx.analysisContext, classElement);
+          code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx, classElement);
 
-          initModuleBuilder.addStatement(
+          ctx.initModuleBuilder.addStatement(
               ref.call([cls, code_builder.literal(tagName), configExpressionBuilder, summaryFactory.call([]), code_builder.literal(false), code_builder.literal(template)]));
           if (template != null) {
-            htmlHeader.writeln("<link rel='import' href='${template}'>");
+            ctx.addImportHtml(template);
           }
         }
         continue;
       }
 
       DartObject behavior = getAnnotation(m.element.metadata, isPolymerBehavior);
-      if (behavior!=null) {
+      if (behavior != null) {
         String name = behavior.getField('name').toStringValue();
-        code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name,ctx.inputUri);
+        code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name, ctx.inputUri);
 
-        code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(libBuilder, ctx.ctx.analysisContext, classElement);
+        code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx, classElement);
 
-        initModuleBuilder.addStatement(defBehavior.call([code_builder.literal(name),cls,configExpressionBuilder]));
+        ctx.initModuleBuilder.addStatement(defBehavior.call([code_builder.literal(name), cls, configExpressionBuilder]));
       }
     }
   }
 }
 
-code_builder.ExpressionBuilder collectConfig(code_builder.LibraryBuilder libBuilder, AnalysisContext context, ClassElement ce) {
-  code_builder.TypeBuilder configType = new code_builder.TypeBuilder("Config",importFrom: POLYMERIZE_JS);
-
+code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassElement ce) {
+  code_builder.TypeBuilder configType = new code_builder.TypeBuilder("Config", importFrom: POLYMERIZE_JS);
 
   code_builder.ReferenceBuilder jsifyRef = code_builder.reference('jsify', JS_UTIL);
 
-  code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("Property",importFrom: POLYMERIZE_JS);
-  code_builder.TypeBuilder reduxPropertyType = new code_builder.TypeBuilder("ReduxProperty",importFrom: POLYMERIZE_JS);
+  code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("Property", importFrom: POLYMERIZE_JS);
+  code_builder.TypeBuilder reduxPropertyType = new code_builder.TypeBuilder("ReduxProperty", importFrom: POLYMERIZE_JS);
 
   List<code_builder.ExpressionBuilder> observers = [];
   List<code_builder.ExpressionBuilder> reduxActions = [];
@@ -163,12 +164,11 @@ code_builder.ExpressionBuilder collectConfig(code_builder.LibraryBuilder libBuil
       statePath = prop.getField('statePath').toStringValue();
     }
 
-    if (statePath!=null) {
+    if (statePath != null) {
       properties[fe.name] = reduxPropertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'statePath': code_builder.literal(statePath)});
     } else {
       properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify)});
     }
-
   });
 
   String behaviorName(ClassElement intf, DartObject anno) {
@@ -197,15 +197,14 @@ code_builder.ExpressionBuilder collectConfig(code_builder.LibraryBuilder libBuil
     'properties': jsifyRef.call([code_builder.map(properties)]),
     'reduxActions': code_builder.list(reduxActions),
     'behaviors': code_builder.list(behaviors),
-    'reduxInfo': reduxInfoBuilder(libBuilder, context, ce)
+    'reduxInfo': reduxInfoBuilder(genctx, ce)
   });
 }
 
 int count = 0;
 
-code_builder.ExpressionBuilder reduxInfoBuilder(code_builder.LibraryBuilder libBuilder, AnalysisContext ctx, ClassElement ce) {
-  code_builder.TypeBuilder reduxInfoRef = new code_builder.TypeBuilder("ReduxInfo",importFrom: POLYMERIZE_JS);
-
+code_builder.ExpressionBuilder reduxInfoBuilder(GeneratorContext ctx, ClassElement ce) {
+  code_builder.TypeBuilder reduxInfoRef = new code_builder.TypeBuilder("ReduxInfo", importFrom: POLYMERIZE_JS);
 
   return ce.interfaces.map((intf) {
     ElementAnnotation anno = getElementAnnotation(intf.element.metadata, isStoreDef);
@@ -219,7 +218,7 @@ code_builder.ExpressionBuilder reduxInfoBuilder(code_builder.LibraryBuilder libB
       //print(
       //    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
 
-      return reduxInfoRef.newInstance([], named: {'reducer': code_builder.reference(m.name,m.source.uri.toString()).property('reducer')});
+      return reduxInfoRef.newInstance([], named: {'reducer': code_builder.reference(m.name, m.source.uri.toString()).property('reducer')});
     } else {
       /**
           DartObject reducer = anno.computeConstantValue().getField('reducer');
@@ -230,5 +229,5 @@ code_builder.ExpressionBuilder reduxInfoBuilder(code_builder.LibraryBuilder libB
   }).firstWhere(notNull, orElse: () => reduxInfoRef.newInstance([]));
 }
 
-Future _addHtmlImport(GeneratorContext ctx, CompilationUnit cu, code_builder.LibraryBuilder libBuilder, code_builder.MethodBuilder initModuleBuilder, IOSink htmlHeader) async =>
-    allFirstLevelAnnotation(cu, isHtmlImport).map((o) => o.getField('path').toStringValue()).forEach((relPath) => htmlHeader.writeln("<link rel='import' href='${relPath}'>"));
+Future _addHtmlImport(GeneratorContext ctx) async =>
+    allFirstLevelAnnotation(ctx.cu, isHtmlImport).map((o) => o.getField('path').toStringValue()).forEach((relPath) => ctx.addImportHtml(relPath));
