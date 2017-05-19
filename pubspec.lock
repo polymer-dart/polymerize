@@ -25,42 +25,12 @@ packages:
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "1.13.3"
-  barback:
-    description:
-      name: barback
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.15.2+11"
   bazel_worker:
     description:
       name: bazel_worker
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "0.1.4"
-  browser:
-    description:
-      name: browser
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.10.0+2"
-  build:
-    description:
-      name: build
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.9.3"
-  build_barback:
-    description:
-      name: build_barback
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.2.2"
-  build_runner:
-    description:
-      name: build_runner
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.3.4"
   charcode:
     description:
       name: charcode
@@ -79,12 +49,6 @@ packages:
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "1.0.3"
-  code_transformers:
-    description:
-      name: code_transformers
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.5.1+3"
   collection:
     description:
       name: collection
@@ -115,12 +79,6 @@ packages:
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "1.0.6"
-  dev_compiler:
-    description:
-      name: dev_compiler
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.2.0-unofficial.2017042201"
   fixnum:
     description:
       name: fixnum
@@ -138,7 +96,7 @@ packages:
       name: func
       url: "https://pub.dart-polymer.com"
     source: hosted
-    version: "0.1.1"
+    version: "1.0.0"
   glob:
     description:
       name: glob
@@ -181,12 +139,6 @@ packages:
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "1.0.0"
-  js:
-    description:
-      name: js
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.6.1"
   kernel:
     description:
       name: kernel
@@ -217,12 +169,6 @@ packages:
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "1.0.5"
-  mime:
-    description:
-      name: mime
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.9.3"
   package_config:
     description:
       name: package_config
@@ -247,48 +193,18 @@ packages:
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "0.2.0"
-  pool:
-    description:
-      name: pool
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "1.3.1"
   protobuf:
     description:
       name: protobuf
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "0.5.4"
-  pub_semver:
-    description:
-      name: pub_semver
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "1.3.2"
   resource:
     description:
       name: resource
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "2.1.2"
-  shelf:
-    description:
-      name: shelf
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.6.7+2"
-  shelf_static:
-    description:
-      name: shelf_static
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.2.4"
-  source_maps:
-    description:
-      name: source_maps
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "0.10.4"
   source_span:
     description:
       name: source_span
@@ -301,12 +217,6 @@ packages:
       url: "https://pub.dart-polymer.com"
     source: hosted
     version: "1.7.3"
-  stream_channel:
-    description:
-      name: stream_channel
-      url: "https://pub.dart-polymer.com"
-    source: hosted
-    version: "1.6.1"
   string_scanner:
     description:
       name: string_scanner

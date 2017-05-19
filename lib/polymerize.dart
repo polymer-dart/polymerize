@@ -1,5 +1,4 @@
 import 'package:analyzer/src/generated/engine.dart';
-import 'package:dev_compiler/src/compiler/module_builder.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:path/path.dart' as path;
 import 'package:analyzer/src/generated/source.dart';
@@ -263,15 +262,21 @@ Future processRequestArgs(ArgParser parser, ArgResults results) async {
   }
 }
 
-Future _exportSDK(String dest, String destHTML, [ModuleFormat format = ModuleFormat.amd]) async {
-  if (format == ModuleFormat.legacy) {
-    await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js", dest);
+Future _exportSDK(String dest, String destHTML, [String format = "amd"]) async {
+  String dir = path.join(findDartSDKHome().parent.path,'lib','dev_compiler');
+  if (format == "legacy") {
+    //await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js", dest);
+
+    await new File(path.join(dir,'legacy/dart_sdk.js')).copy(dest);
     //await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
     //    path.join(dest.path, "dart_library.js"));
-  } else if (format == ModuleFormat.es6) {
-    await _copyResource("package:dev_compiler/js/es6/dart_sdk.js", dest);
-  } else if (format == ModuleFormat.amd) {
-    await _copyResource("package:dev_compiler/js/amd/dart_sdk.js", dest);
+  } else if (format == "es6") {
+    //await _copyResource("package:dev_compiler/js/es6/dart_sdk.js", dest);
+    await new File(path.join(dir,'es6/dart_sdk.js')).copy(dest);
+
+  } else if (format == "amd") {
+    await new File(path.join(dir,'amd/dart_sdk.js')).copy(dest);
+    //await _copyResource("package:dev_compiler/js/amd/dart_sdk.js", dest);
   }
 
   // export HTML

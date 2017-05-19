@@ -64,8 +64,10 @@ Iterable<DartObject> allFirstLevelAnnotation(CompilationUnit cu, bool matches(Da
 
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //
-        bool matches(DartObject x)) =>
-    metadata.map((an) => an.computeConstantValue()).where(notNull).firstWhere(matches, orElse: () => null);
+        bool matches(DartObject x)) {
+    stderr.writeln("DEBUG: ${metadata} looking for ${matches}");
+    return metadata.map((an) => an.computeConstantValue()).where(notNull).firstWhere(matches, orElse: () => null);
+}
 
 ElementAnnotation getElementAnnotation(
         Iterable<ElementAnnotation> metadata, //
