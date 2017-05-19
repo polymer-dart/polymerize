@@ -861,7 +861,8 @@ _main(List<String> args) async {
                 ..addOption('dep', abbr: 'd', allowMultiple: true)
                 ..addOption('output', abbr: 'o')
                 ..addOption('html', abbr: 'h')))
-    ..addCommand('export_sdk', new ArgParser()..addOption('output', abbr: 'o')..addOption('html', abbr: 'h'));
+    ..addCommand('export_sdk', new ArgParser()..addOption('output', abbr: 'o')..addOption('html', abbr: 'h')
+                 ..addOption('imd')..addOption('imd_html'));
 
   // Configure logger
   log.hierarchicalLoggingEnabled = true;
@@ -914,6 +915,7 @@ _main(List<String> args) async {
 
   if (results.command?.name == 'export_sdk') {
     await _exportSDK(results.command['output'], results.command['html']);
+    await _exportRequireJs(results.command['imd'], results.command['imd_html']);
     return;
   }
 
