@@ -81,12 +81,14 @@ Future _generatePolymerRegister(
 
   code_builder.ReferenceBuilder ref = code_builder.reference("polymerize.register");
 
+  code_builder.ReferenceBuilder defBehavior = code_builder.reference("polymerize.defineBehavior");
+
   code_builder.ReferenceBuilder summaryFactory = code_builder.reference("polymerize.summary");
 
   // lookup for annotation
   for (CompilationUnitMember m in cu.declarations) {
     if (m.element?.kind == ElementKind.CLASS) {
-      ClassElement functionElement = m.element;
+      ClassElement classElement = m.element;
       DartObject register = getAnnotation(m.element.metadata, isPolymerRegister);
       if (register != null) {
         String tagName = register.getField('tagName').toStringValue();
@@ -94,9 +96,9 @@ Future _generatePolymerRegister(
         bool native = register.getField('native').toBoolValue();
 
         if (!native) {
-          code_builder.ReferenceBuilder cls = code_builder.reference("_lib.${functionElement.name}");
+          code_builder.ReferenceBuilder cls = code_builder.reference("_lib.${classElement.name}");
 
-          code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(libBuilder, ctx.ctx.analysisContext, functionElement);
+          code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(libBuilder, ctx.ctx.analysisContext, classElement);
 
           initModuleBuilder.addStatement(
               ref.call([cls, code_builder.literal(tagName), configExpressionBuilder, summaryFactory.call([]), code_builder.literal(false), code_builder.literal(template)]));
@@ -104,6 +106,17 @@ Future _generatePolymerRegister(
             htmlHeader.writeln("<link rel='import' href='${template}'>");
           }
         }
+        continue;
+      }
+
+      DartObject behavior = getAnnotation(m.element.metadata, isPolymerBehavior);
+      if (behavior!=null) {
+        String name = behavior.getField('name').toStringValue();
+        code_builder.ReferenceBuilder cls = code_builder.reference("_lib.${classElement.name}");
+
+        code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(libBuilder, ctx.ctx.analysisContext, classElement);
+
+        initModuleBuilder.addStatement(defBehavior.call([code_builder.literal(name),cls,configExpressionBuilder]));
       }
     }
   }
@@ -115,6 +128,7 @@ code_builder.ExpressionBuilder collectConfig(code_builder.LibraryBuilder libBuil
   code_builder.ReferenceBuilder jsifyRef = code_builder.reference('js_util.jsify', 'package:js/js_util.dart');
 
   code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("polymerize.Property");
+  code_builder.TypeBuilder reduxPropertyType = new code_builder.TypeBuilder("polymerize.ReduxProperty");
 
   List<code_builder.ExpressionBuilder> observers = [];
   List<code_builder.ExpressionBuilder> reduxActions = [];
@@ -145,7 +159,12 @@ code_builder.ExpressionBuilder collectConfig(code_builder.LibraryBuilder libBuil
       statePath = prop.getField('statePath').toStringValue();
     }
 
-    properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'statePath': code_builder.literal(statePath)});
+    if (statePath!=null) {
+      properties[fe.name] = reduxPropertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'statePath': code_builder.literal(statePath)});
+    } else {
+      properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify)});
+    }
+
   });
 
   String behaviorName(ClassElement intf, DartObject anno) {
