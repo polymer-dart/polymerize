@@ -130,8 +130,12 @@ _main(List<String> args) async {
     ..addCommand(
         'generate-wrapper',
         new ArgParser()
-          ..addOption('base-dir', abbr: 'b', help: 'base dir')
-          ..addOption('file-path', abbr: 'f', help: 'file path'))
+          ..addSeparator("component wrapper generator")
+          ..addOption('component-refs', help: 'Components references yaml')
+          ..addOption('dest-path', help: 'Destination path')
+          ..addOption('bower-needs-map',
+                          allowMultiple: true, help: 'bower needs')
+          ..addOption('package-name', abbr: 'p', help: 'dest dart package name')
     ..addCommand(
         'pub',
         new ArgParser()
