@@ -1,3 +1,11 @@
+# 0.8.1
+ - rewritten to keep most things in dart 
+ - changed bower strategy (now it is a workspace)
+ - added support for bazel workers (still need some optimization)
+ - support for latest polymer
+ - using SDK ddc instead of extracted DDC package
+ - changed module strategy : one file per module makes it possible to load only what is needed 
+
 # 0.7.2
 
  - upgrade to SDK v. 1.23.0

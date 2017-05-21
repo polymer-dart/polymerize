@@ -5,7 +5,7 @@
 This package is a community effort to bring support for **Polymer 2** and latest HTML standards to Dart (DDC).
 
 It features :
- - support for `polymer 2.0.0-rc.2` (web components 1.0)
+ - support for `polymer 2.0.0` (web components 1.0)
  - using DDC to generate `ES6` output code
  - leverages [html5](https://github.com/polymer-dart/html5), a new html lib for Dart based on js interoperability only,
  - using [bazel](http://bazel.io) as build system (see also [rules](https://github.com/polymer-dart/bazel_polymerize_rules) )
@@ -22,6 +22,8 @@ It features :
 ## Disclaimer
 
 `Polymerize` works on every platforms where `DDC` and `Bazel` runs that's MacOS and Linux for now.
+
+The upcoming version of `pub` will support `DDC` build and `polymerize` will support it too thus extending the platform where you can use it.
 
 ### Browser compatibility
 
