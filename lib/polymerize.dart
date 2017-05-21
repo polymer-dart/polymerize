@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:polymerize/src/bower_library.dart';
 import 'package:polymerize/src/dart_file_command.dart';
+import 'package:polymerize/src/wrapper_generator.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'package:resource/resource.dart' as res;
 import 'package:args/args.dart';
@@ -127,6 +128,11 @@ _main(List<String> args) async {
     ..addFlag('help', abbr: 'h', help: 'print usage')
     ..addFlag('persistent_worker', help: 'run as a bazel worker')
     ..addCommand(
+        'generate-wrapper',
+        new ArgParser()
+          ..addOption('base-dir', abbr: 'b', help: 'base dir')
+          ..addOption('file-path', abbr: 'f', help: 'file path'))
+    ..addCommand(
         'pub',
         new ArgParser()
           ..addSeparator("pub helper for bazel")
@@ -220,6 +226,11 @@ Future processRequestArgs(ArgParser parser, ArgResults results) async {
 
   if (results.command?.name == 'build') {
     await build_cmd.build(results.command);
+    return;
+  }
+
+  if (results.command?.name =='generate-wrapper') {
+    await new Generator().runGenerateWrapper(results.command);
     return;
   }
 
