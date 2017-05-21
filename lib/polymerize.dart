@@ -133,9 +133,8 @@ _main(List<String> args) async {
           ..addSeparator("component wrapper generator")
           ..addOption('component-refs', help: 'Components references yaml')
           ..addOption('dest-path', help: 'Destination path')
-          ..addOption('bower-needs-map',
-                          allowMultiple: true, help: 'bower needs')
-          ..addOption('package-name', abbr: 'p', help: 'dest dart package name')
+          ..addOption('bower-needs-map', allowMultiple: true, help: 'bower needs')
+          ..addOption('package-name', abbr: 'p', help: 'dest dart package name'))
     ..addCommand(
         'pub',
         new ArgParser()
@@ -233,7 +232,7 @@ Future processRequestArgs(ArgParser parser, ArgResults results) async {
     return;
   }
 
-  if (results.command?.name =='generate-wrapper') {
+  if (results.command?.name == 'generate-wrapper') {
     await new Generator().runGenerateWrapper(results.command);
     return;
   }
@@ -283,19 +282,18 @@ Future processRequestArgs(ArgParser parser, ArgResults results) async {
 }
 
 Future _exportSDK(String dest, String destHTML, [String format = "amd"]) async {
-  String dir = path.join(findDartSDKHome().parent.path,'lib','dev_compiler');
+  String dir = path.join(findDartSDKHome().parent.path, 'lib', 'dev_compiler');
   if (format == "legacy") {
     //await _copyResource("package:dev_compiler/js/legacy/dart_sdk.js", dest);
 
-    await new File(path.join(dir,'legacy/dart_sdk.js')).copy(dest);
+    await new File(path.join(dir, 'legacy/dart_sdk.js')).copy(dest);
     //await _copyResource("package:dev_compiler/js/legacy/dart_library.js",
     //    path.join(dest.path, "dart_library.js"));
   } else if (format == "es6") {
     //await _copyResource("package:dev_compiler/js/es6/dart_sdk.js", dest);
-    await new File(path.join(dir,'es6/dart_sdk.js')).copy(dest);
-
+    await new File(path.join(dir, 'es6/dart_sdk.js')).copy(dest);
   } else if (format == "amd") {
-    await new File(path.join(dir,'amd/dart_sdk.js')).copy(dest);
+    await new File(path.join(dir, 'amd/dart_sdk.js')).copy(dest);
     //await _copyResource("package:dev_compiler/js/amd/dart_sdk.js", dest);
   }
 

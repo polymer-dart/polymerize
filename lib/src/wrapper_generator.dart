@@ -7,6 +7,7 @@ import 'package:package_resolver/package_resolver.dart';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 import 'package:glob/glob.dart';
+import 'package:resource/resource.dart' as resres;
 
 Logger _logger = new Logger('wrapper_generator');
 
@@ -19,8 +20,7 @@ class ImportedData {
 
   var descriptor;
 
-  ImportedData(this.jsPackageName, this.jsClassName, this.dartPackageNameAlias,
-      this.path, this.descriptor);
+  ImportedData(this.jsPackageName, this.jsClassName, this.dartPackageNameAlias, this.path, this.descriptor);
 }
 
 class Generator {
@@ -59,18 +59,12 @@ class Generator {
    * Analyzing a file
    */
   Future _analyze(String src, String baseDir) async {
-    PackageResolver resolver = PackageResolver.current;
+    PackageResolver resolver = await PackageResolver.loadConfig(".packages");
     String relPath = src;
 
-    ProcessResult res = await Process.run(
-        'node',
-        [
-          (await resolver.resolveUri('package:polymerize/src/js/analyze.js'))
-              .toFilePath(),
-          baseDir,
-          relPath
-        ],
-        stdoutEncoding: UTF8);
+    Uri analizeUri = await resolver.resolveUri('package:polymerize/src/js/analyze.js');
+
+    ProcessResult res = await Process.run('node', [(analizeUri.toFilePath()), baseDir, relPath], stdoutEncoding: UTF8);
 
     if (res.exitCode != 0) {
       print(res.stderr);
@@ -99,15 +93,13 @@ class Generator {
 
   _generateBowerJson(componentsRefs, String destPath) async {
     await new Directory(destPath).createSync(recursive: true);
-    await new File(path.join(destPath, 'bower.json'))
-        .writeAsString(JSON.encode({
+    await new File(path.join(destPath, 'bower.json')).writeAsString(JSON.encode({
       "name": "generated_elements",
       "version": "0.0.0",
       "homepage": "https://dart-polymer.com",
       "authors": ["Dart-Polymer <info@dart-polymer.com>"],
       "private": true,
-      "dependencies": new Map.fromIterable(componentsRefs['components'],
-          key: (x) => x['name'], value: (x) => x['ref']),
+      "dependencies": new Map.fromIterable(componentsRefs['components'], key: (x) => x['name'], value: (x) => x['ref']),
       "resolutions": new Map()..addAll(componentsRefs['resolutions'])
     }));
     _logger.info("Created `bower.json`");
@@ -115,11 +107,9 @@ class Generator {
 
   _installBowerComponents(String destPath) async {
     _logger.info("Downloading bower components");
-    ProcessResult res =
-        await Process.run('bower', ['install'], workingDirectory: destPath);
+    ProcessResult res = await Process.run('bower', ['install'], workingDirectory: destPath);
     if (res.exitCode != 0) {
-      _logger.severe(
-          "Error downloading bower components, try running `bower install` in ${destPath}, and eventually add a `resolutions` section to the component file");
+      _logger.severe("Error downloading bower components, try running `bower install` in ${destPath}, and eventually add a `resolutions` section to the component file");
       throw res.stderr;
     }
   }
@@ -132,24 +122,19 @@ class Generator {
       return;
     }
 
-    packageMappings.addAll(new Map.fromIterable(
-        bowerNeeds.map((x) => x.split("=")),
-        key: (x) => x[0],
-        value: (x) => x[1]));
+    packageMappings.addAll(new Map.fromIterable(bowerNeeds.map((x) => x.split("=")), key: (x) => x[0], value: (x) => x[1]));
 
     //print("Using mappings : ${packageMappings} from ${bowerNeeds}");
   }
 
-  _generateWrappers(
-      String dartPackageName, componentsRefs, String destPath) async {
+  _generateWrappers(String dartPackageName, componentsRefs, String destPath) async {
     inOutMap = <String, String>{};
     for (Map comp in componentsRefs['components']) {
       await _analyzeComponent(dartPackageName, comp, componentsRefs, destPath);
     }
 
     //print("Resulting mappings :${packageMappings}");
-    _logger.info(
-        "Start writing results for ${analysisResults.keys.length} files: \n");
+    _logger.info("Start writing results for ${analysisResults.keys.length} files: \n");
     List<String> paths = new List.from(analysisResults.keys);
     _logger.finest("Files to generate [${paths.length}] : ${paths}");
 
@@ -161,10 +146,8 @@ class Generator {
       _currentBowerRef = _bowerRefsByPath[p];
 
       try {
-        bool hadElements =
-            await _generateElements(componentsRefs['namespace'], libPath);
-        bool hadBehaviors =
-            await _generateBehaviors(componentsRefs['namespace'], libPath);
+        bool hadElements = await _generateElements(componentsRefs['namespace'], libPath);
+        bool hadBehaviors = await _generateBehaviors(componentsRefs['namespace'], libPath);
         if (!hadElements && !hadBehaviors) {
           await _writeDart(
               libPath,
@@ -187,37 +170,28 @@ class _ {
     }
   }
 
-  Future<List<String>> _enlistFile(String destPath, String componentName,
-      List<String> includes, List<String> excludes) async {
+  Future<List<String>> _enlistFile(String destPath, String componentName, List<String> includes, List<String> excludes) async {
     String from = path.join(destPath, componentName);
-    Iterable<Glob> includeGlobs = (includes ?? ["${componentName}.html"])
-        .map((pat) => new Glob(pat, recursive: false));
-    Iterable<Glob> excludeGlobs =
-        (excludes ?? []).map((pat) => new Glob(pat, recursive: false));
+    Iterable<Glob> includeGlobs = (includes ?? ["${componentName}.html"]).map((pat) => new Glob(pat, recursive: false));
+    Iterable<Glob> excludeGlobs = (excludes ?? []).map((pat) => new Glob(pat, recursive: false));
     List result = [];
-    await for (FileSystemEntity entry
-        in new Directory(from).list(recursive: true)) {
+    await for (FileSystemEntity entry in new Directory(from).list(recursive: true)) {
       if (entry is File) {
         String rel = path.relative(entry.path, from: from);
 
-        if (includeGlobs.any((i) => i.matches(rel)) &&
-            excludeGlobs.every((e) => !e.matches(rel)))
-          result.add("${componentName}/${rel}");
+        if (includeGlobs.any((i) => i.matches(rel)) && excludeGlobs.every((e) => !e.matches(rel))) result.add("${componentName}/${rel}");
       }
     }
     return result;
   }
 
-  _analyzeComponent(String dartPackageName, component, componentsRefs,
-      String destPath) async {
+  _analyzeComponent(String dartPackageName, component, componentsRefs, String destPath) async {
     String componentName = component['name'];
     //String componentRef = component['ref'];
 
     String compDir = path.join(destPath, "bower_components");
 
-    List paths = component['paths'] ??
-        await _enlistFile(compDir, componentName, component['includes'],
-            component['excludes']);
+    List paths = component['paths'] ?? await _enlistFile(compDir, componentName, component['includes'], component['excludes']);
 
     if (paths.isEmpty) {
       throw "No files found for ${destPath}/${componentName}, please specify explicit `path` list in component entry or appropriate `includes` and `excludes` pattern lists";
@@ -260,8 +234,7 @@ class _ {
     }
   }
 
-  _outputFileFor(String p) =>
-      path.basenameWithoutExtension(p).replaceAll("-", "_") + ".dart";
+  _outputFileFor(String p) => path.basenameWithoutExtension(p).replaceAll("-", "_") + ".dart";
 
   runGenerateWrapper(ArgResults params) async {
     // 1. legge il components.yaml
@@ -278,11 +251,9 @@ class _ {
       throw "HELP";
     }
 
-    var componentsRefs =
-        loadYaml(await new File(componentRefsPath).readAsString());
+    var componentsRefs = loadYaml(await new File(componentRefsPath).readAsString());
 
-    String dartPackageName =
-        params['package-name'] ?? componentsRefs['package-name'];
+    String dartPackageName = params['package-name'] ?? componentsRefs['package-name'];
 
     //print("Genrating wrappers with : ${componentsRefs['components'].map((c)=>c['name']).join(',')}");
 
@@ -311,9 +282,8 @@ class _ {
       Map overrides = (_currentBowerRef['overrides'] ?? {})[name] ?? {};
 
       jsName = overrides[r'$name'] ?? name;
-      
-      await _writeDart(destPath,
-          _generateElement(namespace, jsName, name, _currentBowerRef, descr));
+
+      await _writeDart(destPath, _generateElement(namespace, jsName, name, _currentBowerRef, descr));
     }
 
     return found;
@@ -324,13 +294,10 @@ class _ {
     if (elements == null || elements.isEmpty) return false;
 
     // Filter only elements
-    elements = new Map.fromIterable(
-        elements.keys.where((x) => elements[x]['main_file']),
-        value: (x) => elements[x]);
+    elements = new Map.fromIterable(elements.keys.where((x) => elements[x]['main_file']), value: (x) => elements[x]);
     if (elements.isEmpty) return false;
 
-    String res = _generateBehaviorHeader(
-        namespace, elements.keys.first, _currentBowerRef);
+    String res = _generateBehaviorHeader(namespace, elements.keys.first, _currentBowerRef);
     for (String name in elements.keys) {
       var descr = elements[name];
       res += _generateBehavior(namespace, name, _currentBowerRef, descr);
@@ -349,8 +316,7 @@ class _ {
     _logger.info("Wrote ${p} [${++_generatedFilesCount}]");
   }
 
-  _generateElement(
-      String namespace, String jsName, String name, var bowerRef, Map descr) {
+  _generateElement(String namespace, String jsName, String name, var bowerRef, Map descr) {
     _importPrefixes = {};
     return """
 @JS('${namespace}')
@@ -406,17 +372,13 @@ ${importBehaviors(relPath,name)}
 """;
   }
 
-  withBehaviors(String relPath, String name, Map descr,
-      {String keyword: 'implements'}) {
+  withBehaviors(String relPath, String name, Map descr, {String keyword: 'implements'}) {
     List behaviors = descr['behaviors'];
     if (behaviors == null || behaviors.isEmpty) {
       return "";
     }
 
-    return "${keyword} " +
-        behaviors
-            .map((behavior) => withBehavior(relPath, name, descr, behavior))
-            .join(',');
+    return "${keyword} " + behaviors.map((behavior) => withBehavior(relPath, name, descr, behavior)).join(',');
   }
 
   withBehavior(String relPath, String name, Map descr, Map behavior) {
@@ -430,12 +392,9 @@ ${importBehaviors(relPath,name)}
     return (prefix != null) ? "${prefix}.${n}" : n;
   }
 
-  indents(int i, String s) =>
-      ((p, s) => s.split("\n").map((x) => p + x).join("\n"))(
-          UTF8.decode(new List.filled(i, UTF8.encode(" ").first)), s);
+  indents(int i, String s) => ((p, s) => s.split("\n").map((x) => p + x).join("\n"))(UTF8.decode(new List.filled(i, UTF8.encode(" ").first)), s);
 
-  generateComment(String comment, {int indent: 0}) => indents(indent,
-      "/**\n * " + comment.split(new RegExp("\n+")).join("\n * ") + "\n */");
+  generateComment(String comment, {int indent: 0}) => indents(indent, "/**\n * " + comment.split(new RegExp("\n+")).join("\n * ") + "\n */");
 
   Map<String, String> _importPrefixes;
 
@@ -451,17 +410,14 @@ ${importBehaviors(relPath,name)}
 
   Iterable _importedThings() sync* {
     // Defined behavior names
-    Set<String> names = new Set.from((analysisResult['behaviors'] ?? {})
-        .keys
-        .where((x) => analysisResult['behaviors'][x]['main_file']));
+    Set<String> names = new Set.from((analysisResult['behaviors'] ?? {}).keys.where((x) => analysisResult['behaviors'][x]['main_file']));
 
     if (analysisResult['elements'] != null) {
       for (String k in analysisResult['elements'].keys) {
         Map v = analysisResult['elements'][k];
         if (!v['main_file'])
           yield v;
-        else if ((v['behaviors'] ?? []).isNotEmpty)
-          yield* v['behaviors'].where((x) => !names.contains(x['name']));
+        else if ((v['behaviors'] ?? []).isNotEmpty) yield* v['behaviors'].where((x) => !names.contains(x['name']));
       }
     }
 
@@ -470,8 +426,7 @@ ${importBehaviors(relPath,name)}
         Map v = analysisResult['behaviors'][k];
         if (!v['main_file'])
           yield v;
-        else if ((v['behaviors'] ?? []).isNotEmpty)
-          yield* v['behaviors'].where((x) => !names.contains(x['name']));
+        else if ((v['behaviors'] ?? []).isNotEmpty) yield* v['behaviors'].where((x) => !names.contains(x['name']));
       }
     }
   }
@@ -487,9 +442,7 @@ ${importBehaviors(relPath,name)}
       return "";
     }
 
-    return properties.values
-        .map((p) => generateProperty(relPath, name, descr, p))
-        .join("\n");
+    return properties.values.map((p) => generateProperty(relPath, name, descr, p)).join("\n");
   }
 
   generateMethods(String relPath, String name, Map descr, Map methods) {
@@ -497,9 +450,7 @@ ${importBehaviors(relPath,name)}
       return "";
     }
 
-    return methods.values
-        .map((p) => generateMethod(relPath, name, descr, p))
-        .join("\n");
+    return methods.values.map((p) => generateMethod(relPath, name, descr, p)).join("\n");
   }
 
   generateProperty(String relPath, String name, Map descr, Map prop) {
@@ -529,6 +480,5 @@ ${generateComment(method['description'], indent: 2)}
     }
   }
 
-  generateArgs(List args) =>
-      args.map((x) => "${_dartType(x['type'])} ${x['name']}").join(',');
+  generateArgs(List args) => args.map((x) => "${_dartType(x['type'])} ${x['name']}").join(',');
 }
