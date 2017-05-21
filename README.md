@@ -35,28 +35,26 @@ Eventually some "transpiling" support can be added along with some optimizing po
 
 `Polymerize` doesn't uses `dazel` for now because it still lacks some feature that are needed for it to work, but the plan is to migrate to `dazel` as soon as it will be ready.
 
-## Installation & usage
-
-Polymerize can be intalled from pub :
-
-    pub global activate polymerize
+## Usage
 
 ### Prepare a project
 
 In order to build a project must be *prepared* for `polymerize`, just issue the following commands:
 
+ 1. add a dev dependency to `polymerize` in your `pubspec.yaml`
  1. `pub get/update` to check and resolve the dependencies (like in normal dart projects)
- 2. `polymerize init` this will generate or update `bazel` build files
 
- This steps should be repeated every time the dependencies are changed.
+This steps should be repeated every time the dependencies are changed.
 
 ### Build a project
 
- 3. `bazel build default` this is the actual build
+ 1. `pub run polymerize:build` this is the actual build
 
-As *Bazel* is very fast and runs only on changed files you can make it automatically build the project every time a files changed with :
+Every time `polymerize:build` a new bazel configuration is written from scratch and than a new bazel build is run.
 
-    `watch "bazel build default"`
+Bazel is able to understand what actually has changed and rebuild only what's needed, but this holds for everything but workspaces. In short this
+means that if you change your code in such a way that could change your `bower` then you will most probably have to give a `bazel clean --expunge` in order
+to force bazel to download the new files.
 
 # Developing with polymerize
 
@@ -125,7 +123,9 @@ runs `bower install`.
 
 You can also automatically generate a stub from the HTML `polymer` component using `polymerize generate_wrapper`, for instance:
 
-    dart ../bin/polymerize.dart generate-wrapper --component-refs comps.yaml --dest-path out -p polymer_elements --bower-needs-map Polymer.IronFormElementBehavior=package:polymer_elements/iron_form_element_behavior.dart
+    pub run polymerize:polymerize generate-wrapper --component-refs comps.yaml --dest-path out -p polymer_elements --bower-needs-map Polymer.IronFormElementBehavior=package:polymer_elements/iron_form_element_behavior.dart
+
+(You have to add `polymerize` as a dev dependency of your project).
 
 The generator uses a yaml file describing the components to analyze passed through the `component-refs` options (see `gen/comps.yam` in this repo for an example).
 
@@ -142,4 +142,5 @@ After complilation everything will be found in the bazel output folder (`bazel-b
  - annotations for properties (computed props, etc.)
  - ~~support for external element wrappers~~
  - ~~support for auto gen HTML imports~~
+ - support for pub ddc build
  - `dazel` support
