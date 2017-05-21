@@ -22,7 +22,7 @@ bool isPolymerElementHtmlImportUri(Uri u) => u == POLYMER_HTML_IMPORT_URI;
 
 bool isJS(DartObject o) => (isJsUri(o.type.element.librarySource.uri)) && (o.type.name == 'JS');
 
-bool isBowerImport(DartObject o) => o!=null && (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'BowerImport');
+bool isBowerImport(DartObject o) => o != null && (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'BowerImport');
 
 bool isDefine(DartObject o) => (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'Define');
 
@@ -34,7 +34,7 @@ bool isProperty(DartObject o) => (isPolymerElementUri(o.type.element.librarySour
 
 bool isNotify(DartObject o) => (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'Notify');
 
-bool isPolymerRegister(DartObject o) => o!=null && (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'PolymerRegister');
+bool isPolymerRegister(DartObject o) => o != null && (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'PolymerRegister');
 
 bool isPolymerBehavior(DartObject o) => (isPolymerElementUri(o.type.element.librarySource.uri)) && (o.type.name == 'PolymerBehavior');
 
@@ -52,7 +52,7 @@ Iterable<DartObject> allFirstLevelAnnotation(CompilationUnit cu, bool matches(Da
     } else if (m is Directive) {
       anno = m.element?.metadata;
     }
-    if (anno==null) {
+    if (anno == null) {
       continue;
     }
     DartObject html = getAnnotation(anno, matches);
@@ -64,10 +64,8 @@ Iterable<DartObject> allFirstLevelAnnotation(CompilationUnit cu, bool matches(Da
 
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //
-        bool matches(DartObject x)) {
-    stderr.writeln("DEBUG: ${metadata} looking for ${matches}");
-    return metadata.map((an) => an.computeConstantValue()).where(notNull).firstWhere(matches, orElse: () => null);
-}
+        bool matches(DartObject x)) =>
+    metadata.map((an) => an.computeConstantValue()).where(notNull).firstWhere(matches, orElse: () => null);
 
 ElementAnnotation getElementAnnotation(
         Iterable<ElementAnnotation> metadata, //
@@ -83,7 +81,6 @@ Directory findDartSDKHome() {
   // Else tries with current executable
   return new File(Platform.resolvedExecutable).parent;
 }
-
 
 typedef bool matcher(DartObject x);
 

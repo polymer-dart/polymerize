@@ -22,6 +22,41 @@ import 'package:logging/logging.dart' as log;
 
 log.Logger _logger = new log.Logger('deps')..level = log.Level.INFO;
 
+class PackagesUriResolver implements UriResolver {
+
+  SyncPackageResolver packageResolver;
+
+  ResourceProvider resourceProvider;
+
+  Map<String,String> _reverseMap;
+
+  PackagesUriResolver(this.packageResolver,this.resourceProvider) {
+    _reverseMap = {};
+    packageResolver.packageConfigMap.keys.forEach((package) {
+      _reverseMap[packageResolver.packageConfigMap[package].toFilePath()]=package;
+    });
+  }
+
+  @override
+  Source resolveAbsolute(Uri uri, [Uri actualUri]) {
+    if (actualUri!=null) {
+      uri = actualUri;
+    }
+
+    return resourceProvider.getFile(packageResolver.resolveUri(uri).toFilePath()).createSource(uri);
+  }
+
+  @override
+  Uri restoreAbsolute(Source source) {
+    String basePath = _reverseMap.keys.firstWhere((basePath) => pathos.isWithin(basePath , source.fullName),orElse: () => null);
+    if (basePath == null) {
+      return null;
+    }
+
+    return Uri.parse("package:${_reverseMap[basePath]}/${pathos.relative(source.fullName,from:basePath)}");
+  }
+}
+
 class InternalContext {
   PackageResolver _packageResolver;
   AnalysisEngine engine = AnalysisEngine.instance;
@@ -29,6 +64,7 @@ class InternalContext {
   AnalysisContext _analysisContext;
 
   ResourceProvider _resourceProvider = PhysicalResourceProvider.INSTANCE;
+  PackagesUriResolver _packagesUriResolver;
   FolderBasedDartSdk _sdk;
   String _rootPath;
   String _dart_bin_path;
@@ -68,15 +104,16 @@ class InternalContext {
     ResourceUriResolver _resourceResolver = new ResourceUriResolver(_resourceProvider);
 
     _packageResolver = await PackageResolver.loadConfig(pathos.join(_rootPath, ".packages"));
+    _packagesUriResolver = new PackagesUriResolver(await _packageResolver.asSync, _resourceProvider);
+    //PubPackageMapProvider _pub = new PubPackageMapProvider(_resourceProvider, _sdk);
+    //PackageMapUriResolver _pkgRes = new PackageMapUriResolver(_resourceProvider, _pub.computePackageMap(_resourceProvider.getFolder(_rootPath)).packageMap);
 
-    PubPackageMapProvider _pub = new PubPackageMapProvider(_resourceProvider, _sdk);
-    PackageMapUriResolver _pkgRes = new PackageMapUriResolver(_resourceProvider, _pub.computePackageMap(_resourceProvider.getFolder(_rootPath)).packageMap);
 
     _analysisContext = engine.createAnalysisContext()
       ..analysisOptions = (new AnalysisOptionsImpl()
         ..strongMode = true
         ..analyzeFunctionBodies = true)
-      ..sourceFactory = new SourceFactory([new DartUriResolver(_sdk), _resourceResolver, _pkgRes]);
+      ..sourceFactory = new SourceFactory([new DartUriResolver(_sdk), _resourceResolver, _packagesUriResolver]);
 
     _pkgGraph = new PackageGraph.forPath(_rootPath);
   }
@@ -497,7 +534,7 @@ init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
       DependencyAnalyzer dep = _analyzers[packageName];
       _extractBowerLibraryForPackage(packageName, dep).forEach((Map dep) => bower['dependencies'].addAll({dep['name']: dep['ref']}));
     }
-    _logger.info("FINAL BOWER : ${bower}");
+    _logger.fine("FINAL BOWER : ${bower}");
 
     io.File f = new io.File(pathos.join('.polymerize', 'bower', 'bower.json'));
     await f.parent.create(recursive: true);

@@ -19,7 +19,7 @@ import 'package:args/src/arg_results.dart';
 import 'package:polymerize/src/utils.dart';
 import 'package:bazel_worker/bazel_worker.dart';
 
-const String RULES_VERSION = '';
+const String RULES_VERSION = 'v0.12.0';
 
 Future _copyResource(String resx, String dest) async {
   res.Resource rsx = new res.Resource(resx);
@@ -163,7 +163,7 @@ _main(List<String> args) async {
 
   // Configure logger
   log.hierarchicalLoggingEnabled = true;
-  log.Logger.root.onRecord.listen(new LogPrintHandler());
+  log.Logger.root.onRecord.listen(new LogPrintHandler(printFunc: (x) => stderr.writeln(x)));
   log.Logger.root.level = log.Level.INFO;
 
   ArgResults results = parser.parse(args);
@@ -174,7 +174,12 @@ _main(List<String> args) async {
   }
 
   if (workerMode) {
-    return runWorker(parser);
+    //logger.severe("Starting worker");
+    await runWorker(parser);
+    //logger.info("Terminating worker");
+    await driver?.terminateWorkers();
+    //logger.info("Worker terminated");
+    exit(0);
   } else {
     return processRequestArgs(parser, results);
   }

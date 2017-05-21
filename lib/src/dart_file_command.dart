@@ -63,7 +63,7 @@ Future ddcBuild(ArgResults command) async {
 
 Future<int> ddc(List<String> args) async => (await driver.doWork(new WorkRequest()..arguments.addAll(args))).exitCode;
 
-BazelWorkerDriver _driver = new BazelWorkerDriver(() =>Process.start('${findDartSDKHome().path}/dartdevc', ['--persistent_worker']));
+BazelWorkerDriver _driver = new BazelWorkerDriver(() =>Process.start('${findDartSDKHome().path}/dartdevc', ['--persistent_worker']),maxWorkers: 1);
 
 BazelWorkerDriver get driver {
   if (_driver == null) {
