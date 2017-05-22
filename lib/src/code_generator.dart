@@ -135,6 +135,8 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
   code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("Property", importFrom: POLYMERIZE_JS);
   code_builder.TypeBuilder reduxPropertyType = new code_builder.TypeBuilder("ReduxProperty", importFrom: POLYMERIZE_JS);
 
+  code_builder.ReferenceBuilder resolveJs = code_builder.reference('resolveJsObject',POLYMERIZE_JS);
+
   List<code_builder.ExpressionBuilder> observers = [];
   List<code_builder.ExpressionBuilder> reduxActions = [];
   Map<String, code_builder.ExpressionBuilder> properties = {};
@@ -186,7 +188,7 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
     ..addAll(ce.interfaces.map((InterfaceType intf) {
       DartObject anno = getAnnotation(intf.element.metadata, anyOf([isPolymerBehavior, isJS]));
       if (anno != null) {
-        return code_builder.literal(behaviorName(intf.element, anno));
+        return resolveJs.call([code_builder.literal(behaviorName(intf.element, anno))]);
       } else {
         return null;
       }
