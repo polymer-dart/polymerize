@@ -1,3 +1,7 @@
+# 0.8.3
+ - max workers set to 2
+ - fixed behaviors generation
+
 # 0.8.2
  - fixed bad bower dependency calc
 
