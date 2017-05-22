@@ -301,7 +301,7 @@ copy_to_bin_dir(
     yield "   dart_source_uri = '${target.uri}',";
     yield "   other_deps= ['//external:dart_sdk',";
 
-    for (String str in new Set.from(_extractBowerLibraryForPackage(dep.packageRoot, dep).map((dep) => "     '@bower//:${dep['import']}',"))) {
+    for (String str in new Set.from(_extractBowerLibraryForTarget(dep,target).map((dep) => "     '@bower//:${dep['import']}',"))) {
       yield str;
     }
 
@@ -532,7 +532,7 @@ init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
     for (String packageName in _allPackages) {
       // If is external write
       DependencyAnalyzer dep = _analyzers[packageName];
-      _extractBowerLibraryForPackage(packageName, dep).forEach((Map dep) => bower['dependencies'].addAll({dep['name']: dep['ref']}));
+      _extractBowerLibraryForPackage(dep).forEach((Map dep) => bower['dependencies'].addAll({dep['name']: dep['ref']}));
     }
     _logger.fine("FINAL BOWER : ${bower}");
 
@@ -541,18 +541,22 @@ init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
     await f.writeAsString(JSON.encode(bower));
   }
 
-  Iterable<Map> _extractBowerLibraryForPackage(String packagePath, DependencyAnalyzer dep) sync* {
+  Iterable<Map> _extractBowerLibraryForPackage(DependencyAnalyzer dep) sync* {
     // Lookup any annotation of type BowerImport
 
     for (TargetDesc tgt in dep.depsByTarget.keys) {
-      Source src = _ctx.analysisContext.sourceFactory.forUri2(tgt.uri);
-      CompilationUnit cu = _ctx.analysisContext.resolveCompilationUnit2(src, src);
-      _logger.finest("Checking ${cu?.element?.location}");
-      for (DartObject anno in allFirstLevelAnnotation(cu, isBowerImport)) {
-        // Create bower_library
-        _logger.finest("FOUND :${anno}");
-        yield {'name': anno.getField('name').toStringValue(), 'ref': anno.getField('ref').toStringValue(), 'import': anno.getField('import').toStringValue()};
-      }
+      yield* _extractBowerLibraryForTarget(dep,tgt);
+    }
+  }
+
+  Iterable<Map> _extractBowerLibraryForTarget(DependencyAnalyzer dep,TargetDesc tgt) sync* {
+    Source src = _ctx.analysisContext.sourceFactory.forUri2(tgt.uri);
+    CompilationUnit cu = _ctx.analysisContext.resolveCompilationUnit2(src, src);
+    _logger.finest("Checking ${cu?.element?.location}");
+    for (DartObject anno in allFirstLevelAnnotation(cu, isBowerImport)) {
+      // Create bower_library
+      _logger.finest("FOUND :${anno}");
+      yield {'name': anno.getField('name').toStringValue(), 'ref': anno.getField('ref').toStringValue(), 'import': anno.getField('import').toStringValue()};
     }
   }
 

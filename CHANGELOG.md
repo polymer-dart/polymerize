@@ -1,3 +1,6 @@
+# 0.8.2
+ - fixed bad bower dependency calc
+
 # 0.8.1
  - rewritten to keep most things in dart 
  - changed bower strategy (now it is a workspace)
