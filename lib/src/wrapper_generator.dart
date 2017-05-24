@@ -152,16 +152,10 @@ class Generator {
           await _writeDart(
               libPath,
               """
+@BowerImport(ref:'${_currentBowerRef['ref']}',import:"${relPath}",name:'${_currentBowerRef['name']}')
 import 'package:polymer_element/polymer_element.dart' show BowerImport;
 
 ${importBehaviors(relPath,'_')}
-
-/**
- **/
-@BowerImport(ref:'${_currentBowerRef['ref']}',import:"${relPath}",name:'${_currentBowerRef['name']}')
-class _ {
-
-}
 """);
         }
       } catch (error, stack) {

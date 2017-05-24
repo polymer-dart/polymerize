@@ -190,7 +190,12 @@ _main(List<String> args) async {
     //logger.info("Worker terminated");
     exit(0);
   } else {
-    return processRequestArgs(parser, results);
+    logger.finest("Processing ${results}");
+    await processRequestArgs(parser, results);
+    logger.finest("Request processed :${results}");
+    await driver?.terminateWorkers();
+    logger.finest("ddc worker terminated :${results}");
+    exit(0);
   }
 }
 

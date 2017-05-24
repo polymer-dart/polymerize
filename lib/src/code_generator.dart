@@ -135,7 +135,7 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
   code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("Property", importFrom: POLYMERIZE_JS);
   code_builder.TypeBuilder reduxPropertyType = new code_builder.TypeBuilder("ReduxProperty", importFrom: POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder resolveJs = code_builder.reference('resolveJsObject',POLYMERIZE_JS);
+  code_builder.ReferenceBuilder resolveJs = code_builder.reference('resolveJsObject', POLYMERIZE_JS);
 
   List<code_builder.ExpressionBuilder> observers = [];
   List<code_builder.ExpressionBuilder> reduxActions = [];
@@ -176,7 +176,7 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
   String behaviorName(ClassElement intf, DartObject anno) {
     DartObject libAnno = getAnnotation(intf.library.metadata, isJS);
     String res = anno.getField('name').toStringValue();
-    if (libAnno == null) {
+    if (libAnno == null || libAnno.getField('name').isNull) {
       return res;
     } else {
       String pkg = libAnno.getField('name').toStringValue();
@@ -214,19 +214,21 @@ code_builder.ExpressionBuilder reduxInfoBuilder(GeneratorContext ctx, ClassEleme
       return null;
     }
 
-    //print("${anno.element.kind}");
+
     if (anno.element.kind == ElementKind.GETTER) {
       MethodElement m = anno.element;
+      bool local;
+      local = anno.computeConstantValue().getField('local').toBoolValue();
+      stderr.writeln("STOREDEF FOUND  : ${anno.element.kind} ${intf.element.supertype.element}");
+      if (isPolymerElementUri(intf.element.supertype.element.source.uri) && intf.element.supertype.element.name == 'ReduxLocalBehavior') {
+        local = true;
+      }
       //print(
       //    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
 
-      return reduxInfoRef.newInstance([], named: {'reducer': code_builder.reference(m.name, m.source.uri.toString()).property('reducer')});
+      return reduxInfoRef.newInstance([], named: {'reducer': code_builder.reference(m.name, m.source.uri.toString()).property('reducer'), 'local': code_builder.literal(local)});
     } else {
-      /**
-          DartObject reducer = anno.computeConstantValue().getField('reducer');
-          return reducer;
-       */
-      return null;
+      throw "Cannot use redux annotation with parameters : ${anno} in ${anno.source}";
     }
   }).firstWhere(notNull, orElse: () => reduxInfoRef.newInstance([]));
 }
