@@ -83,6 +83,8 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
 
   code_builder.ReferenceBuilder ref = code_builder.reference("register", POLYMERIZE_JS);
 
+  code_builder.ReferenceBuilder importNativeRef = code_builder.reference("importNative", POLYMERIZE_JS);
+
   code_builder.ReferenceBuilder defBehavior = code_builder.reference("defineBehavior", POLYMERIZE_JS);
 
   code_builder.ReferenceBuilder summaryFactory = code_builder.reference("summary", POLYMERIZE_JS);
@@ -107,6 +109,21 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
           if (template != null) {
             ctx.addImportHtml(template);
           }
+        } else {
+          // Import native (define a class if it doesn't exist
+
+          String module;
+          String className;
+
+          DartObject libraryAnnotation = getAnnotation(classElement.library.metadata, isJS).getField('name');
+          module = libraryAnnotation.toStringValue();
+          DartObject classAnno = getAnnotation(classElement.metadata, isJS).getField('name');
+          className = classAnno.isNull ? classElement.name : classAnno.toStringValue();
+
+          ctx.initModuleBuilder.addStatement(importNativeRef.call([
+            code_builder.literal(tagName),
+            code_builder.list([module, className].map((x) => code_builder.literal(x)))
+          ]));
         }
         continue;
       }
@@ -180,8 +197,6 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
       properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify)});
     }
   });
-
-
 
   Set<code_builder.ExpressionBuilder> behaviors = new Set()
     ..addAll(ce.interfaces.map((InterfaceType intf) {
