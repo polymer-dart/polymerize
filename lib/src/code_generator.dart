@@ -29,20 +29,16 @@ class GeneratorContext {
     _htmlHeader.writeln("<link rel='import' href='${path}'>");
   }
 
-  GeneratorContext(this.ctx, this.inputUri, String htmlTemp, this.genPath) {
+  GeneratorContext(this.ctx, this.inputUri, this._htmlHeader, this.genPath) {
     cu = ctx.getCompilationUnit(inputUri);
 
     scope = new code_builder.Scope.dedupe();
     libBuilder = new code_builder.LibraryBuilder.scope(scope: scope);
     initModuleBuilder = new code_builder.MethodBuilder("initModule");
     libBuilder.addMember(initModuleBuilder);
-
-    _htmlHeader = new File(htmlTemp).openWrite();
   }
 
   Future _finish() async {
-    await _htmlHeader.close();
-
     initModuleBuilder.addStatement(code_builder.returnVoid);
 
     return new File(genPath).writeAsString(code_builder.prettyToSource(libBuilder.buildAst(scope)));
@@ -54,8 +50,9 @@ class GeneratorContext {
   }
 }
 
-Future generateCode(String inputUri, String genPath, String htmlTemp) async {
+Future generateCode(String inputUri, String genPath, IOSink htmlTemp) async {
   InternalContext ctx = await InternalContext.create('.');
+  ctx.invalidateUri(inputUri);
   GeneratorContext getctx = new GeneratorContext(ctx, inputUri, htmlTemp, genPath);
 
   return getctx.generateCode();
@@ -116,7 +113,7 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
 
       DartObject behavior = getAnnotation(m.element.metadata, isPolymerBehavior);
       if (behavior != null) {
-        String name = behavior.getField('name').toStringValue();
+        String name = _behaviorName(m.element, behavior);
         code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name, ctx.inputUri);
 
         code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx, classElement);
@@ -124,6 +121,17 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
         ctx.initModuleBuilder.addStatement(defBehavior.call([code_builder.literal(name), cls, configExpressionBuilder]));
       }
     }
+  }
+}
+
+String _behaviorName(ClassElement intf, DartObject anno) {
+  DartObject libAnno = getAnnotation(intf.library.metadata, isJS);
+  String res = anno.getField('name').toStringValue();
+  if (libAnno == null || libAnno.getField('name').isNull) {
+    return res;
+  } else {
+    String pkg = libAnno.getField('name').toStringValue();
+    return "${pkg}.${res}";
   }
 }
 
@@ -173,22 +181,13 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
     }
   });
 
-  String behaviorName(ClassElement intf, DartObject anno) {
-    DartObject libAnno = getAnnotation(intf.library.metadata, isJS);
-    String res = anno.getField('name').toStringValue();
-    if (libAnno == null || libAnno.getField('name').isNull) {
-      return res;
-    } else {
-      String pkg = libAnno.getField('name').toStringValue();
-      return "${pkg}.${res}";
-    }
-  }
+
 
   Set<code_builder.ExpressionBuilder> behaviors = new Set()
     ..addAll(ce.interfaces.map((InterfaceType intf) {
       DartObject anno = getAnnotation(intf.element.metadata, anyOf([isPolymerBehavior, isJS]));
       if (anno != null) {
-        return resolveJs.call([code_builder.literal(behaviorName(intf.element, anno))]);
+        return resolveJs.call([code_builder.literal(_behaviorName(intf.element, anno))]);
       } else {
         return null;
       }

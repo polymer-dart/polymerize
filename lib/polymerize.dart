@@ -159,6 +159,15 @@ _main(List<String> args) async {
           ..addOption('summary', abbr: 's', allowMultiple: true)
           ..addOption('input', abbr: 'i')
           ..addOption('output', abbr: 'o')
+          ..addCommand(
+              'gen_and_build',
+              new ArgParser()
+                ..addOption('generate', abbr: 'g')
+                ..addOption('summary', abbr: 's', allowMultiple: true)
+                ..addOption('input', abbr: 'i')
+                ..addOption('output', abbr: 'o')
+                ..addOption('dep', abbr: 'd', allowMultiple: true)
+                ..addOption('html', abbr: 'h'))
           ..addCommand('generate', new ArgParser()..addOption('temp', abbr: 't')..addOption('generate', abbr: 'g')..addOption('input', abbr: 'i'))
           ..addCommand(
               'html',
@@ -172,7 +181,7 @@ _main(List<String> args) async {
 
   // Configure logger
   log.hierarchicalLoggingEnabled = true;
-  log.Logger.root.onRecord.listen(new LogPrintHandler(printFunc: (x) => stderr.writeln(x)));
+  log.Logger.root.onRecord.listen(new LogPrintHandler(printFunc: (x) => stdout.writeln(x)));
   log.Logger.root.level = log.Level.INFO;
 
   ArgResults results = parser.parse(args);
@@ -195,7 +204,6 @@ _main(List<String> args) async {
     logger.finest("Request processed :${results}");
     await driver?.terminateWorkers();
     logger.finest("ddc worker terminated :${results}");
-    exit(0);
   }
 }
 

@@ -75,10 +75,15 @@ class InternalContext {
 
   AnalysisContext get analysisContext => _analysisContext;
 
-  static Future<InternalContext> create(String rootPath, [String dart_bin_path]) async {
-    InternalContext ctx = new InternalContext._(rootPath, dart_bin_path);
-    await ctx._init();
-    return ctx;
+  static Map<String,Future<InternalContext>> _contexts = {};
+
+  static Future<InternalContext> create(String rootPath, [String dart_bin_path])  {
+    rootPath = pathos.canonicalize(rootPath);
+    return _contexts.putIfAbsent(rootPath, () async {
+      InternalContext ctx = new InternalContext._(rootPath, dart_bin_path);
+      await ctx._init();
+      return ctx;
+    });
   }
 
   LibraryElement getLibraryElement(String inputUri) {
@@ -87,9 +92,16 @@ class InternalContext {
   }
 
   CompilationUnit getCompilationUnit(String inputUri) {
+
     LibraryElement le = getLibraryElement(inputUri);
     Source src = _analysisContext.sourceFactory.forUri2(le.source.uri);
     return _analysisContext.resolveCompilationUnit(src, le);
+  }
+
+  void invalidateUri(String inputUri) {
+    LibraryElement le = getLibraryElement(inputUri);
+    Source src = _analysisContext.sourceFactory.forUri2(le.source.uri);
+    _analysisContext.applyChanges(new ChangeSet()..changedSource(src));
   }
 
   Future _init() async {
