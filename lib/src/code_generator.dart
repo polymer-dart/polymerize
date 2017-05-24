@@ -197,40 +197,11 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
     'observers': code_builder.list(observers),
     'properties': jsifyRef.call([code_builder.map(properties)]),
     'reduxActions': code_builder.list(reduxActions),
-    'behaviors': code_builder.list(behaviors),
-    'reduxInfo': reduxInfoBuilder(genctx, ce)
+    'behaviors': code_builder.list(behaviors)
   });
 }
 
 int count = 0;
-
-code_builder.ExpressionBuilder reduxInfoBuilder(GeneratorContext ctx, ClassElement ce) {
-  code_builder.TypeBuilder reduxInfoRef = new code_builder.TypeBuilder("ReduxInfo", importFrom: POLYMERIZE_JS);
-
-  return ce.interfaces.map((intf) {
-    ElementAnnotation anno = getElementAnnotation(intf.element.metadata, isStoreDef);
-    if (anno == null) {
-      return null;
-    }
-
-
-    if (anno.element.kind == ElementKind.GETTER) {
-      MethodElement m = anno.element;
-      bool local;
-      local = anno.computeConstantValue().getField('local').toBoolValue();
-      stderr.writeln("STOREDEF FOUND  : ${anno.element.kind} ${intf.element.supertype.element}");
-      if (isPolymerElementUri(intf.element.supertype.element.source.uri) && intf.element.supertype.element.name == 'ReduxLocalBehavior') {
-        local = true;
-      }
-      //print(
-      //    "GETTER: ${m.name}, ${mod},${m.source.shortName}, path:${p}");
-
-      return reduxInfoRef.newInstance([], named: {'reducer': code_builder.reference(m.name, m.source.uri.toString()).property('reducer'), 'local': code_builder.literal(local)});
-    } else {
-      throw "Cannot use redux annotation with parameters : ${anno} in ${anno.source}";
-    }
-  }).firstWhere(notNull, orElse: () => reduxInfoRef.newInstance([]));
-}
 
 Future _addHtmlImport(GeneratorContext ctx) async =>
     allFirstLevelAnnotation(ctx.cu, isHtmlImport).map((o) => o.getField('path').toStringValue()).forEach((relPath) => ctx.addImportHtml(relPath));
