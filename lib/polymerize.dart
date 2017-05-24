@@ -20,7 +20,7 @@ import 'package:args/src/arg_results.dart';
 import 'package:polymerize/src/utils.dart';
 import 'package:bazel_worker/bazel_worker.dart';
 
-const String RULES_VERSION = 'v0.12.3';
+const String RULES_VERSION = 'v0.12.4';
 
 Future _copyResource(String resx, String dest) async {
   res.Resource rsx = new res.Resource(resx);

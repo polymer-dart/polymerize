@@ -3,7 +3,7 @@ author: Vittorio Ballestra <vittorio.ballestra@gmail.com>
 homepage: https://dart-polymer.com
 description: An Polymer 2.x support for Dart/DDC
 #publish_to: https://pub.dart-polymer.com
-version: 0.8.3
+version: 0.8.4
 environment:
    sdk: ">=1.8.0 <2.0.0"
 
