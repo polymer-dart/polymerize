@@ -1,3 +1,10 @@
+# 0.8.4
+ - added support for behaviors on behaviors
+ - restored native element class
+ - better performance (analyzer context recycled)
+ - one action to build'em all (build_and_generate)
+ - redux is now a normal behavior/mixin
+ 
 # 0.8.3
  - max workers set to 2
  - fixed behaviors generation
