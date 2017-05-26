@@ -28,74 +28,6 @@ Future _copyResource(String resx, String dest) async {
   return new File(dest).writeAsString(content);
 }
 
-/***
- * Analyze one HTML template
- */
-
-class HtmlDocResume {
-  Set<String> propertyPaths = new Set();
-  Set<String> eventHandlers = new Set();
-  Set<String> customElementsRefs = new Set();
-
-  toString() => "props : ${propertyPaths} , events : ${eventHandlers}, ele : ${customElementsRefs}";
-}
-
-class Options {
-  bool polymerize_imported = false;
-  bool native_imported = false;
-}
-
-HtmlDocResume _analyzeHtmlTemplate(AnalysisContext context, String templatePath) {
-  HtmlDocResume resume = new HtmlDocResume();
-  Source source = context.sourceFactory.forUri(path.toUri(templatePath).toString());
-  dom.Document doc = context.parseHtmlDocument(source);
-  dom.Element domElement = doc.querySelector('dom-module');
-  if (domElement == null) {
-    return resume;
-  }
-  dom.Element templateElement = domElement.querySelector('template');
-  if (templateElement == null) {
-    return resume;
-  }
-
-  // Lookup all the refs
-  _extractRefs(resume, templateElement);
-
-  return resume;
-}
-
-_extractRefs(HtmlDocResume resume, dom.Element element) {
-  if (element.localName.contains('-')) {
-    resume.customElementsRefs.add(element.localName);
-  }
-  element.attributes.keys.forEach((k) {
-    String val = element.attributes[k];
-    if (k.startsWith('on-')) {
-      resume.eventHandlers.add(val);
-    } else {
-      // Check for prop refs
-      resume.propertyPaths.addAll(_extractRefsFromString(val));
-    }
-  });
-
-  _extractRefsFromString(element.text);
-
-  element.children.forEach((el) => _extractRefs(resume, el));
-}
-
-final RegExp _propRefRE = new RegExp(r"(\{\{|\[\[)!?([^}]+)(\}\}|\]\])");
-
-final RegExp _funcCallRE = new RegExp(r'([^()]+)\(([^)]+)\)');
-
-Iterable<String> _extractRefsFromString(String element) => _propRefRE.allMatches(element).map((x) => x.group(2));
-
-String docResumeTemplate(HtmlDocResume resume) => resume == null
-    ? "null"
-    : """{
-  props:[${resume.propertyPaths.map((x) => "'${x}'").join(',')}],
-  events:[${resume.eventHandlers.map((x) => "'${x}'").join(',')}]
-}""";
-
 class BuildError {
   List messages;
 
@@ -311,7 +243,8 @@ Future _exportSDK(String dest, String destHTML, [String format = "amd"]) async {
   }
 
   // export HTML
-  await new File(destHTML).writeAsString("""<script src='${path.basename(dest)}' as='dart_sdk'></script>""");
+  await new File(destHTML).writeAsString("""<script src='${path.basename(dest)}' as='dart_sdk'></script>
+<script>require(['dart_sdk'],(sdk) =>  sdk._isolate_helper.startRootIsolate((args) => null, sdk.dart.constFn(sdk.core.List\$(sdk.core.String))))</script>""");
 }
 
 Future _exportRequireJs(String dest, String dest_html) async {

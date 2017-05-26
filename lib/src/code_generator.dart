@@ -6,9 +6,13 @@ import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/generated/engine.dart';
+import 'package:analyzer/src/generated/source.dart';
 import 'package:code_builder/code_builder.dart' as code_builder;
+
+import 'package:html/dom.dart' as dom;
 import 'package:polymerize/src/dep_analyzer.dart';
 import 'package:polymerize/src/utils.dart';
+import 'package:path/path.dart' as path;
 
 typedef Future CodeGenerator(GeneratorContext ctx);
 
@@ -21,7 +25,7 @@ class GeneratorContext {
 
   CompilationUnit cu;
   code_builder.LibraryBuilder libBuilder;
-  code_builder.MethodBuilder initModuleBuilder;
+  code_builder.MethodBuilder _initModuleBuilder;
   IOSink _htmlHeader;
   code_builder.Scope scope;
 
@@ -34,12 +38,12 @@ class GeneratorContext {
 
     scope = new code_builder.Scope.dedupe();
     libBuilder = new code_builder.LibraryBuilder.scope(scope: scope);
-    initModuleBuilder = new code_builder.MethodBuilder("initModule");
-    libBuilder.addMember(initModuleBuilder);
+    _initModuleBuilder = new code_builder.MethodBuilder("initModule");
+    libBuilder.addMember(_initModuleBuilder);
   }
 
   Future _finish() async {
-    initModuleBuilder.addStatement(code_builder.returnVoid);
+    _initModuleBuilder.addStatement(code_builder.returnVoid);
 
     return new File(genPath).writeAsString(code_builder.prettyToSource(libBuilder.buildAst(scope)));
   }
@@ -47,6 +51,10 @@ class GeneratorContext {
   Future generateCode() async {
     await Future.wait(_codeGenerators.map((gen) => gen(this)));
     return _finish();
+  }
+
+  void addInitStatement(code_builder.StatementBuilder statement) {
+    _initModuleBuilder.addStatement(statement);
   }
 }
 
@@ -69,17 +77,22 @@ Future _generateInitMethods(GeneratorContext ctx) async {
       DartObject init = getAnnotation(m.element.metadata, isInit);
       if (init != null && functionElement.parameters.isEmpty) {
         code_builder.ReferenceBuilder ref = code_builder.reference(functionElement.name, ctx.inputUri);
-        ctx.initModuleBuilder.addStatement(ref.call([]));
+        ctx.addInitStatement(ref.call([]));
       }
     }
   }
 }
 
 const String POLYMERIZE_JS = 'package:polymer_element/polymerize_js.dart';
+const String MEDATADATA_REG_JS = 'package:polymer_element/metadata_registry.dart';
 const String JS_UTIL = 'package:js/js_util.dart';
 
 Future _generatePolymerRegister(GeneratorContext ctx) async {
   //code_builder.TypeBuilder summaryType = new code_builder.TypeBuilder('Summary', importFrom: POLYMERIZE_JS);
+
+  code_builder.ReferenceBuilder metadataRegRef = code_builder.reference("metadataRegistry", MEDATADATA_REG_JS);
+
+  code_builder.TypeBuilder metadataRef = new code_builder.TypeBuilder("Metadata", importFrom: MEDATADATA_REG_JS);
 
   code_builder.ReferenceBuilder ref = code_builder.reference("register", POLYMERIZE_JS);
 
@@ -102,9 +115,28 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
         if (!native) {
           code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name, ctx.inputUri);
 
+          // TODO : add support for template static getter too ...
+          if (template != null) {
+            // Read the template to check for properties that need to be observed
+            String sourcePath = await ctx.ctx.resolvePackageUri(Uri.parse(ctx.inputUri));
+            String dirPath = path.dirname(sourcePath);
+            String templatePath = path.join(dirPath, template);
+
+            if (await new File(templatePath).exists()) {
+              // Read and process the template
+              HtmlDocResume htmlDocResume = _analyzeHtmlTemplate(ctx, templatePath);
+              // Now set the code that will register those info in order
+              // To make it available to eventually the observer behavior
+              ctx.addInitStatement(metadataRegRef.invoke('registerMetadata', [
+                code_builder.literal(tagName),
+                metadataRef.newInstance([], named: {"observedPaths": code_builder.list(htmlDocResume.propertyPaths)})
+              ]));
+            }
+          }
+
           code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx, classElement);
 
-          ctx.initModuleBuilder.addStatement(
+          ctx.addInitStatement(
               ref.call([cls, code_builder.literal(tagName), configExpressionBuilder, summaryFactory.call([]), code_builder.literal(false), code_builder.literal(template)]));
           if (template != null) {
             ctx.addImportHtml(template);
@@ -120,7 +152,7 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
           DartObject classAnno = getAnnotation(classElement.metadata, isJS).getField('name');
           className = classAnno.isNull ? classElement.name : classAnno.toStringValue();
 
-          ctx.initModuleBuilder.addStatement(importNativeRef.call([
+          ctx.addInitStatement(importNativeRef.call([
             code_builder.literal(tagName),
             code_builder.list([module, className].map((x) => code_builder.literal(x)))
           ]));
@@ -135,7 +167,7 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
 
         code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx, classElement);
 
-        ctx.initModuleBuilder.addStatement(defBehavior.call([code_builder.literal(name), cls, configExpressionBuilder]));
+        ctx.addInitStatement(defBehavior.call([code_builder.literal(name), cls, configExpressionBuilder]));
       }
     }
   }
@@ -220,3 +252,64 @@ int count = 0;
 
 Future _addHtmlImport(GeneratorContext ctx) async =>
     allFirstLevelAnnotation(ctx.cu, isHtmlImport).map((o) => o.getField('path').toStringValue()).forEach((relPath) => ctx.addImportHtml(relPath));
+
+/***
+ * Analyze one HTML template
+ */
+
+class HtmlDocResume {
+  Set<String> propertyPaths = new Set();
+  Set<String> eventHandlers = new Set();
+  Set<String> customElementsRefs = new Set();
+
+  toString() => "props : ${propertyPaths} , events : ${eventHandlers}, ele : ${customElementsRefs}";
+}
+
+class Options {
+  bool polymerize_imported = false;
+  bool native_imported = false;
+}
+
+HtmlDocResume _analyzeHtmlTemplate(GeneratorContext genctx, String templatePath) {
+  HtmlDocResume resume = new HtmlDocResume();
+  Source source = genctx.ctx.analysisContext.sourceFactory.forUri(path.toUri(templatePath).toString());
+  dom.Document doc = genctx.ctx.analysisContext.parseHtmlDocument(source);
+  dom.Element domElement = doc.querySelector('dom-module');
+  if (domElement == null) {
+    return resume;
+  }
+  dom.Element templateElement = domElement.querySelector('template');
+  if (templateElement == null) {
+    return resume;
+  }
+
+  // Lookup all the refs
+  _extractRefs(resume, templateElement);
+
+  return resume;
+}
+
+_extractRefs(HtmlDocResume resume, dom.Element element) {
+  if (element.localName.contains('-')) {
+    resume.customElementsRefs.add(element.localName);
+  }
+  element.attributes.keys.forEach((k) {
+    String val = element.attributes[k];
+    if (k.startsWith('on-')) {
+      resume.eventHandlers.add(val);
+    } else {
+      // Check for prop refs
+      resume.propertyPaths.addAll(_extractRefsFromString(val));
+    }
+  });
+
+  _extractRefsFromString(element.text);
+
+  element.children.forEach((el) => _extractRefs(resume, el));
+}
+
+final RegExp _propRefRE = new RegExp(r"(\{\{|\[\[)!?([^}]+)(\}\}|\]\])");
+
+final RegExp _funcCallRE = new RegExp(r'([^()]+)\(([^)]+)\)');
+
+Iterable<String> _extractRefsFromString(String element) => _propRefRE.allMatches(element).map((x) => x.group(2));

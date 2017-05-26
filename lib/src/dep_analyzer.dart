@@ -75,6 +75,8 @@ class InternalContext {
 
   AnalysisContext get analysisContext => _analysisContext;
 
+  Future<String> resolvePackageUri(Uri packageUri) async => (await _packageResolver.resolveUri(packageUri)).toFilePath();
+
   static Map<String,Future<InternalContext>> _contexts = {};
 
   static Future<InternalContext> create(String rootPath, [String dart_bin_path])  {
