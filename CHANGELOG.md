@@ -1,3 +1,6 @@
+# 0.8.5
+ - support for autonotify behavior
+
 # 0.8.4
  - added support for behaviors on behaviors
  - restored native element class
