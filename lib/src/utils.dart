@@ -45,6 +45,7 @@ bool isInit(DartObject o) => o != null && (isPolymerElementInitUri(o.type.elemen
 bool isHtmlImport(DartObject o) => o != null && (isPolymerElementHtmlImportUri(o.type.element.librarySource.uri)) && (o.type.name == 'HtmlImport');
 
 Iterable<DartObject> allFirstLevelAnnotation(CompilationUnit cu, bool matches(DartObject x)) sync* {
+
   for (AstNode m in cu.sortedDirectivesAndDeclarations) {
     List<ElementAnnotation> anno;
     if (m is Declaration) {

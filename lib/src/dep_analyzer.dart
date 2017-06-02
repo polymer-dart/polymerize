@@ -19,6 +19,7 @@ import 'package:polymerize/src/utils.dart';
 import 'package:yaml/yaml.dart' as yaml;
 import 'dart:io' as io;
 import 'package:logging/logging.dart' as log;
+import 'package:html/dom.dart' as dom;
 
 log.Logger _logger = new log.Logger('deps')..level = log.Level.INFO;
 
@@ -59,7 +60,7 @@ class PackagesUriResolver implements UriResolver {
 
 class InternalContext {
   PackageResolver _packageResolver;
-  AnalysisEngine engine = AnalysisEngine.instance;
+  AnalysisEngine _engine = AnalysisEngine.instance;
 
   AnalysisContext _analysisContext;
 
@@ -73,9 +74,7 @@ class InternalContext {
 
   InternalContext._(this._rootPath, this._dart_bin_path);
 
-  AnalysisContext get analysisContext => _analysisContext;
-
-  Future<String> resolvePackageUri(Uri packageUri) async => (await _packageResolver.resolveUri(packageUri)).toFilePath();
+  //AnalysisContext get analysisContext => _analysisContext;
 
   static Map<String,Future<InternalContext>> _contexts = {};
 
@@ -88,16 +87,17 @@ class InternalContext {
     });
   }
 
+
+
   LibraryElement getLibraryElement(String inputUri) {
     Source src = _analysisContext.sourceFactory.forUri(inputUri);
     return _analysisContext.computeLibraryElement(src);
   }
 
-  CompilationUnit getCompilationUnit(String inputUri) {
 
+  CompilationUnit getCompilationUnit(String inputUri) {
     LibraryElement le = getLibraryElement(inputUri);
-    Source src = _analysisContext.sourceFactory.forUri2(le.source.uri);
-    return _analysisContext.resolveCompilationUnit(src, le);
+    return le.unit;
   }
 
   void invalidateUri(String inputUri) {
@@ -123,7 +123,7 @@ class InternalContext {
     //PackageMapUriResolver _pkgRes = new PackageMapUriResolver(_resourceProvider, _pub.computePackageMap(_resourceProvider.getFolder(_rootPath)).packageMap);
 
 
-    _analysisContext = engine.createAnalysisContext()
+    _analysisContext = _engine.createAnalysisContext()
       ..analysisOptions = (new AnalysisOptionsImpl()
         ..strongMode = true
         ..analyzeFunctionBodies = true)
@@ -564,8 +564,7 @@ init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
   }
 
   Iterable<Map> _extractBowerLibraryForTarget(DependencyAnalyzer dep,TargetDesc tgt) sync* {
-    Source src = _ctx.analysisContext.sourceFactory.forUri2(tgt.uri);
-    CompilationUnit cu = _ctx.analysisContext.resolveCompilationUnit2(src, src);
+    CompilationUnit cu = _ctx.getCompilationUnit(tgt.uri.toString());
     _logger.finest("Checking ${cu?.element?.location}");
     for (DartObject anno in allFirstLevelAnnotation(cu, isBowerImport)) {
       // Create bower_library

@@ -25,6 +25,7 @@ dependencies:
 #   url: https://github.com/dart-lang/dev_compiler
 # analyzer: 0.30.0
  args: any
+ code_transformers: any
  stack_trace: any
  resource: any
  homedir: any
@@ -35,6 +36,7 @@ dependencies:
 # pub_client: any
  archive: any
  package_resolver: any
+ barback: any
 # dartson: '0.2.6'
 # build:
 #  git:

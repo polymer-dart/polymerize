@@ -21,7 +21,7 @@ List<CodeGenerator> _codeGenerators = [_generateInitMethods, _generatePolymerReg
 class GeneratorContext {
   InternalContext ctx;
   String inputUri;
-  String genPath;
+  IOSink output;
 
   CompilationUnit cu;
   code_builder.LibraryBuilder libBuilder;
@@ -33,7 +33,7 @@ class GeneratorContext {
     _htmlHeader.writeln("<link rel='import' href='${path}'>");
   }
 
-  GeneratorContext(this.ctx, this.inputUri, this._htmlHeader, this.genPath) {
+  GeneratorContext(this.ctx, this.inputUri, this._htmlHeader, this.output) {
     cu = ctx.getCompilationUnit(inputUri);
 
     scope = new code_builder.Scope.dedupe();
@@ -45,10 +45,12 @@ class GeneratorContext {
   Future _finish() async {
     _initModuleBuilder.addStatement(code_builder.returnVoid);
 
-    return new File(genPath).writeAsString(code_builder.prettyToSource(libBuilder.buildAst(scope)));
+    output.write(code_builder.prettyToSource(libBuilder.buildAst(scope)));
+    await output.flush();
   }
 
   Future generateCode() async {
+    libBuilder.addDirective(new code_builder.ExportBuilder(inputUri));
     await Future.wait(_codeGenerators.map((gen) => gen(this)));
     return _finish();
   }
@@ -61,9 +63,12 @@ class GeneratorContext {
 Future generateCode(String inputUri, String genPath, IOSink htmlTemp) async {
   InternalContext ctx = await InternalContext.create('.');
   ctx.invalidateUri(inputUri);
-  GeneratorContext getctx = new GeneratorContext(ctx, inputUri, htmlTemp, genPath);
 
-  return getctx.generateCode();
+  File f = new File(genPath);
+  IOSink s = f.openWrite();
+  GeneratorContext getctx = new GeneratorContext(ctx, inputUri, htmlTemp, s);
+  await getctx.generateCode();
+  await s.close();
 }
 
 /**
@@ -114,25 +119,6 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
 
         if (!native) {
           code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name, ctx.inputUri);
-
-          // TODO : add support for template static getter too ...
-          if (template != null) {
-            // Read the template to check for properties that need to be observed
-            String sourcePath = await ctx.ctx.resolvePackageUri(Uri.parse(ctx.inputUri));
-            String dirPath = path.dirname(sourcePath);
-            String templatePath = path.join(dirPath, template);
-
-            if (await new File(templatePath).exists()) {
-              // Read and process the template
-              HtmlDocResume htmlDocResume = _analyzeHtmlTemplate(ctx, templatePath);
-              // Now set the code that will register those info in order
-              // To make it available to eventually the observer behavior
-              ctx.addInitStatement(metadataRegRef.invoke('registerMetadata', [
-                code_builder.literal(tagName),
-                metadataRef.newInstance([], named: {"observedPaths": code_builder.list(htmlDocResume.propertyPaths)})
-              ]));
-            }
-          }
 
           code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx, classElement);
 
@@ -257,59 +243,13 @@ Future _addHtmlImport(GeneratorContext ctx) async =>
  * Analyze one HTML template
  */
 
-class HtmlDocResume {
-  Set<String> propertyPaths = new Set();
-  Set<String> eventHandlers = new Set();
-  Set<String> customElementsRefs = new Set();
-
-  toString() => "props : ${propertyPaths} , events : ${eventHandlers}, ele : ${customElementsRefs}";
-}
 
 class Options {
   bool polymerize_imported = false;
   bool native_imported = false;
 }
 
-HtmlDocResume _analyzeHtmlTemplate(GeneratorContext genctx, String templatePath) {
-  HtmlDocResume resume = new HtmlDocResume();
-  Source source = genctx.ctx.analysisContext.sourceFactory.forUri(path.toUri(templatePath).toString());
-  dom.Document doc = genctx.ctx.analysisContext.parseHtmlDocument(source);
-  dom.Element domElement = doc.querySelector('dom-module');
-  if (domElement == null) {
-    return resume;
-  }
-  dom.Element templateElement = domElement.querySelector('template');
-  if (templateElement == null) {
-    return resume;
-  }
-
-  // Lookup all the refs
-  _extractRefs(resume, templateElement);
-
-  return resume;
-}
-
-_extractRefs(HtmlDocResume resume, dom.Element element) {
-  if (element.localName.contains('-')) {
-    resume.customElementsRefs.add(element.localName);
-  }
-  element.attributes.keys.forEach((k) {
-    String val = element.attributes[k];
-    if (k.startsWith('on-')) {
-      resume.eventHandlers.add(val);
-    } else {
-      // Check for prop refs
-      resume.propertyPaths.addAll(_extractRefsFromString(val));
-    }
-  });
-
-  _extractRefsFromString(element.text);
-
-  element.children.forEach((el) => _extractRefs(resume, el));
-}
 
 final RegExp _propRefRE = new RegExp(r"(\{\{|\[\[)!?([^}]+)(\}\}|\]\])");
 
 final RegExp _funcCallRE = new RegExp(r'([^()]+)\(([^)]+)\)');
-
-Iterable<String> _extractRefsFromString(String element) => _propRefRE.allMatches(element).map((x) => x.group(2));
