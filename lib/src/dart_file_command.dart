@@ -61,7 +61,9 @@ class Buffer implements StreamConsumer<List<int>> {
 
   IOSink createSink() => new IOSink(this);
 
-  Stream<String> get stream => new Stream.fromIterable(_buffer).transform(UTF8.decoder);
+  Stream<String> get stream => binaryStream.transform(UTF8.decoder);
+
+  Stream<List<int>> get binaryStream => new Stream.fromIterable(_buffer);
 }
 
 Future _generateAndBuildCommand(ArgResults command) async {

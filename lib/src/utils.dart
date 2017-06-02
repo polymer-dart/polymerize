@@ -3,22 +3,24 @@ import 'package:analyzer/analyzer.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 
-final Uri POLYMER_REGISTER_URI = Uri.parse('package:polymer_element/polymer_element.dart');
-final Uri POLYMER_REGISTER_ASSET_URI = Uri.parse('asset:polymer_element/lib/polymer_element.dart');
-final Uri JS_URI = Uri.parse('package:js/js.dart');
-final Uri JS_ASSET_URI = Uri.parse('asset:js/lib/js.dart');
+final Uri _POLYMER_REGISTER_URI = Uri.parse('package:polymer_element/polymer_element.dart');
+final Uri _POLYMER_REGISTER_ASSET_URI = Uri.parse('asset:polymer_element/lib/polymer_element.dart');
+final Uri _JS_URI = Uri.parse('package:js/js.dart');
+final Uri _JS_ASSET_URI = Uri.parse('asset:js/lib/js.dart');
 
-final Uri POLYMER_INIT_URI = Uri.parse('package:polymerize_common/init.dart');
+final Uri _POLYMER_INIT_URI = Uri.parse('package:polymerize_common/init.dart');
+final Uri _POLYMER_INIT_ASSET_URI = Uri.parse('asset:polymerize_common/lib/init.dart');
 
-final Uri POLYMER_HTML_IMPORT_URI = Uri.parse('package:polymerize_common/html_import.dart');
+final Uri _POLYMER_HTML_IMPORT_URI = Uri.parse('package:polymerize_common/html_import.dart');
+final Uri _POLYMER_HTML_IMPORT_ASSET_URI = Uri.parse('asset:polymerize_common/lib/html_import.dart');
 
-bool isJsUri(Uri u) => u == JS_ASSET_URI || u == JS_URI;
+bool isJsUri(Uri u) => u == _JS_ASSET_URI || u == _JS_URI;
 
-bool isPolymerElementUri(Uri u) => u == POLYMER_REGISTER_ASSET_URI || u == POLYMER_REGISTER_URI;
+bool isPolymerElementUri(Uri u) => u == _POLYMER_REGISTER_ASSET_URI || u == _POLYMER_REGISTER_URI;
 
-bool isPolymerElementInitUri(Uri u) => u == POLYMER_INIT_URI;
+bool isPolymerElementInitUri(Uri u) => u == _POLYMER_INIT_URI || u == _POLYMER_INIT_ASSET_URI;
 
-bool isPolymerElementHtmlImportUri(Uri u) => u == POLYMER_HTML_IMPORT_URI;
+bool isPolymerElementHtmlImportUri(Uri u) => u == _POLYMER_HTML_IMPORT_URI || u == _POLYMER_HTML_IMPORT_ASSET_URI;
 
 bool isJS(DartObject o) => (isJsUri(o.type.element.librarySource.uri)) && (o.type.name == 'JS');
 

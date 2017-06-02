@@ -19,7 +19,6 @@ class ResolversInternalContext implements InternalContext {
     Uri uri = Uri.parse(uriString);
     if (uri.scheme == 'package') {
       AssetId assetId = new AssetId(uri.pathSegments[0], "lib/${uri.pathSegments.sublist(1).join("/")}");
-      print("FROM ${uriString} to ${assetId}");
       return assetId;
     }
     throw "Unknown URI ${uriString}";
@@ -39,9 +38,11 @@ class ResolversInternalContext implements InternalContext {
   }
 }
 
-class PrepareTransformer extends Transformer  implements DeclaringTransformer {
+const String ORIG_EXT = "_orig.dart";
+
+class PrepareTransformer extends Transformer with ResolverTransformer {
   PrepareTransformer({bool releaseMode, this.settings}) {
-    //resolvers = new Resolvers(dartSdkDirectory);
+    resolvers = new Resolvers(dartSdkDirectory);
   }
   BarbackSettings settings;
 
@@ -52,26 +53,18 @@ class PrepareTransformer extends Transformer  implements DeclaringTransformer {
   }
 
   @override
-  declareOutputs(DeclaringTransform transform) {
-    // copy original files
-    transform.declareOutput(transform.primaryId.changeExtension('.orig.dart'));
-  }
-
-  @override
-  apply(Transform transform) async {
-    try {
-      AssetId origId = transform.primaryInput.id.changeExtension(".orig.dart");
-      Stream<List<int>> content = transform.primaryInput.read();
-      Asset orig = new Asset.fromStream(origId, content);
-      transform.addOutput(orig);
-      transform.consumePrimary();
-      transform.logger.fine("COPY ${transform.primaryInput.id} INTO ${origId} WITH CONTENT : ${content}",asset: origId);
-      transform.logger.fine("ADDED : ${orig}",asset:origId);
-    } catch (error) {
-      transform.logger.error("PROBLEM : ${error}");
-      throw error;
+  applyResolver(Transform transform, Resolver resolver) async {
+    if (!resolver.isLibrary(transform.primaryInput.id)) {
+      transform.logger.fine("${transform.primaryInput.id} is NOT a library, skipping");
+      return;
     }
-    //transform.consumePrimary();
+    AssetId origId = transform.primaryInput.id.changeExtension(ORIG_EXT);
+    Stream<List<int>> content = transform.primaryInput.read();
+    Asset orig = new Asset.fromStream(origId, content);
+    transform.addOutput(orig);
+    transform.consumePrimary();
+    transform.logger.fine("COPY ${transform.primaryInput.id} INTO ${origId} WITH CONTENT : ${content}", asset: origId);
+    transform.logger.fine("ADDED : ${orig}", asset: origId);
   }
 
   @override
@@ -79,7 +72,6 @@ class PrepareTransformer extends Transformer  implements DeclaringTransformer {
     return asset.id.extension == ".dart";
   }
 }
-
 
 class InoculateTransformer extends Transformer with ResolverTransformer implements DeclaringTransformer {
   InoculateTransformer({bool releaseMode, this.settings}) {
@@ -90,10 +82,10 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
   InoculateTransformer.asPlugin(BarbackSettings settings) : this(releaseMode: settings.mode == BarbackMode.RELEASE, settings: settings);
 
   Future<bool> isPrimary(id) async {
-    return id.path.endsWith('.orig.dart')&&id.path.startsWith("lib/");
+    return id.path.endsWith(ORIG_EXT) && id.path.startsWith("lib/");
   }
 
-  AssetId toDest(AssetId orig) => new AssetId(orig.package, orig.path.substring(0,orig.path.length-10)+".dart");
+  AssetId toDest(AssetId orig) => new AssetId(orig.package, orig.path.substring(0, orig.path.length - ORIG_EXT.length) + ".dart");
   AssetId toHtmlDest(AssetId orig) => toDest(orig).changeExtension('.mod.html');
 
   @override
@@ -106,34 +98,28 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
 
   @override
   applyResolver(Transform transform, Resolver resolver) async {
-    try {
-      Buffer outputBuffer = new Buffer();
-      Buffer htmlBuffer = new Buffer();
+    Buffer outputBuffer = new Buffer();
+    Buffer htmlBuffer = new Buffer();
 
-      AssetId origId = transform.primaryInput.id;
-      AssetId dest = toDest(origId);
-      transform.logger.info("DEST ID : ${dest}");
+    AssetId origId = transform.primaryInput.id;
+    AssetId dest = toDest(origId);
+    transform.logger.fine("DEST ID : ${dest}");
 
-      String basePath = p.joinAll(p.split(origId.path).sublist(1));
-      String uri = "package:${origId.package}/${basePath}";
-      transform.logger.info("My URI : :${uri}");
+    String basePath = p.joinAll(p.split(origId.path).sublist(1));
+    String uri = "package:${origId.package}/${basePath}";
+    transform.logger.fine("My URI : :${uri}");
 
-      GeneratorContext generatorContext = new GeneratorContext(new ResolversInternalContext(resolver),
-                                                                   uri, htmlBuffer.createSink(), outputBuffer.createSink());
-      await generatorContext.generateCode();
-      Asset gen = new Asset.fromStream(dest, outputBuffer.stream.transform(UTF8.encoder));
-      transform.addOutput(gen);
-      transform.logger.info("GEN ${dest}: ${await gen.readAsString()}");
+    GeneratorContext generatorContext = new GeneratorContext(new ResolversInternalContext(resolver), uri, htmlBuffer.createSink(), outputBuffer.createSink());
+    await generatorContext.generateCode();
+    Asset gen = new Asset.fromStream(dest, outputBuffer.binaryStream);
+    transform.addOutput(gen);
+    //transform.logger.info("GEN ${dest}: ${await gen.readAsString()}");
 
-      AssetId htmlId = toHtmlDest(transform.primaryInput.id);
+    AssetId htmlId = toHtmlDest(transform.primaryInput.id);
 
-      Asset html = new Asset.fromStream(htmlId, htmlBuffer.stream.transform(UTF8.encoder));
-      transform.addOutput(html);
-      transform.logger.info("HTML : ${htmlId}");
-    } catch (error) {
-      transform.logger.error("PROBLEM: ${error}");
-      throw error;
-    }
+    Asset html = new Asset.fromStream(htmlId, htmlBuffer.stream.transform(UTF8.encoder));
+    transform.addOutput(html);
+    transform.logger.fine("HTML : ${htmlId}");
   }
 
   @override
