@@ -3,9 +3,11 @@ import 'dart:convert';
 
 import 'dart:io';
 import 'package:analyzer/analyzer.dart';
+import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:barback/barback.dart';
 import 'package:code_transformers/resolver.dart';
+import 'package:glob/glob.dart';
 import 'package:polymerize/src/code_generator.dart';
 import 'package:polymerize/src/dart_file_command.dart';
 import 'package:polymerize/src/dep_analyzer.dart';
@@ -124,6 +126,43 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
     await html.readAsString();
     transform.addOutput(html);
     transform.logger.fine("HTML : ${htmlId}");
+
+    // generate bower.json
+    if (!settings.configuration.containsKey('entry-point')) {
+      return;
+    }
+
+    transform.logger.info("GENERATING BOWER.JSON WITH ${settings.configuration}",asset: transform.primaryInput.id);
+
+    await _generateBowerJson(transform, resolver);
+  }
+
+  Future _generateBowerJson(Transform t, Resolver r) async {
+    // Check if current lib matches
+    if(!new  Glob(settings.configuration['entry-point']).matches(t.primaryInput.id.path)) {
+      t.logger.warning("${t.primaryInput.id.path} doesn't marches with ${settings.configuration['entry-point']}");
+      return;
+    }
+    t.logger.info("PRODUCING BOWER.JSON FOR ${t.primaryInput.id}");
+
+
+    Map<String, String> deps = new Map.fromIterable(_flatten(_libraryTree(r.getLibrary(t.primaryInput.id)).map((l) => allFirstLevelAnnotation(l.unit, isBowerImport))),
+        key: (DartObject o) => o.getField('name').toStringValue(), value: (DartObject o) => o.getField('ref').toStringValue());
+
+    t.logger.info("DEPS ARE :${deps}");
+    if (deps.isEmpty) {
+      return;
+    }
+
+    AssetId bowerId = new AssetId(t.primaryInput.id.package, 'web/bower.json');
+    Asset bowerJson = new Asset.fromString(bowerId, JSON.encode({'name':t.primaryInput.id.package,'dependencies': deps}));
+    t.addOutput(bowerJson);
+  }
+
+  Iterable<X> _flatten<X>(Iterable<Iterable<X>> x) sync* {
+    for (Iterable<X> i in x) {
+      yield* i;
+    }
   }
 
   Iterable<Uri> _findDependencies(Transform t, Resolver r) => _findDependenciesFor(t, r, r.getLibrary(t.primaryInput.id));
@@ -154,7 +193,7 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
       _referencedLibs(lib).where(_anyDepNeedsHtmlImport).map((lib) => r.getImportUri(lib, from: t.primaryInput.id));
 
   Stream<String> _generateHtml(Buffer htmlBuffer, Transform t, Resolver r, AssetId destId) async* {
-    t.logger.info("IMPORTED: ${r.getLibrary(t.primaryInput.id).imports.map((i)=>i.importedLibrary).where(_needsHtmlImport).map((l) => l.source.uri).join(",")}");
+    t.logger.fine("IMPORTED: ${r.getLibrary(t.primaryInput.id).imports.map((i)=>i.importedLibrary).where(_needsHtmlImport).map((l) => l.source.uri).join(",")}");
     String locName = "${p.split(p.withoutExtension(destId.path)).join('__')}";
     String relName = "${p.split(p.withoutExtension(destId.path)).sublist(1).join('__')}";
     String modName = "packages/${destId.package}/${locName}";
@@ -162,10 +201,13 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
     String modPseudoDir = p.dirname(modName);
 
     yield* htmlBuffer.stream;
-    for (Uri dep in _findDependencies(t, r)) {
-      yield "<!--${dep}-->\n";
-      yield "<link rel='import' href='${p.relative(_packageUriToModuleName(dep),from:modPseudoDir)}'>\n";
-    }
+
+    yield* new Stream.fromIterable(_findDependencies(t, r).map(_packageUriToModuleName).map((u) => "<link rel='import' href='${p.relative(u,from:modPseudoDir)}'>\n"));
+
+    yield* new Stream.fromIterable(
+        _dedupe(allFirstLevelAnnotation(r.getLibrary(t.primaryInput.id).unit, isBowerImport).map((o) => "bower_components/${o.getField('import').toStringValue()}"))
+            .map((i) => "<link rel='import' href='${p.relative(i,from:modPseudoDir)}'>\n"));
+
     yield "<script>require(['${modName}'],(module) =>  module.${relName}.initModule());</script>\n";
   }
 
@@ -174,6 +216,8 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
     return asset.id.path.endsWith('.dart');
   }
 }
+
+Iterable<X> _dedupe<X>(Iterable<X> from) => new Set()..addAll(from);
 
 bool _needsHtmlImport(LibraryElement importedLib) => hasAnyFirstLevelAnnotation(importedLib.unit, anyOf([isHtmlImport, isInit, isPolymerRegister, isBowerImport]));
 
