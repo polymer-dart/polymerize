@@ -138,20 +138,16 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
     }
     traversed.add(from);
     yield from;
-    for (ImportElement imp in from.imports) {
-      yield* _libraryTree(imp.importedLibrary, traversed);
-    }
-
-    for (ExportElement exp in from.exports) {
-      yield* _libraryTree(exp.exportedLibrary, traversed);
+    for (LibraryElement lib in _referencedLibs(from)) {
+      yield* _libraryTree(lib, traversed);
     }
   }
 
   bool _anyDepNeedsHtmlImport(LibraryElement lib) => _libraryTree(lib).any(_needsHtmlImport);
 
   Iterable<LibraryElement> _referencedLibs(LibraryElement lib) sync* {
-    yield* lib.imports.map((i)=>i.importedLibrary);
-    yield* lib.exports.map((e)=>e.exportedLibrary);
+    yield* lib.imports.map((i) => i.importedLibrary);
+    yield* lib.exports.map((e) => e.exportedLibrary);
   }
 
   Iterable<Uri> _findDependenciesFor(Transform t, Resolver r, LibraryElement lib) =>
@@ -179,6 +175,6 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
   }
 }
 
-bool _needsHtmlImport(LibraryElement importedLib) => allFirstLevelAnnotation(importedLib.unit, anyOf([isHtmlImport, isInit, isPolymerRegister, isBowerImport])).isNotEmpty;
+bool _needsHtmlImport(LibraryElement importedLib) => hasAnyFirstLevelAnnotation(importedLib.unit, anyOf([isHtmlImport, isInit, isPolymerRegister, isBowerImport]));
 
 String _packageUriToModuleName(Uri packageUri) => "packages/${packageUri.pathSegments[0]}/${p.withoutExtension(p.joinAll(packageUri.pathSegments.sublist(1)))}.mod.html";

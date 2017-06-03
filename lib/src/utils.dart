@@ -46,24 +46,20 @@ bool isInit(DartObject o) => o != null && (isPolymerElementInitUri(o.type.elemen
 
 bool isHtmlImport(DartObject o) => o != null && (isPolymerElementHtmlImportUri(o.type.element.librarySource.uri)) && (o.type.name == 'HtmlImport');
 
-Iterable<DartObject> allFirstLevelAnnotation(CompilationUnit cu, bool matches(DartObject x)) sync* {
+Iterable<DartObject> allFirstLevelAnnotation(CompilationUnit cu, bool matches(DartObject x)) =>
+    cu.sortedDirectivesAndDeclarations
+      .map(_element)
+      .where(_isNotNull)
+      .map((e) => e.metadata)
+      .where(_isNotNull)
+      .map((anno) => getAnnotation(anno, matches)).where(_isNotNull);
 
-  for (AstNode m in cu.sortedDirectivesAndDeclarations) {
-    List<ElementAnnotation> anno;
-    if (m is Declaration) {
-      anno = m.element?.metadata;
-    } else if (m is Directive) {
-      anno = m.element?.metadata;
-    }
-    if (anno == null) {
-      continue;
-    }
-    DartObject html = getAnnotation(anno, matches);
-    if (html != null) {
-      yield html;
-    }
-  }
-}
+
+Element _element(AstNode x) => (x is Declaration) ? x.element : ((x is Directive) ? x.element : null);
+
+bool _isNotNull(x) => x != null;
+
+bool hasAnyFirstLevelAnnotation(CompilationUnit cu, bool matches(DartObject x)) => allFirstLevelAnnotation(cu,matches).isNotEmpty;
 
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //
