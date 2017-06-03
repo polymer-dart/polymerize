@@ -3,8 +3,8 @@ import 'package:analyzer/analyzer.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 
-final Uri _POLYMER_REGISTER_URI = Uri.parse('package:polymer_element/polymer_element.dart');
-final Uri _POLYMER_REGISTER_ASSET_URI = Uri.parse('asset:polymer_element/lib/polymer_element.dart');
+final Uri _POLYMER_REGISTER_URI = Uri.parse('package:polymer_element/annotations.dart');
+final Uri _POLYMER_REGISTER_ASSET_URI = Uri.parse('asset:polymer_element/lib/annotations.dart');
 final Uri _JS_URI = Uri.parse('package:js/js.dart');
 final Uri _JS_ASSET_URI = Uri.parse('asset:js/lib/js.dart');
 

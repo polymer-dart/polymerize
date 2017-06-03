@@ -33,6 +33,8 @@ class GeneratorContext {
     _htmlHeader.writeln("<link rel='import' href='${path}'>");
   }
 
+  //List<code_builder.ReferenceBuilder> _refs = [];
+
   GeneratorContext(this.ctx, this.inputUri, this._htmlHeader, this.output) {
     cu = ctx.getCompilationUnit(inputUri);
 
@@ -44,13 +46,15 @@ class GeneratorContext {
 
   Future _finish() async {
     _initModuleBuilder.addStatement(code_builder.returnVoid);
+    //libBuilder.addMember(code_builder.list(_refs).asFinal('_refs'));
 
     output.write(code_builder.prettyToSource(libBuilder.buildAst(scope)));
-    await output.flush();
+    await Future.wait([output.flush(),_htmlHeader.flush()]);
   }
 
   Future generateCode() async {
     libBuilder.addDirective(new code_builder.ExportBuilder(inputUri));
+    //libBuilder.addDirective(new code_builder.ImportBuilder(inputUri,prefix: 'orig'));
     await Future.wait(_codeGenerators.map((gen) => gen(this)));
     return _finish();
   }
@@ -58,6 +62,10 @@ class GeneratorContext {
   void addInitStatement(code_builder.StatementBuilder statement) {
     _initModuleBuilder.addStatement(statement);
   }
+
+  //void addRef(code_builder.ReferenceBuilder cls) {
+  //  _refs.add(cls);
+  //}
 }
 
 Future generateCode(String inputUri, String genPath, IOSink htmlTemp) async {
@@ -119,6 +127,7 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
 
         if (!native) {
           code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name, ctx.inputUri);
+          //ctx.addRef(cls);
 
           code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx, classElement);
 
@@ -132,6 +141,8 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
 
           String module;
           String className;
+
+          //ctx.addRef(code_builder.reference(classElement.name,ctx.inputUri));
 
           DartObject libraryAnnotation = getAnnotation(classElement.library.metadata, isJS).getField('name');
           module = libraryAnnotation.toStringValue();
@@ -234,22 +245,5 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
   });
 }
 
-int count = 0;
-
 Future _addHtmlImport(GeneratorContext ctx) async =>
     allFirstLevelAnnotation(ctx.cu, isHtmlImport).map((o) => o.getField('path').toStringValue()).forEach((relPath) => ctx.addImportHtml(relPath));
-
-/***
- * Analyze one HTML template
- */
-
-
-class Options {
-  bool polymerize_imported = false;
-  bool native_imported = false;
-}
-
-
-final RegExp _propRefRE = new RegExp(r"(\{\{|\[\[)!?([^}]+)(\}\}|\]\])");
-
-final RegExp _funcCallRE = new RegExp(r'([^()]+)\(([^)]+)\)');
