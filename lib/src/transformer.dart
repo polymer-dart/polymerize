@@ -204,11 +204,14 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
 
     yield* new Stream.fromIterable(_findDependencies(t, r).map(_packageUriToModuleName).map((u) => "<link rel='import' href='${p.relative(u,from:modPseudoDir)}'>\n"));
 
+    yield "<link rel='import' href='${p.relative('packages/polymer_element/polymerize_js.mod.html',from:modPseudoDir)}'>\n";
+
+
     yield* new Stream.fromIterable(
         _dedupe(allFirstLevelAnnotation(r.getLibrary(t.primaryInput.id).unit, isBowerImport).map((o) => "bower_components/${o.getField('import').toStringValue()}"))
             .map((i) => "<link rel='import' href='${p.relative(i,from:modPseudoDir)}'>\n"));
 
-    yield "<script>require(['${modName}'],(module) =>  module.${relName}.initModule());</script>\n";
+    yield "<script>require({paths:{'${modName}':'${modName}'}},['${modName}'],(module) =>  module.${relName}.initModule());</script>\n";
   }
 
   @override
