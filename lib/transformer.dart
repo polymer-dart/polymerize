@@ -6,6 +6,7 @@ class PolymerizeTransformer extends TransformerGroup {
 
   static List<List> _createPhases(BarbackSettings settings) => [
         [new PrepareTransformer.asPlugin(settings)],
-        [new InoculateTransformer.asPlugin(settings)]
+        [new InoculateTransformer.asPlugin(settings)],
+        [new FinalizeTransformer.asPlugin(settings)]
       ];
 }

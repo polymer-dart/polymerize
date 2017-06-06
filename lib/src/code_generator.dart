@@ -39,17 +39,21 @@ class GeneratorContext {
     cu = ctx.getCompilationUnit(inputUri);
 
     scope = new code_builder.Scope.dedupe();
-    libBuilder = new code_builder.LibraryBuilder.scope(scope: scope);
+    libBuilder = new code_builder.LibraryBuilder.scope(scope: scope,name:inputUri.replaceAll(new RegExp("[/:.]"), "_"));
+    code_builder.ReferenceBuilder ref = code_builder.reference('init','package:polymerize_common/init.dart');
+    libBuilder.addAnnotation(ref);
     _initModuleBuilder = new code_builder.MethodBuilder("initModule");
     libBuilder.addMember(_initModuleBuilder);
   }
 
-  Future _finish() async {
+  Future<String> _finish() async {
     _initModuleBuilder.addStatement(code_builder.returnVoid);
     //libBuilder.addMember(code_builder.list(_refs).asFinal('_refs'));
 
     output.write(code_builder.prettyToSource(libBuilder.buildAst(scope)));
     await Future.wait([output.flush(),_htmlHeader.flush()]);
+
+    return code_builder.prettyToSource(_initModuleBuilder.buildAst(scope));
   }
 
   Future generateCode() async {

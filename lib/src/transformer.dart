@@ -76,7 +76,34 @@ class PrepareTransformer extends Transformer with ResolverTransformer {
   }
 }
 
-class InoculateTransformer extends Transformer with ResolverTransformer implements DeclaringTransformer {
+Iterable<Uri> _findDependencies(Transform t, Resolver r) => _findDependenciesFor(t, r, r.getLibrary(t.primaryInput.id));
+
+Iterable<LibraryElement> _libraryTree(LibraryElement from, [Set<LibraryElement> traversed]) sync* {
+  if (traversed == null) {
+    traversed = new Set<LibraryElement>();
+  }
+
+  if (traversed.contains(from)) {
+    return;
+  }
+  traversed.add(from);
+  yield from;
+  for (LibraryElement lib in _referencedLibs(from)) {
+    yield* _libraryTree(lib, traversed);
+  }
+}
+
+bool _anyDepNeedsHtmlImport(LibraryElement lib) => _libraryTree(lib).any(_needsHtmlImport);
+
+Iterable<LibraryElement> _referencedLibs(LibraryElement lib) sync* {
+  yield* lib.imports.map((i) => i.importedLibrary);
+  yield* lib.exports.map((e) => e.exportedLibrary);
+}
+
+Iterable<Uri> _findDependenciesFor(Transform t, Resolver r, LibraryElement lib) =>
+    _referencedLibs(lib).where(_anyDepNeedsHtmlImport).map((lib) => r.getImportUri(lib, from: t.primaryInput.id));
+
+class InoculateTransformer extends Transformer with ResolverTransformer {
   InoculateTransformer({bool releaseMode, this.settings}) {
     resolvers = new Resolvers(dartSdkDirectory);
   }
@@ -89,14 +116,13 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
   }
 
   AssetId toDest(AssetId orig) => new AssetId(orig.package, orig.path.substring(0, orig.path.length - ORIG_EXT.length) + ".dart");
-  AssetId toHtmlDest(AssetId orig) => toDest(orig).changeExtension('.mod.html');
 
   @override
   declareOutputs(DeclaringTransform transform) {
     // for each dart file produce a '.g.dart'
 
     transform.declareOutput(toDest(transform.primaryId));
-    transform.declareOutput(toHtmlDest(transform.primaryId));
+    //transform.declareOutput(toHtmlDest(transform.primaryId));
   }
 
   @override
@@ -118,100 +144,144 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
     await generatorContext.generateCode();
     Asset gen = new Asset.fromStream(dest, outputBuffer.binaryStream);
     transform.addOutput(gen);
-    //transform.logger.info("GEN ${dest}: ${await gen.readAsString()}");
+  }
 
-    AssetId htmlId = toHtmlDest(transform.primaryInput.id);
+  @override
+  Future<bool> shouldApplyResolver(Asset asset) async {
+    return asset.id.path.endsWith('.dart');
+  }
+}
 
-    Asset html = new Asset.fromStream(htmlId, _generateHtml(htmlBuffer, transform, resolver, dest).transform(UTF8.encoder));
-    await html.readAsString();
-    transform.addOutput(html);
-    transform.logger.fine("HTML : ${htmlId}");
+class FinalizeTransformer extends Transformer with ResolverTransformer {
+  FinalizeTransformer({bool releaseMode, this.settings}) {
+    resolvers = new Resolvers(dartSdkDirectory);
+  }
+  BarbackSettings settings;
 
+  FinalizeTransformer.asPlugin(BarbackSettings settings) : this(releaseMode: settings.mode == BarbackMode.RELEASE, settings: settings);
+
+  Future<bool> isPrimary(id) async {
+    return id.extension == '.dart';
+  }
+
+  @override
+  applyResolver(Transform transform, Resolver resolver) async {
     // generate bower.json
     if (!settings.configuration.containsKey('entry-point')) {
       return;
     }
 
-    transform.logger.info("GENERATING BOWER.JSON WITH ${settings.configuration}",asset: transform.primaryInput.id);
+    transform.logger.info("GENERATING BOWER.JSON WITH ${settings.configuration}", asset: transform.primaryInput.id);
 
     await _generateBowerJson(transform, resolver);
   }
 
   Future _generateBowerJson(Transform t, Resolver r) async {
     // Check if current lib matches
-    if(!new  Glob(settings.configuration['entry-point']).matches(t.primaryInput.id.path)) {
+    if (!new Glob(settings.configuration['entry-point']).matches(t.primaryInput.id.path)) {
       t.logger.warning("${t.primaryInput.id.path} doesn't marches with ${settings.configuration['entry-point']}");
       return;
     }
     t.logger.info("PRODUCING BOWER.JSON FOR ${t.primaryInput.id}");
 
+    // Create bower.json and collect all extra deps
 
-    Map<String, String> deps = new Map.fromIterable(_flatten(_libraryTree(r.getLibrary(t.primaryInput.id)).map((l) => allFirstLevelAnnotation(l.unit, isBowerImport))),
-        key: (DartObject o) => o.getField('name').toStringValue(), value: (DartObject o) => o.getField('ref').toStringValue());
+    Map<String, Set<String>> extraDeps = {};
 
-    t.logger.info("DEPS ARE :${deps}");
-    if (deps.isEmpty) {
-      return;
+    Map<String, String> bowerDeps = {};
+
+    Map<String, String> runInit = new Map();
+
+    _libraryTree(r.getLibrary(t.primaryInput.id)).forEach((le) {
+      AssetId libAsset = r.getSourceAssetId(le);
+      if (libAsset == null) {
+        t.logger.fine("SOURCE ASSET IS NULL FOR ${le} , ${le.source.uri}");
+        return;
+      }
+      t.logger.info("Examining ${libAsset}");
+      Map<String, List<DartObject>> annotations = firstLevelAnnotationMap(le.unit, {'bower': isBowerImport, 'html': isHtmlImport, 'js': isJsMap});
+
+      String libKey = 'packages/${libAsset.package}/${p.split(p.withoutExtension(libAsset.path)).join('__')}';
+      Set<String> libDeps = extraDeps.putIfAbsent(libKey, () => new Set());
+
+      annotations['bower']?.forEach((o) {
+        bowerDeps[o.getField('name').toStringValue()] = o.getField('ref').toStringValue();
+        libDeps.add('htmlimport!bower_components/${o.getField('import').toStringValue()}');
+      });
+
+      annotations['html']?.forEach((o) {
+        libDeps.add('htmlimport!packages/${libAsset.package}/${p.join(p.dirname(libAsset.path),o.getField('path').toStringValue())}');
+      });
+
+      annotations['js']?.forEach((o) {
+        libDeps.add(o.getField('mapped').toStringValue());
+      });
+
+      DartObject libInit = getAnnotation(le.metadata, isInit);
+      if (libInit != null) {
+        runInit[libKey] = p.split(p.withoutExtension(libAsset.path.substring(4))).join('__');
+      }
+
+      // NO GOOD
+      /*
+      if (libAsset.path.endsWith("_orig.dart")) {
+        // Ensure the main is loaded first
+        libDeps.add('${libKey.substring(0,libKey.length-5)}');
+      }*/
+    });
+
+//    Map<String, String> deps = new Map.fromIterable(flatten(_libraryTree(r.getLibrary(t.primaryInput.id)).map((l) => allFirstLevelAnnotation(l.unit, isBowerImport))),
+//        key: (DartObject o) => o.getField('name').toStringValue(), value: (DartObject o) => o.getField('ref').toStringValue());
+
+    t.logger.info("DEPS ARE :${bowerDeps}");
+    if (bowerDeps.isNotEmpty) {
+      AssetId bowerId = new AssetId(t.primaryInput.id.package, 'web/bower.json');
+      Asset bowerJson = new Asset.fromString(bowerId, JSON.encode({'name': t.primaryInput.id.package, 'dependencies': bowerDeps}));
+      t.addOutput(bowerJson);
     }
 
-    AssetId bowerId = new AssetId(t.primaryInput.id.package, 'web/bower.json');
-    Asset bowerJson = new Asset.fromString(bowerId, JSON.encode({'name':t.primaryInput.id.package,'dependencies': deps}));
-    t.addOutput(bowerJson);
-  }
+    // Write require config map
+    if (extraDeps.isNotEmpty) {
+      AssetId bowerId = new AssetId(t.primaryInput.id.package, 'web/require.map.js');
+      Asset bowerJson = new Asset.fromStream(
+          bowerId,
+          () async* {
+            yield "require.config({\n";
+            yield " map: { '*' : {\n";
 
-  Iterable<X> _flatten<X>(Iterable<Iterable<X>> x) sync* {
-    for (Iterable<X> i in x) {
-      yield* i;
+            for (String libKey in extraDeps.keys) {
+              if (extraDeps[libKey].isEmpty && !runInit.containsKey(libKey)) {
+                continue;
+              }
+
+              yield "  '${libKey}' : 'polymerize_loader!${libKey}',\n";
+            }
+
+            yield " }},\n";
+
+            yield " polymerize_loader: {\n";
+
+            for (String libKey in extraDeps.keys) {
+              if (extraDeps[libKey].isEmpty) {
+                continue;
+              }
+              yield "  '${libKey}' : [${extraDeps[libKey].map((x)=> "'${x}'").join(',')}],\n";
+            }
+
+            yield " },\n";
+            yield " polymerize_init: {\n";
+
+            for (String libKey in runInit.keys) {
+              yield "  '${libKey}' : '${runInit[libKey]}',\n";
+            }
+
+            yield " }\n";
+
+            yield "});\n";
+          }()
+              .transform(UTF8.encoder));
+      t.addOutput(bowerJson);
     }
-  }
-
-  Iterable<Uri> _findDependencies(Transform t, Resolver r) => _findDependenciesFor(t, r, r.getLibrary(t.primaryInput.id));
-
-  Iterable<LibraryElement> _libraryTree(LibraryElement from, [Set<LibraryElement> traversed]) sync* {
-    if (traversed == null) {
-      traversed = new Set<LibraryElement>();
-    }
-
-    if (traversed.contains(from)) {
-      return;
-    }
-    traversed.add(from);
-    yield from;
-    for (LibraryElement lib in _referencedLibs(from)) {
-      yield* _libraryTree(lib, traversed);
-    }
-  }
-
-  bool _anyDepNeedsHtmlImport(LibraryElement lib) => _libraryTree(lib).any(_needsHtmlImport);
-
-  Iterable<LibraryElement> _referencedLibs(LibraryElement lib) sync* {
-    yield* lib.imports.map((i) => i.importedLibrary);
-    yield* lib.exports.map((e) => e.exportedLibrary);
-  }
-
-  Iterable<Uri> _findDependenciesFor(Transform t, Resolver r, LibraryElement lib) =>
-      _referencedLibs(lib).where(_anyDepNeedsHtmlImport).map((lib) => r.getImportUri(lib, from: t.primaryInput.id));
-
-  Stream<String> _generateHtml(Buffer htmlBuffer, Transform t, Resolver r, AssetId destId) async* {
-    t.logger.fine("IMPORTED: ${r.getLibrary(t.primaryInput.id).imports.map((i)=>i.importedLibrary).where(_needsHtmlImport).map((l) => l.source.uri).join(",")}");
-    String locName = "${p.split(p.withoutExtension(destId.path)).join('__')}";
-    String relName = "${p.split(p.withoutExtension(destId.path)).sublist(1).join('__')}";
-    String modName = "packages/${destId.package}/${locName}";
-
-    String modPseudoDir = p.dirname(modName);
-
-    yield* htmlBuffer.stream;
-
-    yield* new Stream.fromIterable(_findDependencies(t, r).map(_packageUriToModuleName).map((u) => "<link rel='import' href='${p.relative(u,from:modPseudoDir)}'>\n"));
-
-    yield "<link rel='import' href='${p.relative('packages/polymer_element/polymerize_js.mod.html',from:modPseudoDir)}'>\n";
-
-
-    yield* new Stream.fromIterable(
-        _dedupe(allFirstLevelAnnotation(r.getLibrary(t.primaryInput.id).unit, isBowerImport).map((o) => "bower_components/${o.getField('import').toStringValue()}"))
-            .map((i) => "<link rel='import' href='${p.relative(i,from:modPseudoDir)}'>\n"));
-
-    yield "<script>require({paths:{'${modName}':'${modName}'}},['${modName}'],(module) =>  module.${relName}.initModule());</script>\n";
   }
 
   @override
@@ -222,6 +292,6 @@ class InoculateTransformer extends Transformer with ResolverTransformer implemen
 
 Iterable<X> _dedupe<X>(Iterable<X> from) => new Set()..addAll(from);
 
-bool _needsHtmlImport(LibraryElement importedLib) => hasAnyFirstLevelAnnotation(importedLib.unit, anyOf([isHtmlImport, isInit, isPolymerRegister, isBowerImport]));
+bool _needsHtmlImport(LibraryElement importedLib) => hasAnyFirstLevelAnnotation(importedLib.unit, anyOf([isInit, isPolymerRegister]));
 
 String _packageUriToModuleName(Uri packageUri) => "packages/${packageUri.pathSegments[0]}/${p.withoutExtension(p.joinAll(packageUri.pathSegments.sublist(1)))}.mod.html";
