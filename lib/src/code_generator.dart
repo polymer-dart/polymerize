@@ -193,7 +193,7 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
 
   code_builder.ReferenceBuilder jsifyRef = code_builder.reference('jsify', JS_UTIL);
 
-  code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("Property", importFrom: POLYMERIZE_JS);
+  code_builder.TypeBuilder propertyType = new code_builder.TypeBuilder("PolymerProperty", importFrom: POLYMERIZE_JS);
   code_builder.TypeBuilder reduxPropertyType = new code_builder.TypeBuilder("ReduxProperty", importFrom: POLYMERIZE_JS);
 
   code_builder.ReferenceBuilder resolveJs = code_builder.reference('resolveJsObject', POLYMERIZE_JS);

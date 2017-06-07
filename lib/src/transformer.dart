@@ -185,7 +185,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
   Future _generateBowerJson(Transform t, Resolver r) async {
     // Check if current lib matches
     if (!new Glob(settings.configuration['entry-point']).matches(t.primaryInput.id.path)) {
-      t.logger.warning("${t.primaryInput.id.path} doesn't marches with ${settings.configuration['entry-point']}");
+      t.logger.warning("${t.primaryInput.id.path} doesn't matches with ${settings.configuration['entry-point']}");
       return;
     }
     t.logger.info("PRODUCING BOWER.JSON FOR ${t.primaryInput.id}");
@@ -206,7 +206,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       }
       t.logger.info("Examining ${libAsset}");
       Map<String, List<AnnotationInfo>> annotations =
-          firstLevelAnnotationMap(le.units.map((e) => e.unit), {'bower': isBowerImport, 'html': isHtmlImport, 'js': isJsMap, 'initMod': isInitModule,'reg':isPolymerRegister});
+      firstLevelAnnotationMap(le.units.map((e) => e.unit), {'bower': isBowerImport, 'html': isHtmlImport, 'js': isJsMap, 'initMod': isInitModule, 'reg': isPolymerRegister});
 
       String libKey = 'packages/${libAsset.package}/${p.split(p.withoutExtension(libAsset.path)).join('__')}';
       Set<String> libDeps = extraDeps.putIfAbsent(libKey, () => new Set());
@@ -217,7 +217,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       });
 
       annotations['html']?.forEach((o) {
-        libDeps.add('htmlimport!packages/${libAsset.package}/${p.join(p.dirname(libAsset.path),o.annotation.getField('path').toStringValue())}');
+        libDeps.add('htmlimport!packages/${libAsset.package}/${p.join(p.dirname(libAsset.path), o.annotation.getField('path').toStringValue())}');
       });
 
       annotations['js']?.forEach((o) {
@@ -230,25 +230,20 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
           return;
         }
         AssetId elemId = r.getSourceAssetId(o.element);
-        String path = p.normalize(p.relative(p.join(p.dirname(elemId.path),template),from:'lib'));
+        String path = p.normalize(p.relative(p.join(p.dirname(elemId.path), template), from: 'lib'));
         libDeps.add('htmlimport!packages/${elemId.package}/${path}');
       });
 
       if ((annotations['initMod'] ?? []).isNotEmpty) {
-        AnnotationInfo info = annotations['initMod'].single;
-        runInit[libKey] = [p.split(p.withoutExtension(libAsset.path.substring(4))).join('__'), info.element.name].map((x) => "'${x}'").join(',');
-      }
+        if (annotations['initMod'].length > 1) {
+          throw "There should be at least one `@initModule` annotation per library but '${le.displayName}' has ${annotations['initMod'].length} !";
+        }
 
-      // NO GOOD
-      /*
-      if (libAsset.path.endsWith("_orig.dart")) {
-        // Ensure the main is loaded first
-        libDeps.add('${libKey.substring(0,libKey.length-5)}');
-      }*/
+        AnnotationInfo info = annotations['initMod'].single;
+        runInit[libKey] = [p.split(p.withoutExtension(p.relative(libAsset.path, from: 'lib'))).join('__'), info.element.name].map((x) => "'${x}'").join(',');
+      }
     });
 
-//    Map<String, String> deps = new Map.fromIterable(flatten(_libraryTree(r.getLibrary(t.primaryInput.id)).map((l) => allFirstLevelAnnotation(l.unit, isBowerImport))),
-//        key: (DartObject o) => o.getField('name').toStringValue(), value: (DartObject o) => o.getField('ref').toStringValue());
 
     t.logger.info("DEPS ARE :${bowerDeps}");
     if (bowerDeps.isNotEmpty) {
