@@ -24,7 +24,7 @@ class GeneratorContext {
   IOSink output;
 
   CompilationUnit cu;
-  code_builder.LibraryBuilder libBuilder;
+  code_builder.PartOfBuilder libBuilder;
   code_builder.MethodBuilder _initModuleBuilder;
   IOSink _htmlHeader;
   code_builder.Scope scope;
@@ -39,25 +39,28 @@ class GeneratorContext {
     cu = ctx.getCompilationUnit(inputUri);
 
     scope = new code_builder.Scope.dedupe();
-    libBuilder = new code_builder.LibraryBuilder.scope(scope: scope,name:inputUri.replaceAll(new RegExp("[/:.]"), "_"));
-    code_builder.ReferenceBuilder ref = code_builder.reference('init','package:polymerize_common/init.dart');
-    libBuilder.addAnnotation(ref);
-    _initModuleBuilder = new code_builder.MethodBuilder("initModule");
+
+    libBuilder = new code_builder.PartOfBuilder(inputUri, scope);
+
+    code_builder.ReferenceBuilder ref = code_builder.reference('initModule','package:polymerize_common/init.dart');
+    //libBuilder.addAnnotation(ref);
+    _initModuleBuilder = new code_builder.MethodBuilder("generatedInitModule");
     libBuilder.addMember(_initModuleBuilder);
+    _initModuleBuilder.addAnnotation(ref);
   }
 
-  Future<String> _finish() async {
+  Future<FunctionDeclaration> _finish() async {
     _initModuleBuilder.addStatement(code_builder.returnVoid);
     //libBuilder.addMember(code_builder.list(_refs).asFinal('_refs'));
 
     output.write(code_builder.prettyToSource(libBuilder.buildAst(scope)));
     await Future.wait([output.flush(),_htmlHeader.flush()]);
 
-    return code_builder.prettyToSource(_initModuleBuilder.buildAst(scope));
+    return _initModuleBuilder.buildFunction(scope);
   }
 
   Future generateCode() async {
-    libBuilder.addDirective(new code_builder.ExportBuilder(inputUri));
+    //libBuilder.addDirective(new code_builder.ExportBuilder(inputUri));
     //libBuilder.addDirective(new code_builder.ImportBuilder(inputUri,prefix: 'orig'));
     await Future.wait(_codeGenerators.map((gen) => gen(this)));
     return _finish();
@@ -250,4 +253,4 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
 }
 
 Future _addHtmlImport(GeneratorContext ctx) async =>
-    allFirstLevelAnnotation(ctx.cu, isHtmlImport).map((o) => o.getField('path').toStringValue()).forEach((relPath) => ctx.addImportHtml(relPath));
+    allFirstLevelAnnotation([ctx.cu], isHtmlImport).map((o) => o.getField('path').toStringValue()).forEach((relPath) => ctx.addImportHtml(relPath));

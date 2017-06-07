@@ -51,10 +51,17 @@ bool isStoreDef(DartObject o) => (isPolymerElementUri(o.type.element.librarySour
 
 bool isInit(DartObject o) => o != null && (isPolymerElementInitUri(o.type.element.librarySource.uri)) && (o.type.name == 'Init');
 
+bool isInitModule(DartObject o) => o != null && (isPolymerElementInitUri(o.type.element.librarySource.uri)) && (o.type.name == 'InitModule');
+
 bool isHtmlImport(DartObject o) => o != null && (isPolymerElementHtmlImportUri(o.type.element.librarySource.uri)) && (o.type.name == 'HtmlImport');
 
-Iterable<DartObject> allFirstLevelAnnotation(CompilationUnit cu, bool matches(DartObject x)) =>
-    cu.sortedDirectivesAndDeclarations.map(_element).where(notNull).map((e) => e.metadata).where(notNull).map((anno) => getAnnotation(anno, matches)).where(notNull);
+Iterable<DartObject> allFirstLevelAnnotation(Iterable<CompilationUnit> cus, bool matches(DartObject x)) => flatten(cus.map((cu) => cu.sortedDirectivesAndDeclarations))
+    .map(_element)
+    .where(notNull)
+    .map((e) => e.metadata)
+    .where(notNull)
+    .map((anno) => getAnnotation(anno, matches))
+    .where(notNull);
 
 typedef bool Matcher(DartObject x);
 
@@ -79,14 +86,24 @@ Iterable<X> flatten<X>(Iterable<Iterable<X>> x) sync* {
   }
 }
 
-Map<X, List<DartObject>> firstLevelAnnotationMap<X>(CompilationUnit cu, Map<X, Matcher> matchers) => _collect(
-    flatten(cu.sortedDirectivesAndDeclarations.map(_element).where(notNull).map((e) => e.metadata).where(notNull)).map((anno) => anno.computeConstantValue()).where(notNull),
-    key: (o) => _whichMatcher(o, matchers),
-    value: (o) => o);
+class AnnotationInfo {
+  Element element;
+  DartObject annotation;
+
+  AnnotationInfo({this.element, this.annotation});
+}
+
+Map<X, List<AnnotationInfo>> firstLevelAnnotationMap<X>(Iterable<CompilationUnit> cus, Map<X, Matcher> matchers) => _collect(
+    flatten<AnnotationInfo>(flatten<AstNode>(cus.map((cu) => cu.sortedDirectivesAndDeclarations))
+        .map(_element)
+        .where((e) => e?.metadata != null)
+        .map((e) => e.metadata.map((a) => a.computeConstantValue()).where(notNull).map((o) => new AnnotationInfo(element: e, annotation: o)))),
+    key: (AnnotationInfo o) => _whichMatcher(o.annotation, matchers),
+    value: (AnnotationInfo o) => o);
 
 Element _element(AstNode x) => (x is Declaration) ? x.element : ((x is Directive) ? x.element : null);
 
-bool hasAnyFirstLevelAnnotation(CompilationUnit cu, bool matches(DartObject x)) => allFirstLevelAnnotation(cu, matches).isNotEmpty;
+bool hasAnyFirstLevelAnnotation(Iterable<CompilationUnit> cus, bool matches(DartObject x)) => allFirstLevelAnnotation(cus, matches).isNotEmpty;
 
 DartObject getAnnotation(
         Iterable<ElementAnnotation> metadata, //

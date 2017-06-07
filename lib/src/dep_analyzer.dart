@@ -566,7 +566,7 @@ init_local_polymerize('${sdk_home}','${pathos.join(developHome,'polymerize')}')
   Iterable<Map> _extractBowerLibraryForTarget(DependencyAnalyzer dep,TargetDesc tgt) sync* {
     CompilationUnit cu = _ctx.getCompilationUnit(tgt.uri.toString());
     _logger.finest("Checking ${cu?.element?.location}");
-    for (DartObject anno in allFirstLevelAnnotation(cu, isBowerImport)) {
+    for (DartObject anno in allFirstLevelAnnotation([cu], isBowerImport)) {
       // Create bower_library
       _logger.finest("FOUND :${anno}");
       yield {'name': anno.getField('name').toStringValue(), 'ref': anno.getField('ref').toStringValue(), 'import': anno.getField('import').toStringValue()};
