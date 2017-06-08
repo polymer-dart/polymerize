@@ -151,6 +151,25 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
     FunctionDeclaration initMethod = await generatorContext.generateCode();
     Asset gen = new Asset.fromStream(dest, outputBuffer.binaryStream);
     transform.addOutput(gen);
+
+    // add a line at the endbeginning
+    String myFile = (await transform.primaryInput.readAsString());
+    int pos;
+    List<Declaration> decls = resolver.getLibrary(transform.primaryInput.id).unit.declarations;
+    if (decls.isEmpty) {
+      pos = myFile.length;
+    } else {
+      pos = decls.first.offset;
+    }
+    transform.addOutput(new Asset.fromStream(
+        transform.primaryInput.id,
+        () async* {
+          yield myFile.substring(0, pos);
+          yield "\n// POLYMERIZED \n";
+          yield "part '${p.basename(dest.path)}';\n";
+          yield myFile.substring(pos);
+        }()
+            .transform(UTF8.encoder)));
   }
 
   @override
@@ -259,6 +278,8 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       AssetId polymer_htmlimport = new AssetId(t.primaryInput.id.package, 'web/polymerize_require/htmlimport.js');
       t.addOutput(new Asset.fromString(polymer_loader, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/loader.js'))));
       t.addOutput(new Asset.fromString(polymer_htmlimport, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/htmlimport.js'))));
+      t.addOutput(new Asset.fromString(
+          new AssetId(t.primaryInput.id.package, 'web/polymerize_require/start.js'), await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/start.js'))));
       Asset bowerJson = new Asset.fromStream(
           bowerId,
           () async* {
