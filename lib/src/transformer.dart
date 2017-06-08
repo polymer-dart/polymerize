@@ -12,6 +12,7 @@ import 'package:polymerize/src/code_generator.dart';
 import 'package:polymerize/src/dart_file_command.dart';
 import 'package:polymerize/src/dep_analyzer.dart';
 import 'package:code_builder/code_builder.dart';
+import 'package:resource/resource.dart';
 
 import 'package:path/path.dart' as p;
 import 'package:polymerize/src/utils.dart';
@@ -206,18 +207,18 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       }
       t.logger.info("Examining ${libAsset}");
       Map<String, List<AnnotationInfo>> annotations =
-      firstLevelAnnotationMap(le.units.map((e) => e.unit), {'bower': isBowerImport, 'html': isHtmlImport, 'js': isJsMap, 'initMod': isInitModule, 'reg': isPolymerRegister});
+          firstLevelAnnotationMap(le.units.map((e) => e.unit), {'bower': isBowerImport, 'html': isHtmlImport, 'js': isJsMap, 'initMod': isInitModule, 'reg': isPolymerRegister});
 
       String libKey = 'packages/${libAsset.package}/${p.split(p.withoutExtension(libAsset.path)).join('__')}';
       Set<String> libDeps = extraDeps.putIfAbsent(libKey, () => new Set());
 
       annotations['bower']?.forEach((o) {
         bowerDeps[o.annotation.getField('name').toStringValue()] = o.annotation.getField('ref').toStringValue();
-        libDeps.add('htmlimport!bower_components/${o.annotation.getField('import').toStringValue()}');
+        libDeps.add('polymerize_require/htmlimport!bower_components/${o.annotation.getField('import').toStringValue()}');
       });
 
       annotations['html']?.forEach((o) {
-        libDeps.add('htmlimport!packages/${libAsset.package}/${p.join(p.dirname(libAsset.path), o.annotation.getField('path').toStringValue())}');
+        libDeps.add('polymerize_require/htmlimport!packages/${libAsset.package}/${p.join(p.dirname(libAsset.path), o.annotation.getField('path').toStringValue())}');
       });
 
       annotations['js']?.forEach((o) {
@@ -231,7 +232,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
         }
         AssetId elemId = r.getSourceAssetId(o.element);
         String path = p.normalize(p.relative(p.join(p.dirname(elemId.path), template), from: 'lib'));
-        libDeps.add('htmlimport!packages/${elemId.package}/${path}');
+        libDeps.add('polymerize_require/htmlimport!packages/${elemId.package}/${path}');
       });
 
       if ((annotations['initMod'] ?? []).isNotEmpty) {
@@ -244,7 +245,6 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       }
     });
 
-
     t.logger.info("DEPS ARE :${bowerDeps}");
     if (bowerDeps.isNotEmpty) {
       AssetId bowerId = new AssetId(t.primaryInput.id.package, 'web/bower.json');
@@ -255,6 +255,10 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
     // Write require config map
     if (extraDeps.isNotEmpty) {
       AssetId bowerId = new AssetId(t.primaryInput.id.package, 'web/require.map.js');
+      AssetId polymer_loader = new AssetId(t.primaryInput.id.package, 'web/polymerize_require/loader.js');
+      AssetId polymer_htmlimport = new AssetId(t.primaryInput.id.package, 'web/polymerize_require/htmlimport.js');
+      t.addOutput(new Asset.fromString(polymer_loader, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/loader.js'))));
+      t.addOutput(new Asset.fromString(polymer_htmlimport, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/htmlimport.js'))));
       Asset bowerJson = new Asset.fromStream(
           bowerId,
           () async* {
@@ -266,7 +270,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
                 continue;
               }
 
-              yield "  '${libKey}' : 'polymerize_loader!${libKey}',\n";
+              yield "  '${libKey}' : 'polymerize_require/loader!${libKey}',\n";
             }
 
             yield " }},\n";
