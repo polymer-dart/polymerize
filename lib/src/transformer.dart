@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'dart:core';
 import 'dart:io';
 import 'package:analyzer/analyzer.dart';
 import 'package:analyzer/dart/constant/value.dart';
@@ -129,11 +130,12 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
 
   @override
   applyResolver(Transform transform, Resolver resolver) async {
-    if (!resolver.isLibrary(transform.primaryInput.id) || !_needsHtmlImport(resolver.getLibrary(transform.primaryInput.id))) {
+    if (!resolver.isLibrary(transform.primaryInput.id) || !needsProcessing(resolver.getLibrary(transform.primaryInput.id))) {
       transform.logger.fine("${transform.primaryInput.id} is NOT a library, skipping");
       return;
     }
-    transform.logger.info("Processing ${transform.primaryInput.id}");
+
+    transform.logger.fine("Processing ${transform.primaryInput.id}");
     Buffer outputBuffer = new Buffer();
     Buffer htmlBuffer = new Buffer();
 
@@ -148,9 +150,11 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
     transform.logger.fine("My URI : :${uri}");
 
     GeneratorContext generatorContext = new GeneratorContext(new ResolversInternalContext(resolver), uri, htmlBuffer.createSink(), outputBuffer.createSink());
-    FunctionDeclaration initMethod = await generatorContext.generateCode();
+    await generatorContext.generateCode();
     Asset gen = new Asset.fromStream(dest, outputBuffer.binaryStream);
     transform.addOutput(gen);
+
+    transform.logger.fine("PRODUCED : ${await gen.readAsString()}");
 
     // add a line at the endbeginning
     String myFile = (await transform.primaryInput.readAsString());
@@ -159,9 +163,18 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
     if (decls.isEmpty) {
       pos = myFile.length;
     } else {
-      pos = decls.first.offset;
+      // find first part
+      List<Directive> ris = resolver.getLibrary(transform.primaryInput.id).unit.directives ?? [];
+
+      PartDirective firstPart = ris.firstWhere((d) => d is PartDirective, orElse: () => null);
+      if (firstPart != null) {
+        pos = firstPart.offset;
+      } else {
+        pos = decls.first.offset;
+      }
     }
-    transform.addOutput(new Asset.fromStream(
+
+    Asset replacing = new Asset.fromStream(
         transform.primaryInput.id,
         () async* {
           yield myFile.substring(0, pos);
@@ -169,7 +182,11 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
           yield "part '${p.basename(dest.path)}';\n";
           yield myFile.substring(pos);
         }()
-            .transform(UTF8.encoder)));
+            .transform(UTF8.encoder));
+    transform.logger.fine("REPLACING : ${await replacing.readAsString()}");
+    transform.addOutput(replacing);
+
+    transform.logger.fine("PROCESSED ${transform.primaryInput.id}");
   }
 
   @override
@@ -224,7 +241,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
         t.logger.fine("SOURCE ASSET IS NULL FOR ${le} , ${le.source.uri}");
         return;
       }
-      t.logger.info("Examining ${libAsset}");
+      t.logger.fine("Examining ${libAsset}");
       Map<String, List<AnnotationInfo>> annotations =
           firstLevelAnnotationMap(le.units.map((e) => e.unit), {'bower': isBowerImport, 'html': isHtmlImport, 'js': isJsMap, 'initMod': isInitModule, 'reg': isPolymerRegister});
 
@@ -237,7 +254,8 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       });
 
       annotations['html']?.forEach((o) {
-        libDeps.add('polymerize_require/htmlimport!packages/${libAsset.package}/${p.join(p.dirname(libAsset.path), o.annotation.getField('path').toStringValue())}');
+        libDeps.add(
+            'polymerize_require/htmlimport!packages/${libAsset.package}/${p.relative(p.join(p.dirname(libAsset.path), o.annotation.getField('path').toStringValue()),from:'lib')}');
       });
 
       annotations['js']?.forEach((o) {
@@ -256,7 +274,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
 
       if ((annotations['initMod'] ?? []).isNotEmpty) {
         if (annotations['initMod'].length > 1) {
-          throw "There should be at least one `@initModule` annotation per library but '${le.displayName}' has ${annotations['initMod'].length} !";
+          throw "There should be at least one `@initModule` annotation per library but '${le.source.uri}' has ${annotations['initMod'].length} !";
         }
 
         AnnotationInfo info = annotations['initMod'].single;
@@ -283,6 +301,39 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       Asset bowerJson = new Asset.fromStream(
           bowerId,
           () async* {
+            yield "(function(){\n";
+            yield " let polymerize_loader= {\n";
+
+            for (String libKey in extraDeps.keys) {
+              if (extraDeps[libKey].isEmpty) {
+                continue;
+              }
+              yield "  '${libKey}' : [${extraDeps[libKey].map((x)=> "'${x}'").join(',')}],\n";
+            }
+
+            yield " };\n";
+            yield """
+	var oldDefine = define;
+	define = function(name,deps,callback) {
+		var id = document.currentScript.getAttribute('data-requiremodule');
+		// console.log("DEFINING : "+id);
+		let d=deps;
+		if (typeof name!=='string') {
+			d = name;
+		} 
+		// Append extra deps
+		if (polymerize_loader[id]) {
+			Array.prototype.push.apply(d,polymerize_loader[id]);
+		}
+		if (typeof name!=='string') {
+			name = d;	
+		} else {
+			deps = d;
+		}
+		return oldDefine(name,deps,callback);
+	}
+})();          
+            """;
             yield "require.config({\n";
             yield " map: { '*' : {\n";
 
@@ -296,16 +347,6 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
 
             yield " }},\n";
 
-            yield " polymerize_loader: {\n";
-
-            for (String libKey in extraDeps.keys) {
-              if (extraDeps[libKey].isEmpty) {
-                continue;
-              }
-              yield "  '${libKey}' : [${extraDeps[libKey].map((x)=> "'${x}'").join(',')}],\n";
-            }
-
-            yield " },\n";
             yield " polymerize_init: {\n";
 
             for (String libKey in runInit.keys) {

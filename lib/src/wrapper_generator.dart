@@ -153,7 +153,7 @@ class Generator {
               libPath,
               """
 @BowerImport(ref:'${_currentBowerRef['ref']}',import:"${relPath}",name:'${_currentBowerRef['name']}')
-import 'package:polymer_element/polymer_element.dart' show BowerImport;
+import 'package:polymer_element/polymer_element.dart';
 
 ${importBehaviors(relPath,'_')}
 """);

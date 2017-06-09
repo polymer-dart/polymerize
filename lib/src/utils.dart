@@ -130,3 +130,7 @@ typedef bool matcher(DartObject x);
 matcher anyOf(List<matcher> matches) => (DartObject o) => matches.any((m) => m(o));
 
 bool notNull(x) => x != null;
+
+
+bool needsProcessing(LibraryElement le) => hasAnyFirstLevelAnnotation(le.units.map((u)=>u.unit), anyOf([isJsMap,isBowerImport,isPolymerRegister,isInit,isInitModule,isHtmlImport,isPolymerBehavior]));
+

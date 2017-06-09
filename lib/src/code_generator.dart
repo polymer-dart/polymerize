@@ -16,7 +16,7 @@ import 'package:path/path.dart' as path;
 
 typedef Future CodeGenerator(GeneratorContext ctx);
 
-List<CodeGenerator> _codeGenerators = [_generateInitMethods, _generatePolymerRegister, _addHtmlImport];
+List<CodeGenerator> _codeGenerators = [_generateInitMethods, _generatePolymerRegister, _addHtmlImport,_generateForceImport];
 
 class GeneratorContext {
   InternalContext ctx;
@@ -49,17 +49,17 @@ class GeneratorContext {
     _initModuleBuilder.addAnnotation(ref);
   }
 
-  Future<FunctionDeclaration> _finish() async {
+  Future<List<code_builder.ImportBuilder>> _finish() async {
     _initModuleBuilder.addStatement(code_builder.returnVoid);
     //libBuilder.addMember(code_builder.list(_refs).asFinal('_refs'));
 
     output.write(code_builder.prettyToSource(libBuilder.buildAst(scope)));
     await Future.wait([output.flush(),_htmlHeader.flush()]);
 
-    return _initModuleBuilder.buildFunction(scope);
+    return scope.toImports();
   }
 
-  Future generateCode() async {
+  Future<List<code_builder.ImportBuilder>> generateCode() async {
     //libBuilder.addDirective(new code_builder.ExportBuilder(inputUri));
     //libBuilder.addDirective(new code_builder.ImportBuilder(inputUri,prefix: 'orig'));
     await Future.wait(_codeGenerators.map((gen) => gen(this)));
@@ -101,6 +101,24 @@ Future _generateInitMethods(GeneratorContext ctx) async {
       }
     }
   }
+}
+
+/**
+ * Check if importing a native lib that contains annotations that needs be imported.
+ */
+
+String forceFlagName(LibraryElement le,[String prefix]) => "${prefix!=null?prefix+'.':''}FORCE_${le.source.uri.toString().replaceAll(new RegExp('[._:/-]'),'_')}";
+
+Future _generateForceImport(GeneratorContext ctx) async {
+
+  code_builder.ExpressionBuilder expressionBuilder = code_builder.literal(false);
+  for (ImportElement ie in ctx.cu.element.library.imports) {
+    if (needsProcessing(ie.importedLibrary)) {
+      expressionBuilder = expressionBuilder.or(code_builder.reference(forceFlagName(ie.importedLibrary,ie.prefix?.name),ie.importedLibrary.source.uri.toString()));
+    }
+  }
+  ctx.libBuilder.addMember(expressionBuilder.asFinal(forceFlagName(ctx.cu.element.library)));
+
 }
 
 const String POLYMERIZE_JS = 'package:polymer_element/polymerize_js.dart';
