@@ -266,6 +266,9 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       t.addOutput(new Asset.fromString(polymer_htmlimport, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/htmlimport.js'))));
       t.addOutput(new Asset.fromString(
           new AssetId(t.primaryInput.id.package, 'web/polymerize_require/start.js'), await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/start.js'))));
+
+      t.addOutput(new Asset.fromString(
+          new AssetId(t.primaryInput.id.package, 'web/polymerize_require/require.js'), await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/require.js'))));
       Asset bowerJson = new Asset.fromStream(
           bowerId,
           () async* {
@@ -280,52 +283,13 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
             }
 
             yield " };\n";
-            yield """
-	var oldDefine = define;
-	define = function(name,deps,callback) {
-		var id = document.currentScript.getAttribute('data-requiremodule');
-		// console.log("DEFINING : "+id);
-		let d=deps;
-		if (typeof name!=='string') {
-			d = name;
-		} 
-		// Append extra deps
-		if (polymerize_loader[id]) {
-			Array.prototype.push.apply(d,polymerize_loader[id]);
-		}
-		if (typeof name!=='string') {
-			name = d;	
-		} else {
-			deps = d;
-		}
-		return oldDefine(name,deps,callback);
-	};
-	
-	define.amd = true;
-})();          
-            """;
-            yield "require.config({\n";
-            yield " map: { '*' : {\n";
-
-            for (String libKey in extraDeps.keys) {
-              if (extraDeps[libKey].isEmpty && !runInit.containsKey(libKey)) {
-                continue;
-              }
-
-              yield "  '${libKey}' : 'polymerize_require/loader!${libKey}',\n";
-            }
-
-            yield " }},\n";
-
-            yield " polymerize_init: {\n";
-
+            yield " let polymerize_init = {\n";
             for (String libKey in runInit.keys) {
               yield "  '${libKey}' : [${runInit[libKey]}],\n";
             }
-
-            yield " }\n";
-
-            yield "});\n";
+            yield " };\n";
+            yield " polymerize_redefine(polymerize_loader,polymerize_init);\n";
+            yield "})();\n";
           }()
               .transform(UTF8.encoder));
       t.addOutput(bowerJson);
