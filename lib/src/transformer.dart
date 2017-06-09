@@ -331,7 +331,9 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
 			deps = d;
 		}
 		return oldDefine(name,deps,callback);
-	}
+	};
+	
+	define.amd = true;
 })();          
             """;
             yield "require.config({\n";
