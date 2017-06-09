@@ -395,6 +395,10 @@ copy_to_bin_dir(
       }
     }
 
+    // Create WORKSPACE (needed for 0.5.1 bazel)
+
+    new io.File(pathos.join(destBasePath,'WORKSPACE')).writeAsString('workspace(name = "build_files")\n');
+
     // Create BUILD PATH FOR .polymerize WORKSPACE
     await write(pathos.join(destBasePath, "BUILD"), new Stream.fromIterable(['package(default_visibility = ["//visibility:public"])']));
 

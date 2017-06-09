@@ -1,3 +1,6 @@
+# 0.8.6
+ - fixes for bazel 0.5.1
+
 # 0.8.5
  - support for autonotify behavior
 
