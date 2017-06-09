@@ -1,12 +1,12 @@
 import 'package:barback/barback.dart';
-import 'package:polymerize/src/transformer.dart';
+import 'package:polymerize/src/transformers.dart';
 
 class PolymerizeTransformer extends TransformerGroup {
   PolymerizeTransformer.asPlugin(BarbackSettings settings) : super(_createPhases(settings)) {}
 
   static List<List> _createPhases(BarbackSettings settings) => [
-      //  [new PrepareTransformer.asPlugin(settings)],
         [new InoculateTransformer.asPlugin(settings)],
-        [new FinalizeTransformer.asPlugin(settings)]
+        [new FinalizeTransformer.asPlugin(settings)],
+        [new BowerInstallTransformer.asPlugin(settings)]
       ];
 }

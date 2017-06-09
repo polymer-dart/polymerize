@@ -46,39 +46,6 @@ class ResolversInternalContext implements InternalContext {
 
 const String ORIG_EXT = ".dart";
 
-class PrepareTransformer extends Transformer with ResolverTransformer {
-  PrepareTransformer({bool releaseMode, this.settings}) {
-    resolvers = new Resolvers(dartSdkDirectory);
-  }
-  BarbackSettings settings;
-
-  PrepareTransformer.asPlugin(BarbackSettings settings) : this(releaseMode: settings.mode == BarbackMode.RELEASE, settings: settings);
-
-  Future<bool> isPrimary(id) async {
-    return id.extension == '.dart' && id.path.startsWith("lib/");
-  }
-
-  @override
-  applyResolver(Transform transform, Resolver resolver) async {
-    if (!resolver.isLibrary(transform.primaryInput.id) || !_needsHtmlImport(resolver.getLibrary(transform.primaryInput.id))) {
-      transform.logger.fine("${transform.primaryInput.id} is NOT a library, skipping");
-      return;
-    }
-    AssetId origId = transform.primaryInput.id.changeExtension(ORIG_EXT);
-    Stream<List<int>> content = transform.primaryInput.read();
-    Asset orig = new Asset.fromStream(origId, content);
-    transform.addOutput(orig);
-    transform.consumePrimary();
-    transform.logger.fine("COPY ${transform.primaryInput.id} INTO ${origId} WITH CONTENT : ${content}", asset: origId);
-    transform.logger.fine("ADDED : ${orig}", asset: origId);
-  }
-
-  @override
-  Future<bool> shouldApplyResolver(Asset asset) async {
-    return asset.id.extension == ".dart";
-  }
-}
-
 Iterable<Uri> _findDependencies(Transform t, Resolver r) => _findDependenciesFor(t, r, r.getLibrary(t.primaryInput.id));
 
 Iterable<LibraryElement> _libraryTree(LibraryElement from, [Set<LibraryElement> traversed]) sync* {
@@ -178,8 +145,9 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
         transform.primaryInput.id,
         () async* {
           yield myFile.substring(0, pos);
-          yield "\n// POLYMERIZED \n";
-          yield "part '${p.basename(dest.path)}';\n";
+          yield "/* POLYMERIZED ( */";
+          yield "part '${p.basename(dest.path)}';";
+          yield "/* ) POLYMERIZED */";
           yield myFile.substring(pos);
         }()
             .transform(UTF8.encoder));
@@ -214,7 +182,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       return;
     }
 
-    transform.logger.info("GENERATING BOWER.JSON WITH ${settings.configuration}", asset: transform.primaryInput.id);
+    transform.logger.fine("GENERATING BOWER.JSON WITH ${settings.configuration}", asset: transform.primaryInput.id);
 
     await _generateBowerJson(transform, resolver);
   }
@@ -222,10 +190,10 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
   Future _generateBowerJson(Transform t, Resolver r) async {
     // Check if current lib matches
     if (!new Glob(settings.configuration['entry-point']).matches(t.primaryInput.id.path)) {
-      t.logger.warning("${t.primaryInput.id.path} doesn't matches with ${settings.configuration['entry-point']}");
+      t.logger.fine("${t.primaryInput.id.path} doesn't matches with ${settings.configuration['entry-point']}");
       return;
     }
-    t.logger.info("PRODUCING BOWER.JSON FOR ${t.primaryInput.id}");
+    t.logger.fine("PRODUCING BOWER.JSON FOR ${t.primaryInput.id}");
 
     // Create bower.json and collect all extra deps
 
@@ -282,7 +250,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
       }
     });
 
-    t.logger.info("DEPS ARE :${bowerDeps}");
+    t.logger.fine("DEPS ARE :${bowerDeps}");
     if (bowerDeps.isNotEmpty) {
       AssetId bowerId = new AssetId(t.primaryInput.id.package, 'web/bower.json');
       Asset bowerJson = new Asset.fromString(bowerId, JSON.encode({'name': t.primaryInput.id.package, 'dependencies': bowerDeps}));
@@ -368,6 +336,42 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
   Future<bool> shouldApplyResolver(Asset asset) async {
     return asset.id.path.endsWith('.dart');
   }
+}
+
+class BowerInstallTransformer extends Transformer {
+  BowerInstallTransformer.asPlugin(BarbackSettings settings);
+
+
+  @override
+  apply(Transform transform) async {
+
+    // Run bower install in a temporary folder and make them run produce assets
+
+    Directory dir  = await Directory.systemTemp.createTemp('bower_import');
+
+    File bowerJson = new File(p.join(dir.path,'bower.json'));
+    await bowerJson.writeAsString(await transform.primaryInput.readAsString());
+    transform.logger.info("Downloading bower dependencies ...");
+    ProcessResult res = await Process.run('bower', ['install'],workingDirectory: dir.path);
+    if (res.exitCode!=0) {
+      transform.logger.error("BOWER ERROR : ${res.stdout} / ${res.stderr}");
+      throw "Error running bower install";
+    }
+    transform.logger.info("Downloading bower dependencies ... DONE");
+
+    Directory bowerComponents = new Directory(p.join(dir.path,'bower_components'));
+
+    await for (FileSystemEntity e in bowerComponents.list(recursive: true)) {
+      if (e is File) {
+        transform.addOutput(new Asset.fromFile(new AssetId(transform.primaryInput.id.package, "web/${p.relative(e.path,from:dir.path)}"),e));
+      }
+    }
+  }
+
+  @override
+  isPrimary(AssetId id) => id.path=='web/bower.json';
+
+
 }
 
 Iterable<X> _dedupe<X>(Iterable<X> from) => new Set()..addAll(from);
