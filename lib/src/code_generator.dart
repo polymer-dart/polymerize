@@ -248,9 +248,9 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
     }
 
     if (statePath != null) {
-      properties[fe.name] = reduxPropertyType.newInstance([], named: {'notify': code_builder.literal(notify),'computed':code_builder.literal(computed), 'statePath': code_builder.literal(statePath)});
+      properties[fe.name] = reduxPropertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'statePath': code_builder.literal(statePath)});
     } else {
-      properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify)});
+      properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify),'computed':code_builder.literal(computed)});
     }
   });
 
