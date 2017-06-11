@@ -239,14 +239,16 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
     bool notify;
     String statePath;
     notify = not != null;
+    String computed;
     DartObject prop = getAnnotation(fe.metadata, isProperty);
     if (prop != null) {
       notify = prop.getField('notify').toBoolValue();
+      computed = prop.getField('computed').toStringValue();
       statePath = prop.getField('statePath').toStringValue();
     }
 
     if (statePath != null) {
-      properties[fe.name] = reduxPropertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'statePath': code_builder.literal(statePath)});
+      properties[fe.name] = reduxPropertyType.newInstance([], named: {'notify': code_builder.literal(notify),'computed':code_builder.literal(computed), 'statePath': code_builder.literal(statePath)});
     } else {
       properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify)});
     }

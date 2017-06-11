@@ -172,7 +172,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
   FinalizeTransformer.asPlugin(BarbackSettings settings) : this(releaseMode: settings.mode == BarbackMode.RELEASE, settings: settings);
 
   Future<bool> isPrimary(id) async {
-    return id.extension == '.dart';
+    return settings.configuration.containsKey('entry-point')&& new Glob(settings.configuration['entry-point']).matches(id.path);
   }
 
   @override
@@ -189,10 +189,7 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
 
   Future _generateBowerJson(Transform t, Resolver r) async {
     // Check if current lib matches
-    if (!new Glob(settings.configuration['entry-point']).matches(t.primaryInput.id.path)) {
-      t.logger.fine("${t.primaryInput.id.path} doesn't matches with ${settings.configuration['entry-point']}");
-      return;
-    }
+
     t.logger.fine("PRODUCING BOWER.JSON FOR ${t.primaryInput.id}");
 
     // Create bower.json and collect all extra deps
