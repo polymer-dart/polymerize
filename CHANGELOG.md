@@ -1,3 +1,6 @@
+# 0.9.0
+ - moving to pub+ddc
+
 # 0.8.5
  - support for autonotify behavior
 

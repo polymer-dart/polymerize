@@ -8,7 +8,8 @@ It features :
  - support for `polymer 2.0.0` (web components 1.0)
  - using DDC to generate `ES6` output code
  - leverages [html5](https://github.com/polymer-dart/html5), a new html lib for Dart based on js interoperability only,
- - using [bazel](http://bazel.io) as build system (see also [rules](https://github.com/polymer-dart/bazel_polymerize_rules) )
+ - ~~using [bazel](http://bazel.io) as build system (see also [rules](https://github.com/polymer-dart/bazel_polymerize_rules) )~~
+ - **NOW** working with dart 1.24 + pub (ddc)
  - **dynamic load** of polymer components definitions through `imd` (require js implementation using html imports)
  - **interoperability** with other JS frameworks
  - **Incremental** build (dependencies are built only once, thanks to DDC modularity system and bazel build)
@@ -21,7 +22,7 @@ It features :
 
 ## Disclaimer
 
-`Polymerize` works on every platforms where `DDC` and `Bazel` runs that's MacOS and Linux for now.
+`Polymerize` works on every platforms where `DDC` runs that's MacOS and Linux for now.
 
 The upcoming version of `pub` will support `DDC` build and `polymerize` will support it too thus extending the platform where you can use it.
 
@@ -31,30 +32,42 @@ The upcoming version of `pub` will support `DDC` build and `polymerize` will sup
 
 Eventually some "transpiling" support can be added along with some optimizing post processing (like vulcanize or similar) could be added to the build chain to broaden the compatibility range.  
 
-### Dazel
+** UPDATE ** : after moving to ** PUB+DDC ** there's something broken with firefox , will fix soon. But I wanted to publish this release quickly after 1.24 was officially released.
 
-`Polymerize` doesn't uses `dazel` for now because it still lacks some feature that are needed for it to work, but the plan is to migrate to `dazel` as soon as it will be ready.
 
 ## Usage
 
 ### Prepare a project
 
-In order to build a project must be *prepared* for `polymerize`, just issue the following commands:
+In order to build a project with polymerize you have to add the following transformer and dev dependencies to your pubspec:
 
- 1. add a dev dependency to `polymerize` in your `pubspec.yaml`
- 1. `pub get/update` to check and resolve the dependencies (like in normal dart projects)
+    dev_dependencies:
+      - polymerize: ^0.9.0
+    transformers:
+      - polymerize:
+         entry-point: web/index.dart
 
-This steps should be repeated every time the dependencies are changed.
+
+The entry point is the main dart file. Your html file should look as this:
+
+    <html>
+     <head>
+         <script src="bower_components/webcomponentsjs/webcomponents-loader.js"></script>
+         <script type="application/dart" src="index.dart"></script>
+         <script src="polymerize_require/start.js"></script>
+     </head>
+     ...
+    </html>
+
+
+See the demo todo project for more details.
 
 ### Build a project
 
- 1. `pub run polymerize:build` this is the actual build
+ 1. `pub build --web-compiler dartdevc` (or add the necessary entries in the pubspec as well) 
 
-Every time `polymerize:build` a new bazel configuration is written from scratch and than a new bazel build is run.
+** DISCLAIMER ** : When using `dartdevc` for production build you will loose al the optimizations that `dart2js` normally makes to your code. This means that you will have bigger fat code even if modular and loaded only on demand.
 
-Bazel is able to understand what actually has changed and rebuild only what's needed, but this holds for everything but workspaces. In short this
-means that if you change your code in such a way that could change your `bower` then you will most probably have to give a `bazel clean --expunge` in order
-to force bazel to download the new files.
 
 # Developing with polymerize
 
@@ -70,9 +83,9 @@ See the [README](https://github.com/dam0vm3nt/polymer_dcc/blob/master/README.md)
 This is a sample component definition:
 
     import 'package:polymer_element/polymer_element.dart';
-    import 'package:my_component/other_component.dart' show OtherComponent;
+    import 'package:my_component/other_component.dart';
 
-    @PolymerRegister('my-tag',template:'my-tag.html',uses=[OtherComponent])
+    @PolymerRegister('my-tag',template:'my-tag.html')
     abstract class MyTag extends PolymerElement {
 
       int count = 0;  // <- no need to annotate this !!!
@@ -98,8 +111,7 @@ This is a sample component definition:
     }
 
 The Html template is just the usual `dom-module`  template **without** any JS code. The import dependencies will generate the appropriate html imports so there is no need to add them to
-the template. The `uses` attribute of the  `@PolymerRegister` annotation is still there only for cosmetic reasons (this avoids
-the annoying *unused import* analyzer warning when a component is imported but referenced only in the html template and not in the dart code, and also the IDE will help you adding the right import).
+the template. 
 
 The `index.html` should preload `imd`, `webcomponents` polyfill and `polymer.html` (see the demo).
 
@@ -113,8 +125,8 @@ To import a bower component and use it in your project simply create a stub (tha
       /**
        * If true, the button should be styled with a shadow.
        */
-      bool get raised;
-      set raised(bool value);
+      external bool get raised;
+      external set raised(bool value);
 
     }
 
@@ -139,8 +151,6 @@ After complilation everything will be found in the bazel output folder (`bazel-b
 
  - more polymer APIs
  - ~~support for mixins~~
- - annotations for properties (computed props, etc.)
+ - ~~annotations for properties (computed props, etc.)~~
  - ~~support for external element wrappers~~
  - ~~support for auto gen HTML imports~~
- - support for pub ddc build
- - `dazel` support
