@@ -249,8 +249,14 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
 
     t.logger.fine("DEPS ARE :${bowerDeps}");
     if (bowerDeps.isNotEmpty) {
+      Map conf=new Map()..addAll(settings.configuration['bower'] ?? {});
+      conf
+        ..['name']=t.primaryInput.id.package
+        ..['dependencies']=(conf['dependencies']??{}
+          ..addAll(bowerDeps));
+
       AssetId bowerId = new AssetId(t.primaryInput.id.package, 'web/bower.json');
-      Asset bowerJson = new Asset.fromString(bowerId, JSON.encode({'name': t.primaryInput.id.package, 'dependencies': bowerDeps}));
+      Asset bowerJson = new Asset.fromString(bowerId, JSON.encode(conf));
       t.addOutput(bowerJson);
     }
 
@@ -300,7 +306,8 @@ class FinalizeTransformer extends Transformer with ResolverTransformer {
 }
 
 class BowerInstallTransformer extends Transformer {
-  BowerInstallTransformer.asPlugin(BarbackSettings settings);
+  BarbackSettings settings;
+  BowerInstallTransformer.asPlugin(this.settings);
 
 
   @override
@@ -316,6 +323,7 @@ class BowerInstallTransformer extends Transformer {
     ProcessResult res = await Process.run('bower', ['install'],workingDirectory: dir.path);
     if (res.exitCode!=0) {
       transform.logger.error("BOWER ERROR : ${res.stdout} / ${res.stderr}");
+      transform.logger.error("BOWER:\n${await bowerJson.readAsString()}");
       throw "Error running bower install";
     }
     transform.logger.info("Downloading bower dependencies ... DONE");
