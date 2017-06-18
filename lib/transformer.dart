@@ -6,6 +6,7 @@ class PolymerizeTransformer extends TransformerGroup {
 
   static List<List> _createPhases(BarbackSettings settings) => [
         [new InoculateTransformer.asPlugin(settings)],
+        [new GatheringTransformer.asPlugin(settings)],
         [new FinalizeTransformer.asPlugin(settings)],
         [new BowerInstallTransformer.asPlugin(settings)]
       ];
