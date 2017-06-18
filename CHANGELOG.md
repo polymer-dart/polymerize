@@ -1,3 +1,6 @@
+# 0.9.1
+ - require loading 
+
 # 0.9.0
  - moving to pub+ddc
 
