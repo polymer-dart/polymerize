@@ -18,6 +18,8 @@ import 'package:resource/resource.dart';
 import 'package:path/path.dart' as p;
 import 'package:polymerize/src/utils.dart';
 
+import 'dart:io' ;
+
 class ResolversInternalContext implements InternalContext {
   Resolver _resolver;
 
@@ -389,11 +391,14 @@ class BowerInstallTransformer extends Transformer {
     // Run bower install in a temporary folder and make them run produce assets
 
     Directory dir = await Directory.systemTemp.createTemp('bower_import');
-
+    transform.logger.fine('Using temp dir ${dir.path}');
     File bowerJson = new File(p.join(dir.path, 'bower.json'));
+
     await bowerJson.writeAsString(await transform.primaryInput.readAsString());
+    transform.logger.fine('Created ${bowerJson.path}');
     transform.logger.info("Downloading bower dependencies ...");
-    ProcessResult res = await Process.run('bower', ['install'], workingDirectory: dir.path);
+
+    ProcessResult res = await Process.run(Platform.isWindows?'bower.cmd':'bower', ['install'], workingDirectory: dir.path);
     if (res.exitCode != 0) {
       transform.logger.error("BOWER ERROR : ${res.stdout} / ${res.stderr}");
       transform.logger.error("BOWER:\n${await bowerJson.readAsString()}");
