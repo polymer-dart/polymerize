@@ -343,7 +343,7 @@ class FinalizeTransformer extends AggregateTransformer {
       t.addOutput(new Asset.fromString(polymer_loader, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/loader.js'))));
       t.addOutput(new Asset.fromString(polymer_htmlimport, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/htmlimport.js'))));
       t.addOutput(new Asset.fromString(
-          new AssetId(t.package, 'web/polymerize_require/start.js'), await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/start.js'))));
+          new AssetId(t.package, 'web/polymerize_require/start.js'), await t.readInputAsString(new AssetId('polymerize',settings.mode==BarbackMode.DEBUG ? 'lib/src/polymerize_require/start_debug.js': 'lib/src/polymerize_require/start.js'))));
 
       t.addOutput(new Asset.fromString(
           new AssetId(t.package, 'web/polymerize_require/require.js'), await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/require.js'))));
@@ -390,7 +390,20 @@ class BowerInstallTransformer extends Transformer {
   apply(Transform transform) async {
     // Run bower install in a temporary folder and make them run produce assets
 
+
     Directory dir = await Directory.systemTemp.createTemp('bower_import');
+    String bowerCmd = Platform.isWindows ? 'bower.cmd' : 'bower';
+
+    try {
+      ProcessResult res = await Process.run(bowerCmd, ['-v'], workingDirectory: dir.path);
+      if (res.exitCode!=0) {
+        throw "Bower execution failed : ${res.stderr} , ${res.stdout}";
+      }
+    } catch (error) {
+      transform.logger.warning('Could not find bower, skipping bower install phase: ${error}');
+      return;
+    }
+
     transform.logger.fine('Using temp dir ${dir.path}');
     File bowerJson = new File(p.join(dir.path, 'bower.json'));
 
@@ -398,7 +411,7 @@ class BowerInstallTransformer extends Transformer {
     transform.logger.fine('Created ${bowerJson.path}');
     transform.logger.info("Downloading bower dependencies ...");
 
-    ProcessResult res = await Process.run(Platform.isWindows?'bower.cmd':'bower', ['install'], workingDirectory: dir.path);
+    ProcessResult res = await Process.run(bowerCmd, ['install'], workingDirectory: dir.path);
     if (res.exitCode != 0) {
       transform.logger.error("BOWER ERROR : ${res.stdout} / ${res.stderr}");
       transform.logger.error("BOWER:\n${await bowerJson.readAsString()}");

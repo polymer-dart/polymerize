@@ -1,3 +1,7 @@
+# 0.9.2
+ - better detecting of bower
+ - added support for dart stack trace mapping
+
 # 0.9.1+1
  - fix for windows
 # 0.9.1
