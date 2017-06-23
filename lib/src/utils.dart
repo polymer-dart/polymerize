@@ -51,6 +51,8 @@ bool isStoreDef(DartObject o) => (isPolymerElementUri(o.type.element.librarySour
 
 bool isInit(DartObject o) => o != null && (isPolymerElementInitUri(o.type.element.librarySource.uri)) && (o.type.name == 'Init');
 
+bool isEntryPoint(DartObject o) => o != null && (isPolymerElementInitUri(o.type.element.librarySource.uri)) && (o.type.name == 'EntryPoint');
+
 bool isInitModule(DartObject o) => o != null && (isPolymerElementInitUri(o.type.element.librarySource.uri)) && (o.type.name == 'InitModule');
 
 bool isHtmlImport(DartObject o) => o != null && (isPolymerElementHtmlImportUri(o.type.element.librarySource.uri)) && (o.type.name == 'HtmlImport');
@@ -65,7 +67,7 @@ Iterable<DartObject> allFirstLevelAnnotation(Iterable<CompilationUnit> cus, bool
 
 typedef bool Matcher(DartObject x);
 
-X _whichMatcher<X>(DartObject annotation, Map<X, Matcher> matchers) => matchers.keys.firstWhere((k) => matchers[k](annotation), orElse: () => null);
+X _whichMatcher<X>(DartObject annotation, Map<X, Matcher> matchers,X orElse) => matchers.keys.firstWhere((k) => matchers[k](annotation), orElse: () => orElse);
 
 Map<X, Iterable<Y>> _collect<X, Y, Z>(Iterable<Z> i, {X key(Z z), Y value(Z z)}) {
   Map<X, List<Y>> res = {};
@@ -93,12 +95,12 @@ class AnnotationInfo {
   AnnotationInfo({this.element, this.annotation});
 }
 
-Map<X, List<AnnotationInfo>> firstLevelAnnotationMap<X>(Iterable<CompilationUnit> cus, Map<X, Matcher> matchers) => _collect(
+Map<X, List<AnnotationInfo>> firstLevelAnnotationMap<X>(Iterable<CompilationUnit> cus, Map<X, Matcher> matchers,X orElse) => _collect(
     flatten<AnnotationInfo>(flatten<AstNode>(cus.map((cu) => cu.sortedDirectivesAndDeclarations))
         .map(_element)
         .where((e) => e?.metadata != null)
         .map((e) => e.metadata.map((a) => a.computeConstantValue()).where(notNull).map((o) => new AnnotationInfo(element: e, annotation: o)))),
-    key: (AnnotationInfo o) => _whichMatcher(o.annotation, matchers),
+    key: (AnnotationInfo o) => _whichMatcher(o.annotation, matchers,orElse),
     value: (AnnotationInfo o) => o);
 
 Element _element(AstNode x) => (x is Declaration) ? x.element : ((x is Directive) ? x.element : null);
@@ -132,5 +134,5 @@ matcher anyOf(List<matcher> matches) => (DartObject o) => matches.any((m) => m(o
 bool notNull(x) => x != null;
 
 
-bool needsProcessing(LibraryElement le) => hasAnyFirstLevelAnnotation(le.units.map((u)=>u.unit), anyOf([isJsMap,isBowerImport,isPolymerRegister,isInit,isInitModule,isHtmlImport,isPolymerBehavior]));
+bool needsProcessing(LibraryElement le) => hasAnyFirstLevelAnnotation(le.units.map((u)=>u.unit), anyOf([isJsMap,isBowerImport,isPolymerRegister,isInit,isInitModule,isHtmlImport,isPolymerBehavior,isEntryPoint]));
 
