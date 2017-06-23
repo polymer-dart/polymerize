@@ -20,6 +20,9 @@ import 'package:polymerize/src/utils.dart';
 
 import 'dart:io';
 
+// Is there a better way to do this ?
+const String VERSION='0.9.3';
+
 class ResolversInternalContext implements InternalContext {
   Resolver _resolver;
   String packageName;
@@ -106,7 +109,7 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
       transform.logger.fine("${transform.primaryInput.id} is NOT a library, skipping");
       return;
     }
-
+    transform.logger.fine("POLYMERIZE VERSION:${VERSION}");
     transform.logger.fine("Processing ${transform.primaryInput.id}");
     Buffer outputBuffer = new Buffer();
     Buffer htmlBuffer = new Buffer();
