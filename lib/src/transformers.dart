@@ -22,17 +22,20 @@ import 'dart:io' ;
 
 class ResolversInternalContext implements InternalContext {
   Resolver _resolver;
+  String packageName;
 
-  static AssetId toAssetId(String uriString) {
+  AssetId toAssetId(String uriString) {
     Uri uri = Uri.parse(uriString);
     if (uri.scheme == 'package') {
       AssetId assetId = new AssetId(uri.pathSegments[0], "lib/${uri.pathSegments.sublist(1).join("/")}");
       return assetId;
+    } else {
+      return new AssetId(packageName,"web/${uriString}");
     }
     throw "Unknown URI ${uriString}";
   }
 
-  ResolversInternalContext(Resolver resolver) : _resolver = resolver;
+  ResolversInternalContext(Resolver resolver,this.packageName) : _resolver = resolver;
 
   @override
   CompilationUnit getCompilationUnit(String inputUri) => getLibraryElement(inputUri).unit;
@@ -84,7 +87,7 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
   InoculateTransformer.asPlugin(BarbackSettings settings) : this(releaseMode: settings.mode == BarbackMode.RELEASE, settings: settings);
 
   Future<bool> isPrimary(id) async {
-    return id.path.endsWith(ORIG_EXT) && id.path.startsWith("lib/");
+    return id.path.endsWith(ORIG_EXT) /* && id.path.startsWith("lib/")*/;
   }
 
   AssetId toDest(AssetId orig) => new AssetId(orig.package, orig.path.substring(0, orig.path.length - ORIG_EXT.length) + "_g.dart");
@@ -118,7 +121,7 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
     uri = resolver.getImportUri(resolver.getLibrary(origId), from: dest).toString();
     transform.logger.fine("My URI : :${uri}");
 
-    GeneratorContext generatorContext = new GeneratorContext(new ResolversInternalContext(resolver), uri, htmlBuffer.createSink(), outputBuffer.createSink());
+    GeneratorContext generatorContext = new GeneratorContext(new ResolversInternalContext(resolver,transform.primaryInput.id.package), uri, htmlBuffer.createSink(), outputBuffer.createSink());
     await generatorContext.generateCode();
     Asset gen = new Asset.fromStream(dest, outputBuffer.binaryStream);
     transform.addOutput(gen);
@@ -197,6 +200,9 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
   Future _generateBowerJson(Transform t, Resolver r) async {
     // Check if current lib matches
 
+    if (!r.isLibrary(t.primaryInput.id)) {
+      return;
+    }
     t.logger.fine("PRODUCING POLYMERIZE SUMMARY FOR ${t.primaryInput.id}");
 
     // Create bower.json and collect all extra deps
@@ -217,7 +223,12 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
       Map<String, List<AnnotationInfo>> annotations =
           firstLevelAnnotationMap(le.units.map((e) => e.unit), {'bower': isBowerImport, 'html': isHtmlImport, 'js': isJsMap, 'initMod': isInitModule, 'reg': isPolymerRegister});
 
-      String libKey = 'packages/${libAsset.package}/${p.split(p.withoutExtension(libAsset.path)).join('__')}';
+      String libKey;
+      if (libAsset.path.startsWith('lib')) {
+        libKey = 'packages/${libAsset.package}/${p.split(p.withoutExtension(libAsset.path)).join('__')}';
+      } else if (libAsset.path.startsWith('web')) {
+        libKey = '${p.split(p.withoutExtension(libAsset.path)).join('__')}';
+      }
       Set<String> libDeps = extraDeps.putIfAbsent(libKey, () => new Set());
 
       annotations['bower']?.forEach((o) {
@@ -250,7 +261,11 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
         }
 
         AnnotationInfo info = annotations['initMod'].single;
-        runInit[libKey] = [p.split(p.withoutExtension(p.relative(libAsset.path, from: 'lib'))).join('__'), info.element.name].map((x) => "'${x}'").join(',');
+        if (libAsset.path.startsWith('lib')) {
+          runInit[libKey] = [p.split(p.withoutExtension(p.relative(libAsset.path, from: 'lib'))).join('__'), info.element.name].map((x) => "'${x}'").join(',');
+        } else {
+          runInit[libKey] = [p.split(p.withoutExtension(p.relative(libAsset.path, from: 'web'))).join('__'), info.element.name].map((x) => "'${x}'").join(',');
+        }
       }
     });
 
