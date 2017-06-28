@@ -387,6 +387,7 @@ class FinalizeTransformer extends AggregateTransformer {
             }
             yield " };\n";
             yield "define('_start',['dart_sdk'],function(dart_sdk) {\n";
+            yield "  patch_dart_sdk(dart_sdk);\n"; // PATCH&OPTIMIZE THE DART SDK
             yield "  return () => { dart_sdk._isolate_helper.startRootIsolate(() => {}, []); dart_sdk._isolate_helper.startRootIsolate = function(){}; }\n";
             yield "});\n";
             yield "require(['_start'],function(s) { s(); });\n";
