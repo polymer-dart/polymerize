@@ -16,7 +16,7 @@ import 'package:path/path.dart' as path;
 
 typedef Future CodeGenerator(GeneratorContext ctx);
 
-List<CodeGenerator> _codeGenerators = [_generateInitMethods, _generatePolymerRegister, _addHtmlImport,_generateForceImport];
+List<CodeGenerator> _codeGenerators = [_generateInitMethods, _generatePolymerRegister, _addHtmlImport, _generateForceImport];
 
 class GeneratorContext {
   InternalContext ctx;
@@ -42,7 +42,7 @@ class GeneratorContext {
 
     libBuilder = new code_builder.PartOfBuilder(inputUri, scope);
 
-    code_builder.ReferenceBuilder ref = code_builder.reference('initModule','package:polymerize_common/init.dart');
+    code_builder.ReferenceBuilder ref = code_builder.reference('initModule', 'package:polymerize_common/init.dart');
     //libBuilder.addAnnotation(ref);
     _initModuleBuilder = new code_builder.MethodBuilder("generatedInitModule");
     libBuilder.addMember(_initModuleBuilder);
@@ -54,7 +54,7 @@ class GeneratorContext {
     //libBuilder.addMember(code_builder.list(_refs).asFinal('_refs'));
 
     output.write(code_builder.prettyToSource(libBuilder.buildAst(scope)));
-    await Future.wait([output.flush(),_htmlHeader.flush()]);
+    await Future.wait([output.flush(), _htmlHeader.flush()]);
 
     return scope.toImports();
   }
@@ -107,18 +107,16 @@ Future _generateInitMethods(GeneratorContext ctx) async {
  * Check if importing a native lib that contains annotations that needs be imported.
  */
 
-String forceFlagName(LibraryElement le,[String prefix]) => "${prefix!=null?prefix+'.':''}FORCE_${le.source.uri.toString().replaceAll(new RegExp('[._:/-]'),'_')}";
+String forceFlagName(LibraryElement le, [String prefix]) => "${prefix!=null?prefix+'.':''}FORCE_${le.source.uri.toString().replaceAll(new RegExp('[._:/-]'),'_')}";
 
 Future _generateForceImport(GeneratorContext ctx) async {
-
   code_builder.ExpressionBuilder expressionBuilder = code_builder.literal(false);
   for (ImportElement ie in ctx.cu.element.library.imports) {
     if (needsProcessing(ie.importedLibrary)) {
-      expressionBuilder = expressionBuilder.or(code_builder.reference(forceFlagName(ie.importedLibrary,ie.prefix?.name),ie.importedLibrary.source.uri.toString()));
+      expressionBuilder = expressionBuilder.or(code_builder.reference(forceFlagName(ie.importedLibrary, ie.prefix?.name), ie.importedLibrary.source.uri.toString()));
     }
   }
   ctx.libBuilder.addMember(expressionBuilder.asFinal(forceFlagName(ctx.cu.element.library)));
-
 }
 
 const String POLYMERIZE_JS = 'package:polymer_element/polymerize_js.dart';
@@ -169,15 +167,17 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
 
           //ctx.addRef(code_builder.reference(classElement.name,ctx.inputUri));
 
-          DartObject libraryAnnotation = getAnnotation(classElement.library.metadata, isJS).getField('name');
-          module = libraryAnnotation.toStringValue();
-          DartObject classAnno = getAnnotation(classElement.metadata, isJS).getField('name');
-          className = classAnno.isNull ? classElement.name : classAnno.toStringValue();
+          DartObject libraryAnnotation = getAnnotation(classElement.library.metadata, isJS)?.getField('name');
+          if (libraryAnnotation != null) {
+            module = libraryAnnotation.toStringValue();
+            DartObject classAnno = getAnnotation(classElement.metadata, isJS).getField('name');
+            className = classAnno.isNull ? classElement.name : classAnno.toStringValue();
 
-          ctx.addInitStatement(importNativeRef.call([
-            code_builder.literal(tagName),
-            code_builder.list([module, className].map((x) => code_builder.literal(x)))
-          ]));
+            ctx.addInitStatement(importNativeRef.call([
+              code_builder.literal(tagName),
+              code_builder.list([module, className].map((x) => code_builder.literal(x)))
+            ]));
+          }
         }
         continue;
       }
@@ -250,7 +250,7 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
     if (statePath != null) {
       properties[fe.name] = reduxPropertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'statePath': code_builder.literal(statePath)});
     } else {
-      properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify),'computed':code_builder.literal(computed)});
+      properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'computed': code_builder.literal(computed)});
     }
   });
 
