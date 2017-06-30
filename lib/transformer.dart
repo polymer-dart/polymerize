@@ -8,6 +8,7 @@ class PolymerizeTransformer extends TransformerGroup {
         [new InoculateTransformer.asPlugin(settings)],
         [new GatheringTransformer.asPlugin(settings)],
         [new FinalizeTransformer.asPlugin(settings)],
-        [new BowerInstallTransformer.asPlugin(settings)]
+        [new BowerInstallTransformer.asPlugin(settings)],
+        [new TestTransfomer.asPlugin(settings)]
       ];
 }

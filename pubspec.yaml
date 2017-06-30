@@ -37,6 +37,8 @@ dependencies:
  archive: any
  package_resolver: any
  barback: any
+ test: any
+ html5: ^0.1.5
 # dartson: '0.2.6'
 # build:
 #  git:

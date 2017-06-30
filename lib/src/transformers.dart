@@ -494,6 +494,73 @@ class BowerInstallTransformer extends Transformer {
   isPrimary(AssetId id) => id.path.endsWith('/bower.json');
 }
 
+class TestTransfomer extends Transformer with ResolverTransformer {
+  @override
+  Future<bool> isPrimary(AssetId id) async => id.path.startsWith('test/') && id.path.endsWith('.dart');
+
+  BarbackSettings settings;
+
+  TestTransfomer.asPlugin(this.settings) {
+    resolvers = new Resolvers(dartSdkDirectory);
+  }
+
+  @override
+  Future<bool> shouldApplyResolver(Asset asset) async => asset.id.path.endsWith('.dart');
+
+  @override
+  applyResolver(Transform transform, Resolver resolver) async {
+    if (!resolver.isLibrary(transform.primaryInput.id)) {
+      return;
+    }
+
+    LibraryElement origLib = resolver.getLibrary(transform.primaryInput.id);
+    FunctionElement mainFunction = origLib.definingCompilationUnit.functions.firstWhere((fe) => fe.name == 'main', orElse: () => null);
+    if (mainFunction == null) {
+      return;
+    }
+
+    AssetId newLibId = transform.primaryInput.id.addExtension('.browser_test.dart');
+
+    // Generate the output
+    Scope scope = new Scope.dedupe();
+
+    LibraryBuilder libraryBuilder = new LibraryBuilder.scope(scope: scope);
+    libraryBuilder.addDirective(new ImportBuilder(resolver.getImportUri(origLib, from: newLibId).toString(), prefix: 'orig'));
+    MethodBuilder mainBuilder = new MethodBuilder.returnVoid('main')
+      ..addStatements(() sync* {
+        ExpressionBuilder origMain = reference('orig.main');
+        ExpressionBuilder runTest = reference('runTest','package:polymerize/test_support.dart');
+        yield runTest.call([origMain]);
+      }());
+    libraryBuilder.addMember(mainBuilder);
+
+    transform.addOutput(new Asset.fromString(newLibId, prettyToSource(libraryBuilder.buildAst(scope))));
+
+    // If the user has their own HTML file for the test, let that take
+    // precedence. Otherwise, create our own basic file.
+    var htmlId = transform.primaryInput.id.changeExtension('.html');
+    if (await transform.hasInput(htmlId)) return;
+
+    transform.addOutput(new Asset.fromString(
+        htmlId,
+        '''
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>${HTML_ESCAPE.convert(transform.primaryInput.id.path)} Test</title>
+            <link rel="x-dart-test"
+                  href="${HTML_ESCAPE.convert(p.url.basename(transform.primaryInput.id.path))}">
+            <script src="polymerize_require/dart_test.js"></script>
+            <!-- needed because pub will refuse executing otherwise
+              <script src="packages/test/dart.js"></script>
+            -->
+
+          </head>
+          </html>
+        '''));
+  }
+}
+
 Iterable<X> _dedupe<X>(Iterable<X> from) => new Set()..addAll(from);
 
 bool _needsHtmlImport(LibraryElement importedLib) => hasAnyFirstLevelAnnotation(importedLib.units.map((u) => u.unit), anyOf([isInit, isPolymerRegister]));
