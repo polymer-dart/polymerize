@@ -1,3 +1,6 @@
+# 0.9.4
+ - added support for tests!!!
+
 # 0.9.2
  - better detecting of bower
  - added support for dart stack trace mapping
