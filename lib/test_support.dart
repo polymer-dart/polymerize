@@ -25,7 +25,7 @@ class TestMessage {
 StreamChannel postMessageChannel() {
   var controller = new StreamChannelController(sync: true);
 
-  new EventStreamProvider('message').forTarget(window).listen((message) {
+  onMessage(window).listen((MessageEvent message) {
     // A message on the Window can theoretically come from any website. It's
     // very unlikely that a malicious site would care about hacking someone's
     // unit tests, let alone be able to find the test server while it's

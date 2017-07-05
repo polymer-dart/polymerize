@@ -38,14 +38,16 @@ dependencies:
  package_resolver: any
  barback: any
  test: any
- html5: ^0.1.5
+ html5: ^0.1.7-dev
 # dartson: '0.2.6'
 # build:
 #  git:
 #   url: https://github.com/dart-lang/build.git
 executables:
  polymerize: polymerize
-#dependency_overrides:
+dependency_overrides:
+ html5:
+   path: ../html_lib
 # analyzer: 0.30.0
 # analyzer: 0.29.1
 # dev_compiler:
