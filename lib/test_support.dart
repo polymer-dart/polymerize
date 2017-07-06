@@ -1,6 +1,7 @@
 @JS()
 library polymerize_test_support;
 
+import 'dart:convert';
 import 'dart:js_util';
 import 'package:js/js.dart';
 import 'package:stream_channel/stream_channel.dart';
@@ -20,6 +21,9 @@ class TestMessage {
   external factory TestMessage({String href,data,bool ready});
 }
 
+@JS('JSON.stringify')
+external String jsToJson(obj);
+
 /// Constructs a [StreamChannel] wrapping `postMessage` communication with the
 /// host page.
 StreamChannel postMessageChannel() {
@@ -32,8 +36,9 @@ StreamChannel postMessageChannel() {
     // running, but it's good practice to check the origin anyway.
     if (message.origin != window.location.origin) return;
     message.stopPropagation();
-
-    controller.local.sink.add(message.data);
+    var jsonMsg= JSON.decode(jsToJson(message.data));
+    //print('ADDING TO SINK :${jsonMsg} from ${message.data}');
+    controller.local.sink.add(jsonMsg);
   });
 
   Window parent = (window.parent as Window);
@@ -42,7 +47,7 @@ StreamChannel postMessageChannel() {
     // TODO(nweiz): Stop manually adding href here once issue 22554 is
     // fixed.
     TestMessage msg =new TestMessage(href:window.location.href, data:jsify(data));
-    print('sending :${msg.href} / ${msg.data}');
+    //print('sending :${msg.href} / ${msg.data}');
 
     parent.postMessage(
         msg, window.location.origin);
@@ -50,7 +55,7 @@ StreamChannel postMessageChannel() {
 
   // Send a ready message once we're listening so the host knows it's safe to
   // start sending events.
-  print('sending ready');
+  //print('sending ready');
   parent.postMessage(new TestMessage(href:window.location.href,ready:true), window.location.origin);
 
   return controller.foreign;
