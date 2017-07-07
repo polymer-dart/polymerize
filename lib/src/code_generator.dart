@@ -139,57 +139,74 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
   code_builder.ReferenceBuilder summaryFactory = code_builder.reference("summary", POLYMERIZE_JS);
 
   // lookup for annotation
-  for (CompilationUnitMember m in ctx.cu.declarations) {
-    if (m.element?.kind == ElementKind.CLASS) {
-      ClassElement classElement = m.element;
-      DartObject register = getAnnotation(m.element.metadata, isPolymerRegister);
-      if (register != null) {
-        String tagName = register.getField('tagName').toStringValue();
-        String template = register.getField('template').toStringValue();
-        bool native = register.getField('native').toBoolValue();
 
-        if (!native) {
-          code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name, ctx.inputUri);
-          //ctx.addRef(cls);
+  for (CompilationUnit cu in ctx.cu.element.library.units.map((CompilationUnitElement ce)=> ce.unit)) {
+    for (CompilationUnitMember m in cu.declarations) {
+      if (m.element?.kind == ElementKind.CLASS) {
+        ClassElement classElement = m.element;
+        DartObject register = getAnnotation(m.element.metadata, isPolymerRegister);
+        if (register != null) {
+          String tagName = register.getField('tagName').toStringValue();
+          String template = register.getField('template').toStringValue();
+          bool native = register.getField('native').toBoolValue();
+
+          if (!native) {
+            code_builder.ReferenceBuilder cls = code_builder.reference(
+                classElement.name, ctx.inputUri);
+            //ctx.addRef(cls);
+
+            code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(
+                ctx, classElement);
+
+            ctx.addInitStatement(
+                ref.call([
+                           cls,
+                           code_builder.literal(tagName),
+                           configExpressionBuilder,
+                           summaryFactory.call([]),
+                           code_builder.literal(false),
+                           code_builder.literal(template)
+                         ]));
+            if (template != null) {
+              ctx.addImportHtml(template);
+            }
+          } else {
+            // Import native (define a class if it doesn't exist
+
+            String module;
+            String className;
+
+            //ctx.addRef(code_builder.reference(classElement.name,ctx.inputUri));
+
+            DartObject libraryAnnotation = getAnnotation(classElement.library.metadata, isJS)
+                ?.getField('name');
+            if (libraryAnnotation != null) {
+              module = libraryAnnotation.toStringValue();
+              DartObject classAnno = getAnnotation(classElement.metadata, isJS).getField('name');
+              className = classAnno.isNull ? classElement.name : classAnno.toStringValue();
+
+              ctx.addInitStatement(importNativeRef.call([
+                                                          code_builder.literal(tagName),
+                                                          code_builder.list(
+                                                              [module, className].map((x) =>
+                                                                  code_builder.literal(x)))
+                                                        ]));
+            }
+          }
+          continue;
+        }
+
+        DartObject behavior = getAnnotation(m.element.metadata, isPolymerBehavior);
+        if (behavior != null) {
+          String name = _behaviorName(m.element, behavior);
+          code_builder.ReferenceBuilder cls = code_builder.reference(
+              classElement.name, ctx.inputUri);
 
           code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx, classElement);
 
           ctx.addInitStatement(
-              ref.call([cls, code_builder.literal(tagName), configExpressionBuilder, summaryFactory.call([]), code_builder.literal(false), code_builder.literal(template)]));
-          if (template != null) {
-            ctx.addImportHtml(template);
-          }
-        } else {
-          // Import native (define a class if it doesn't exist
-
-          String module;
-          String className;
-
-          //ctx.addRef(code_builder.reference(classElement.name,ctx.inputUri));
-
-          DartObject libraryAnnotation = getAnnotation(classElement.library.metadata, isJS)?.getField('name');
-          if (libraryAnnotation != null) {
-            module = libraryAnnotation.toStringValue();
-            DartObject classAnno = getAnnotation(classElement.metadata, isJS).getField('name');
-            className = classAnno.isNull ? classElement.name : classAnno.toStringValue();
-
-            ctx.addInitStatement(importNativeRef.call([
-              code_builder.literal(tagName),
-              code_builder.list([module, className].map((x) => code_builder.literal(x)))
-            ]));
-          }
+              defBehavior.call([code_builder.literal(name), cls, configExpressionBuilder]));
         }
-        continue;
-      }
-
-      DartObject behavior = getAnnotation(m.element.metadata, isPolymerBehavior);
-      if (behavior != null) {
-        String name = _behaviorName(m.element, behavior);
-        code_builder.ReferenceBuilder cls = code_builder.reference(classElement.name, ctx.inputUri);
-
-        code_builder.ExpressionBuilder configExpressionBuilder = collectConfig(ctx, classElement);
-
-        ctx.addInitStatement(defBehavior.call([code_builder.literal(name), cls, configExpressionBuilder]));
       }
     }
   }
