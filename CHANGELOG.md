@@ -1,3 +1,7 @@
+# 0.9.5
+ - fixes
+ - better support for builders
+
 # 0.9.4
  - added support for tests!!!
 
