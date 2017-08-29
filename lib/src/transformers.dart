@@ -53,8 +53,6 @@ class ResolversInternalContext implements InternalContext {
 
 const String ORIG_EXT = ".dart";
 
-Iterable<Uri> _findDependencies(Transform t, Resolver r) => _findDependenciesFor(t, r, r.getLibrary(t.primaryInput.id));
-
 Iterable<LibraryElement> _libraryTree(LibraryElement from, [Set<LibraryElement> traversed]) sync* {
   if (traversed == null) {
     traversed = new Set<LibraryElement>();
@@ -70,15 +68,10 @@ Iterable<LibraryElement> _libraryTree(LibraryElement from, [Set<LibraryElement> 
   }
 }
 
-bool _anyDepNeedsHtmlImport(LibraryElement lib) => _libraryTree(lib).any(_needsHtmlImport);
-
 Iterable<LibraryElement> _referencedLibs(LibraryElement lib) sync* {
   yield* lib.imports.map((i) => i.importedLibrary);
   yield* lib.exports.map((e) => e.exportedLibrary);
 }
-
-Iterable<Uri> _findDependenciesFor(Transform t, Resolver r, LibraryElement lib) =>
-    _referencedLibs(lib).where(_anyDepNeedsHtmlImport).map((lib) => r.getImportUri(lib, from: t.primaryInput.id));
 
 class InoculateTransformer extends Transformer with ResolverTransformer {
   InoculateTransformer({bool releaseMode, this.settings}) {
@@ -93,14 +86,6 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
   }
 
   AssetId toDest(AssetId orig) => new AssetId(orig.package, orig.path.substring(0, orig.path.length - ORIG_EXT.length) + "_g.dart");
-
-  @override
-  declareOutputs(DeclaringTransform transform) {
-    // for each dart file produce a '.g.dart'
-
-    transform.declareOutput(toDest(transform.primaryId));
-    //transform.declareOutput(toHtmlDest(transform.primaryId));
-  }
 
   @override
   applyResolver(Transform transform, Resolver resolver) async {
