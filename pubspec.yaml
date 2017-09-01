@@ -8,8 +8,9 @@ environment:
    sdk: ">=1.8.0 <2.0.0"
 
 dependencies:
-# build: ^0.9.1
-# build_runner: ^0.3.2
+ build: ^0.10.0
+ build_runner: ^0.4.0
+ source_gen: ^0.7.0
  bazel_worker: "^0.1.4"
  code_builder: ^1.0.2
 # dev_compiler:

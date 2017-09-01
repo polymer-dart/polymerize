@@ -43,6 +43,24 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "1.0.2"
+  build:
+    description:
+      name: build
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.10.0+1"
+  build_barback:
+    description:
+      name: build_barback
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.4.0"
+  build_runner:
+    description:
+      name: build_runner
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.4.0+3"
   charcode:
     description:
       name: charcode
@@ -135,10 +153,10 @@ packages:
     version: "0.13.2"
   html5:
     description:
-      path: "../html_lib"
-      relative: true
-    source: path
-    version: "0.1.7-dev"
+      name: html5
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.1.7"
   http:
     description:
       name: http
@@ -204,7 +222,7 @@ packages:
       name: meta
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "1.0.5"
+    version: "1.1.1"
   mime:
     description:
       name: mime
@@ -289,6 +307,12 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "0.2.1"
+  source_gen:
+    description:
+      name: source_gen
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.7.1"
   source_map_stack_trace:
     description:
       name: source_map_stack_trace
@@ -319,6 +343,12 @@ packages:
       url: "http://pub.drafintech.it:5001"
     source: hosted
     version: "1.6.1"
+  stream_transform:
+    description:
+      name: stream_transform
+      url: "http://pub.drafintech.it:5001"
+    source: hosted
+    version: "0.0.9"
   string_scanner:
     description:
       name: string_scanner
@@ -368,4 +398,4 @@ packages:
     source: hosted
     version: "2.1.12"
 sdks:
-  dart: ">=1.24.0 <2.0.0"
+  dart: ">=1.24.0 <2.0.0-dev.infinity"

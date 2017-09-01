@@ -7,6 +7,7 @@ import 'package:analyzer/analyzer.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:barback/barback.dart';
+import 'package:build/src/builder/builder.dart';
 import 'package:code_transformers/resolver.dart';
 import 'package:glob/glob.dart';
 import 'package:polymerize/src/code_generator.dart';
@@ -18,6 +19,9 @@ import 'package:resource/resource.dart';
 import 'package:path/path.dart' as p;
 import 'package:polymerize/src/utils.dart';
 import 'package:package_config/packages.dart';
+import 'package:build_barback/build_barback.dart';
+import 'package:source_gen/source_gen.dart' as source_gen;
+
 
 import 'dart:io';
 
@@ -73,6 +77,13 @@ Iterable<LibraryElement> _referencedLibs(LibraryElement lib) sync* {
   yield* lib.exports.map((e) => e.exportedLibrary);
 }
 
+const String EXT = '.polymerize.dart';
+
+class PartGeneratorTransformer extends BuilderTransformer {
+  PartGeneratorTransformer() : super(new source_gen.LibraryBuilder(new PolymerizeDartGenerator(),generatedExtension: EXT,formatOutput: (str) => str));
+
+}
+
 class InoculateTransformer extends Transformer with ResolverTransformer {
   InoculateTransformer({bool releaseMode, this.settings}) {
     resolvers = new Resolvers(dartSdkDirectory);
@@ -85,7 +96,7 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
     return id.path.endsWith(ORIG_EXT) /* && id.path.startsWith("lib/")*/;
   }
 
-  AssetId toDest(AssetId orig) => new AssetId(orig.package, orig.path.substring(0, orig.path.length - ORIG_EXT.length) + "_g.dart");
+  AssetId toDest(AssetId orig) => new AssetId(orig.package, orig.path.substring(0, orig.path.length - ORIG_EXT.length) + EXT);
 
   @override
   applyResolver(Transform transform, Resolver resolver) async {
@@ -95,29 +106,8 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
     }
     transform.logger.fine("POLYMERIZE VERSION:0.9.4");
     transform.logger.fine("Processing ${transform.primaryInput.id}");
-    Buffer outputBuffer = new Buffer();
-    Buffer htmlBuffer = new Buffer();
-
     AssetId origId = transform.primaryInput.id;
     AssetId dest = toDest(origId);
-    transform.logger.fine("DEST ID : ${dest}");
-
-    String basePath = p.joinAll(p.split(origId.path).sublist(1));
-    String uri; // = "package:${origId.package}/${basePath}";
-
-    uri = resolver.getImportUri(resolver.getLibrary(origId), from: dest).toString();
-    transform.logger.fine("My URI : :${uri}");
-
-    GeneratorContext generatorContext = new GeneratorContext(
-        new ResolversInternalContext(resolver, transform.primaryInput.id.package, p.split(transform.primaryInput.id.path).first),
-        uri,
-        htmlBuffer.createSink(),
-        outputBuffer.createSink());
-    await generatorContext.generateCode();
-    Asset gen = new Asset.fromStream(dest, outputBuffer.binaryStream);
-    transform.addOutput(gen);
-
-    transform.logger.fine("PRODUCED : ${await gen.readAsString()}");
 
     // add a line at the endbeginning
     String myFile = (await transform.primaryInput.readAsString());
@@ -155,7 +145,7 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
 
   @override
   Future<bool> shouldApplyResolver(Asset asset) async {
-    return asset.id.path.endsWith('.dart');
+    return asset.id.path.endsWith('.dart')&&!asset.id.path.endsWith(EXT);
   }
 }
 

@@ -1,7 +1,4 @@
-import 'package:analyzer/src/generated/engine.dart';
-import 'package:html/dom.dart' as dom;
 import 'package:path/path.dart' as path;
-import 'package:analyzer/src/generated/source.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:polymerize/src/bower_library.dart';
@@ -19,6 +16,8 @@ import 'package:polymerize/src/build_command.dart' as build_cmd;
 import 'package:args/src/arg_results.dart';
 import 'package:polymerize/src/utils.dart';
 import 'package:bazel_worker/bazel_worker.dart';
+
+export 'package:polymerize/src/code_generator.dart' show PolymerizeDartGenerator;
 
 const String RULES_VERSION = 'v0.12.5';
 

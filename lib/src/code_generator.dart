@@ -7,14 +7,22 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart' as code_builder;
+import 'package:code_builder/src/builders/file.dart';
 
+import 'package:code_transformers/assets.dart';
+import 'package:code_transformers/src/resolver_impl.dart';
 import 'package:html/dom.dart' as dom;
+import 'package:polymerize/src/dart_file_command.dart';
 import 'package:polymerize/src/dep_analyzer.dart';
 import 'package:polymerize/src/utils.dart';
 import 'package:path/path.dart' as path;
-
+import 'package:logging/logging.dart' as logging;
+import 'package:source_gen/source_gen.dart';
 typedef Future CodeGenerator(GeneratorContext ctx);
+
+logging.Logger _logger = new logging.Logger('polymerize.lib.src.code_generator');
 
 List<CodeGenerator> _codeGenerators = [_generateInitMethods, _generatePolymerRegister, _addHtmlImport, _generateForceImport];
 
@@ -24,19 +32,19 @@ class GeneratorContext {
   IOSink output;
 
   CompilationUnit cu;
-  code_builder.PartOfBuilder libBuilder;
+  FileBuilder libBuilder;
   code_builder.MethodBuilder _initModuleBuilder;
-  IOSink _htmlHeader;
+  //IOSink _htmlHeader;
   code_builder.Scope scope;
 
   void addImportHtml(String path) {
-    _htmlHeader.writeln("<link rel='import' href='${path}'>");
+    //_htmlHeader.writeln("<link rel='import' href='${path}'>");
   }
 
   //List<code_builder.ReferenceBuilder> _refs = [];
 
-  GeneratorContext(this.ctx, this.inputUri, this._htmlHeader, this.output) {
-    cu = ctx.getCompilationUnit(inputUri);
+  GeneratorContext(this.ctx,this.cu, this.inputUri, _ /*this._htmlHeader*/, this.output) {
+    //cu = ctx.getCompilationUnit(inputUri);
 
     scope = new code_builder.Scope.dedupe();
 
@@ -54,7 +62,7 @@ class GeneratorContext {
     //libBuilder.addMember(code_builder.list(_refs).asFinal('_refs'));
 
     output.write(code_builder.prettyToSource(libBuilder.buildAst(scope)));
-    await Future.wait([output.flush(), _htmlHeader.flush()]);
+    await Future.wait([output.flush()/*, _htmlHeader.flush()*/]);
 
     return scope.toImports();
   }
@@ -81,7 +89,7 @@ Future generateCode(String inputUri, String genPath, IOSink htmlTemp) async {
 
   File f = new File(genPath);
   IOSink s = f.openWrite();
-  GeneratorContext getctx = new GeneratorContext(ctx, inputUri, htmlTemp, s);
+  GeneratorContext getctx = new GeneratorContext(ctx,ctx.getCompilationUnit(inputUri), inputUri, htmlTemp, s);
   await getctx.generateCode();
   await s.close();
 }
@@ -291,3 +299,61 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
 
 Future _addHtmlImport(GeneratorContext ctx) async =>
     allFirstLevelAnnotation([ctx.cu], isHtmlImport).map((o) => o.getField('path').toStringValue()).forEach((relPath) => ctx.addImportHtml(relPath));
+
+
+class SimpleContext implements InternalContext {
+  AnalysisContext _context;
+  SimpleContext.fromLib(LibraryElement el) {
+    _context = el.context;
+  }
+
+  @override
+  CompilationUnit getCompilationUnit(String inputUri) => getLibraryElement(inputUri).unit;
+
+
+  @override
+  LibraryElement getLibraryElement(String inputUri) {
+    Source src = _context.sourceFactory.forUri(inputUri);
+    return _context.getLibraryElement(src);
+  }
+
+  @override
+  void invalidateUri(String inputUri) {
+    // TODO: implement invalidateUri
+  }
+}
+
+class PolymerizeDartGenerator extends Generator {
+
+  @override
+  Future<String> generate(LibraryReader library, BuildStep buildStep) async {
+
+    if (library.element.unit!=library.element.definingCompilationUnit.unit ||! needsProcessing(library.element)) {
+      return null;
+    }
+    Buffer outputBuffer = new Buffer();
+
+    GeneratorContext generatorContext = new GeneratorContext(
+        new SimpleContext.fromLib(library.element),
+        library.element.unit,
+        _getUri(library.element.source),
+        null,
+        outputBuffer.createSink());
+    await generatorContext.generateCode();
+
+    //
+    String res = await outputBuffer.stream/*.where((s)=>!s.contains("part of"))*/.join('\n');
+
+    _logger.fine("PRODUCED : ${res}");
+
+    return res;
+  }
+
+  String _getUri(Source src) {
+    if (src is AssetBasedSource) {
+      return assetIdToUri(src.assetId,from: src.assetId);
+    } else {
+      return src.uri.toString();
+    }
+  }
+}
