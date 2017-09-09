@@ -9,8 +9,6 @@ class PolymerizeTransformer extends TransformerGroup {
   static List<List> _createPhases(BarbackSettings settings) {
     List<List> res;
 
-    print("POLYMERIZE TRANSFORMER SETTINGS : ${settings.configuration}");
-
     if (settings.configuration.containsKey("skip-generate")) {
       res = [];
     } else {
