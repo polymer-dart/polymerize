@@ -2,14 +2,31 @@ import 'package:barback/barback.dart';
 import 'package:polymerize/src/transformers.dart';
 
 class PolymerizeTransformer extends TransformerGroup {
-  PolymerizeTransformer.asPlugin(BarbackSettings settings) : super(_createPhases(settings)) {}
+  PolymerizeTransformer.asPlugin(BarbackSettings settings)
+      : super(_createPhases(settings)) {
+  }
 
-  static List<List> _createPhases(BarbackSettings settings) => [
-        [new InoculateTransformer.asPlugin(settings)],  // adds "part" directives
-        [new PartGeneratorTransformer()], // creates parts
-        [new GatheringTransformer.asPlugin(settings)], // collects data to be later gathered
-        [new FinalizeTransformer.asPlugin(settings)], //
-        [new BowerInstallTransformer.asPlugin(settings)],
-        [new TestTransfomer.asPlugin(settings)]
+  static List<List> _createPhases(BarbackSettings settings) {
+    List<List> res;
+
+    print("POLYMERIZE TRANSFORMER SETTINGS : ${settings.configuration}");
+
+    if (settings.configuration.containsKey("skip-generate")) {
+      res = [];
+    } else {
+      res = [
+        [new InoculateTransformer.asPlugin(settings)],
+        [new PartGeneratorTransformer()],
       ];
+    }
+
+    res.addAll([
+      [new GatheringTransformer.asPlugin(settings)],
+      [new FinalizeTransformer.asPlugin(settings)],
+      [new BowerInstallTransformer.asPlugin(settings)],
+      [new TestTransfomer.asPlugin(settings)],
+    ]);
+
+    return res;
+  }
 }

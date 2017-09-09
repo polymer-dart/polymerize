@@ -80,9 +80,11 @@ Iterable<LibraryElement> _referencedLibs(LibraryElement lib) sync* {
 const String EXT = '.polymerize.dart';
 
 class PartGeneratorTransformer extends BuilderTransformer {
-  PartGeneratorTransformer() : super(new source_gen.LibraryBuilder(new PolymerizeDartGenerator(),generatedExtension: EXT,formatOutput: (str) => str));
+  PartGeneratorTransformer() : super(polymerizePartBuilder());
 
 }
+
+Builder polymerizePartBuilder({String extension:EXT}) => new source_gen.LibraryBuilder(new PolymerizeDartGenerator(),generatedExtension: extension,formatOutput: (str) => str);
 
 class InoculateTransformer extends Transformer with ResolverTransformer {
   InoculateTransformer({bool releaseMode, this.settings}) {
@@ -104,7 +106,7 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
       transform.logger.fine("${transform.primaryInput.id} is NOT a library, skipping");
       return;
     }
-    transform.logger.fine("POLYMERIZE VERSION:0.9.4");
+    transform.logger.fine("POLYMERIZE VERSION:DEV");
     transform.logger.fine("Processing ${transform.primaryInput.id}");
     AssetId origId = transform.primaryInput.id;
     AssetId dest = toDest(origId);

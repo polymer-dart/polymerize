@@ -18,6 +18,7 @@ import 'package:polymerize/src/utils.dart';
 import 'package:bazel_worker/bazel_worker.dart';
 
 export 'package:polymerize/src/code_generator.dart' show PolymerizeDartGenerator;
+export 'package:polymerize/src/transformers.dart' show polymerizePartBuilder;
 
 const String RULES_VERSION = 'v0.12.5';
 
