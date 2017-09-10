@@ -1,3 +1,9 @@
+# 0.9.6
+ - fixes for https://github.com/polymer-dart/todo_ddc/issues/12
+ - introducing [build](https://pub.dartlang.org/packages/build) support
+   - added `Builder` for `build` (use `polymerizeBuilder()` to generate a builder for polymerize)
+   - added option `skip-generate: true` to skip generation 
+
 # 0.9.5
  - fixes
  - better support for builders
