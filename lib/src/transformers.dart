@@ -431,6 +431,20 @@ class BowerInstallTransformer extends Transformer {
     String basePath = p.split(transform.primaryInput.id.path).first;
 
     Directory dir = await Directory.systemTemp.createTemp('bower_import');
+
+    try {
+      Asset rc = await transform.getInput(new AssetId(transform.primaryInput.id.package, '.bowerrc'));
+      await new File(p.join(dir.path,'.bowerrc')).writeAsString(await rc.readAsString());
+    } on AssetNotFoundException catch (e) {
+    }
+
+
+    List<String> opts = ['-v'];
+    if (settings.configuration['bower']?.containsKey('offline')??false||Platform.environment.containsKey('POLYMERIZE_BOWER_OFFLINE')) {
+      opts.add('-o');
+      transform.logger.info("Using Bower OFFLINE mode");
+    }
+
     String bowerCmd = Platform.isWindows ? 'bower.cmd' : 'bower';
 
     try {
