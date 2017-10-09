@@ -22,7 +22,6 @@ import 'package:package_config/packages.dart';
 import 'package:build_barback/build_barback.dart';
 import 'package:source_gen/source_gen.dart' as source_gen;
 
-
 import 'dart:io';
 
 class ResolversInternalContext implements InternalContext {
@@ -33,7 +32,8 @@ class ResolversInternalContext implements InternalContext {
   AssetId toAssetId(String uriString) {
     Uri uri = Uri.parse(uriString);
     if (uri.scheme == 'package') {
-      AssetId assetId = new AssetId(uri.pathSegments[0], "lib/${uri.pathSegments.sublist(1).join("/")}");
+      AssetId assetId = new AssetId(
+          uri.pathSegments[0], "lib/${uri.pathSegments.sublist(1).join("/")}");
       return assetId;
     } else {
       return new AssetId(packageName, "${prefix}/${uriString}");
@@ -41,13 +41,16 @@ class ResolversInternalContext implements InternalContext {
     throw "Unknown URI ${uriString}";
   }
 
-  ResolversInternalContext(Resolver resolver, this.packageName, this.prefix) : _resolver = resolver;
+  ResolversInternalContext(Resolver resolver, this.packageName, this.prefix)
+      : _resolver = resolver;
 
   @override
-  CompilationUnit getCompilationUnit(String inputUri) => getLibraryElement(inputUri).unit;
+  CompilationUnit getCompilationUnit(String inputUri) =>
+      getLibraryElement(inputUri).unit;
 
   @override
-  LibraryElement getLibraryElement(String inputUri) => _resolver.getLibrary(toAssetId(inputUri));
+  LibraryElement getLibraryElement(String inputUri) =>
+      _resolver.getLibrary(toAssetId(inputUri));
 
   @override
   void invalidateUri(String inputUri) {
@@ -57,7 +60,8 @@ class ResolversInternalContext implements InternalContext {
 
 const String ORIG_EXT = ".dart";
 
-Iterable<LibraryElement> _libraryTree(LibraryElement from, [Set<LibraryElement> traversed]) sync* {
+Iterable<LibraryElement> _libraryTree(LibraryElement from,
+    [Set<LibraryElement> traversed]) sync* {
   if (traversed == null) {
     traversed = new Set<LibraryElement>();
   }
@@ -81,10 +85,11 @@ const String EXT = '.polymerize.dart';
 
 class PartGeneratorTransformer extends BuilderTransformer {
   PartGeneratorTransformer() : super(polymerizePartBuilder());
-
 }
 
-Builder polymerizePartBuilder({String extension:EXT}) => new source_gen.LibraryBuilder(new PolymerizeDartGenerator(),generatedExtension: extension,formatOutput: (str) => str);
+Builder polymerizePartBuilder({String extension: EXT}) =>
+    new source_gen.LibraryBuilder(new PolymerizeDartGenerator(),
+        generatedExtension: extension, formatOutput: (str) => str);
 
 class InoculateTransformer extends Transformer with ResolverTransformer {
   InoculateTransformer({bool releaseMode, this.settings}) {
@@ -92,18 +97,24 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
   }
   BarbackSettings settings;
 
-  InoculateTransformer.asPlugin(BarbackSettings settings) : this(releaseMode: settings.mode == BarbackMode.RELEASE, settings: settings);
+  InoculateTransformer.asPlugin(BarbackSettings settings)
+      : this(
+            releaseMode: settings.mode == BarbackMode.RELEASE,
+            settings: settings);
 
   Future<bool> isPrimary(id) async {
     return id.path.endsWith(ORIG_EXT) /* && id.path.startsWith("lib/")*/;
   }
 
-  AssetId toDest(AssetId orig) => new AssetId(orig.package, orig.path.substring(0, orig.path.length - ORIG_EXT.length) + EXT);
+  AssetId toDest(AssetId orig) => new AssetId(orig.package,
+      orig.path.substring(0, orig.path.length - ORIG_EXT.length) + EXT);
 
   @override
   applyResolver(Transform transform, Resolver resolver) async {
-    if (!resolver.isLibrary(transform.primaryInput.id) || !needsProcessing(resolver.getLibrary(transform.primaryInput.id))) {
-      transform.logger.fine("${transform.primaryInput.id} is NOT a library, skipping");
+    if (!resolver.isLibrary(transform.primaryInput.id) ||
+        !needsProcessing(resolver.getLibrary(transform.primaryInput.id))) {
+      transform.logger
+          .fine("${transform.primaryInput.id} is NOT a library, skipping");
       return;
     }
     transform.logger.fine("POLYMERIZE VERSION:DEV");
@@ -114,14 +125,17 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
     // add a line at the endbeginning
     String myFile = (await transform.primaryInput.readAsString());
     int pos;
-    List<Declaration> decls = resolver.getLibrary(transform.primaryInput.id).unit.declarations;
+    List<Declaration> decls =
+        resolver.getLibrary(transform.primaryInput.id).unit.declarations;
     if (decls.isEmpty) {
       pos = myFile.length;
     } else {
       // find first part
-      List<Directive> ris = resolver.getLibrary(transform.primaryInput.id).unit.directives ?? [];
+      List<Directive> ris =
+          resolver.getLibrary(transform.primaryInput.id).unit.directives ?? [];
 
-      PartDirective firstPart = ris.firstWhere((d) => d is PartDirective, orElse: () => null);
+      PartDirective firstPart =
+          ris.firstWhere((d) => d is PartDirective, orElse: () => null);
       if (firstPart != null) {
         pos = firstPart.offset;
       } else {
@@ -147,7 +161,7 @@ class InoculateTransformer extends Transformer with ResolverTransformer {
 
   @override
   Future<bool> shouldApplyResolver(Asset asset) async {
-    return asset.id.path.endsWith('.dart')&&!asset.id.path.endsWith(EXT);
+    return asset.id.path.endsWith('.dart') && !asset.id.path.endsWith(EXT);
   }
 }
 
@@ -162,7 +176,10 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
   }
   BarbackSettings settings;
 
-  GatheringTransformer.asPlugin(BarbackSettings settings) : this(releaseMode: settings.mode == BarbackMode.RELEASE, settings: settings);
+  GatheringTransformer.asPlugin(BarbackSettings settings)
+      : this(
+            releaseMode: settings.mode == BarbackMode.RELEASE,
+            settings: settings);
 
   static List<X> asList<X>(something) {
     if (something == null) {
@@ -177,18 +194,23 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
   }
 
   Future<bool> isPrimary(id) async {
-    Iterable<Glob> entryPoints = asList(settings.configuration['entry-point'] ?? settings.configuration['entry-points']).map((x) => new Glob(x));
+    Iterable<Glob> entryPoints = asList(settings.configuration['entry-point'] ??
+            settings.configuration['entry-points'])
+        .map((x) => new Glob(x));
     return entryPoints.any((g) => g.matches(id.path));
   }
 
   @override
   applyResolver(Transform transform, Resolver resolver) async {
     // generate bower.json
-    if (!settings.configuration.containsKey('entry-point') && !settings.configuration.containsKey('entry-points')) {
+    if (!settings.configuration.containsKey('entry-point') &&
+        !settings.configuration.containsKey('entry-points')) {
       return;
     }
 
-    transform.logger.fine("GENERATING BOWER.JSON WITH ${settings.configuration}", asset: transform.primaryInput.id);
+    transform.logger.fine(
+        "GENERATING BOWER.JSON WITH ${settings.configuration}",
+        asset: transform.primaryInput.id);
 
     await _generateBowerJson(transform, resolver);
   }
@@ -223,15 +245,25 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
       basePaths.add(p.split(libAsset.path).first);
 
       Map<String, List<AnnotationInfo>> annotations = firstLevelAnnotationMap(
-          le.units.map((e) => e.unit), {'bower': isBowerImport, 'html': isHtmlImport, 'js': isJsMap, 'initMod': isInitModule, 'reg': isPolymerRegister}, 'other');
+          le.units.map((e) => e.unit),
+          {
+            'bower': isBowerImport,
+            'html': isHtmlImport,
+            'js': isJsMap,
+            'initMod': isInitModule,
+            'reg': isPolymerRegister
+          },
+          'other');
 
       String libKey = toModuleJs(libAsset);
 
       Set<String> libDeps = extraDeps.putIfAbsent(libKey, () => new Set());
 
       annotations['bower']?.forEach((o) {
-        bowerDeps[o.annotation.getField('name').toStringValue()] = o.annotation.getField('ref').toStringValue();
-        libDeps.add('polymerize_require/htmlimport!bower_components/${o.annotation.getField('import').toStringValue()}');
+        bowerDeps[o.annotation.getField('name').toStringValue()] =
+            o.annotation.getField('ref').toStringValue();
+        libDeps.add(
+            'polymerize_require/htmlimport!bower_components/${o.annotation.getField('import').toStringValue()}');
       });
 
       annotations['html']?.forEach((o) {
@@ -249,8 +281,10 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
           return;
         }
         AssetId elemId = r.getSourceAssetId(o.element);
-        String path = p.normalize(p.relative(p.join(p.dirname(elemId.path), template), from: 'lib'));
-        libDeps.add('polymerize_require/htmlimport!packages/${elemId.package}/${path}');
+        String path = p.normalize(
+            p.relative(p.join(p.dirname(elemId.path), template), from: 'lib'));
+        libDeps.add(
+            'polymerize_require/htmlimport!packages/${elemId.package}/${path}');
       });
 
       if (annotations['initMod']?.isNotEmpty ?? false) {
@@ -259,7 +293,10 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
         }
 
         AnnotationInfo info = annotations['initMod'].single;
-        runInit[libKey] = [p.split(p.withoutExtension(libAsset.path)).sublist(1).join('__'), info.element.name].map((x) => "'${x}'").join(',');
+        runInit[libKey] = [
+          p.split(p.withoutExtension(libAsset.path)).sublist(1).join('__'),
+          info.element.name
+        ].map((x) => "'${x}'").join(',');
       }
     });
 
@@ -270,7 +307,8 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
         resultId,
         JSON.encode({
           'basePaths': new List.from(basePaths),
-          'extraDeps': new Map.fromIterable(extraDeps.keys, value: (k) => new List.from(extraDeps[k])),
+          'extraDeps': new Map.fromIterable(extraDeps.keys,
+              value: (k) => new List.from(extraDeps[k])),
           'bowerDeps': bowerDeps,
           'runInit': runInit
         }));
@@ -280,7 +318,8 @@ class GatheringTransformer extends Transformer with ResolverTransformer {
   String toModuleJs(AssetId libAsset) {
     String libKey;
     if (libAsset.path.startsWith('lib')) {
-      libKey = 'packages/${libAsset.package}/${p.split(p.withoutExtension(libAsset.path)).join('__')}';
+      libKey =
+          'packages/${libAsset.package}/${p.split(p.withoutExtension(libAsset.path)).join('__')}';
     } else if (libAsset.path.startsWith('web')) {
       libKey = '${p.split(p.withoutExtension(libAsset.path)).join('__')}';
     } else if (libAsset.path.startsWith('test')) {
@@ -299,7 +338,10 @@ class FinalizeTransformer extends AggregateTransformer {
   FinalizeTransformer({bool releaseMode, this.settings}) {}
   BarbackSettings settings;
 
-  FinalizeTransformer.asPlugin(BarbackSettings settings) : this(releaseMode: settings.mode == BarbackMode.RELEASE, settings: settings);
+  FinalizeTransformer.asPlugin(BarbackSettings settings)
+      : this(
+            releaseMode: settings.mode == BarbackMode.RELEASE,
+            settings: settings);
 
   @override
   apply(AggregateTransform transform) async {
@@ -321,6 +363,7 @@ class FinalizeTransformer extends AggregateTransformer {
 
     Set<String> basePaths = new Set();
 
+    List<AssetId> primaryInputIds = [];
     await for (Asset asset in t.primaryInputs) {
       t.logger.fine('Merging metadata from ${asset.id}');
       // Merge
@@ -347,6 +390,7 @@ class FinalizeTransformer extends AggregateTransformer {
 
       // Consuming
       t.logger.fine('Consumed ${asset.id}');
+      primaryInputIds.add(asset.id);
       t.consumePrimary(asset.id);
     }
 
@@ -355,7 +399,8 @@ class FinalizeTransformer extends AggregateTransformer {
     t.logger.fine("FINAL runInit ARE :${runInit}");
     t.logger.fine("BASE PATHS : ${basePaths}");
 
-    await Future.wait(basePaths.where((String p) => p != 'lib').map((String basePath) async {
+    await Future.wait(
+        basePaths.where((String p) => p != 'lib').map((String basePath) async {
       t.logger.fine('Producing things for ${basePath}');
       if (bowerDeps.isNotEmpty) {
         Map conf = new Map()..addAll(settings.configuration['bower'] ?? {});
@@ -372,22 +417,39 @@ class FinalizeTransformer extends AggregateTransformer {
       // Write require config map
       if (extraDeps.isNotEmpty || runInit.isNotEmpty) {
         AssetId bowerId = new AssetId(t.package, '${basePath}/require.map.js');
-        AssetId webpackConfigId = new AssetId(t.package, '${basePath}/webpack.config.js');
-        AssetId patched_sdkId = new AssetId(t.package, '${basePath}/patched_sdk.js');
+        AssetId webpackConfigId =
+            new AssetId(t.package, '${basePath}/webpack.config.js');
+        AssetId patched_sdkId =
+            new AssetId(t.package, '${basePath}/patched_sdk.js');
 
-        AssetId dart_test = new AssetId(t.package, '${basePath}/polymerize_require/dart_test.js');
-        AssetId polymer_htmlimport = new AssetId(t.package, '${basePath}/polymerize_require/htmlimport.js');
-        t.addOutput(new Asset.fromString(dart_test, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/dart_test.js'))));
-        t.addOutput(new Asset.fromString(polymer_htmlimport, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/htmlimport.js'))));
+        AssetId dart_test = new AssetId(
+            t.package, '${basePath}/polymerize_require/dart_test.js');
+        AssetId polymer_htmlimport = new AssetId(
+            t.package, '${basePath}/polymerize_require/htmlimport.js');
+        t.addOutput(new Asset.fromString(
+            dart_test,
+            await t.readInputAsString(new AssetId(
+                'polymerize', 'lib/src/polymerize_require/dart_test.js'))));
+        t.addOutput(new Asset.fromString(
+            polymer_htmlimport,
+            await t.readInputAsString(new AssetId(
+                'polymerize', 'lib/src/polymerize_require/htmlimport.js'))));
         t.addOutput(new Asset.fromString(
             new AssetId(t.package, '${basePath}/polymerize_require/start.js'),
-            await t.readInputAsString(
-                new AssetId('polymerize', settings.mode == BarbackMode.DEBUG ? 'lib/src/polymerize_require/start_debug.js' : 'lib/src/polymerize_require/start.js'))));
+            await t.readInputAsString(new AssetId(
+                'polymerize',
+                settings.mode == BarbackMode.DEBUG
+                    ? 'lib/src/polymerize_require/start_debug.js'
+                    : 'lib/src/polymerize_require/start.js'))));
 
         t.addOutput(new Asset.fromString(
-            new AssetId(t.package, '${basePath}/polymerize_require/require.js'), await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/require.js'))));
+            new AssetId(t.package, '${basePath}/polymerize_require/require.js'),
+            await t.readInputAsString(new AssetId(
+                'polymerize', 'lib/src/polymerize_require/require.js'))));
 
-        t.addOutput(new Asset.fromString(patched_sdkId,'''
+        t.addOutput(new Asset.fromString(
+            patched_sdkId,
+            '''
 define('patched_sdk', ['./dart_sdk'], function(dart_sdk) {
 
 
@@ -445,9 +507,17 @@ define('patched_sdk', ['./dart_sdk'], function(dart_sdk) {
                 .transform(UTF8.encoder));
         t.addOutput(bowerJson);
 
+        String mainBooter;
+        for (AssetId pp in primaryInputIds) {
+          if (await t.hasInput(pp.changeExtension('.booter.js'))) {
+            mainBooter = p.basename(pp.changeExtension('.booter').path);
+            break;
+          }
+        }
+
         Asset webpackConfig = new Asset.fromStream(
             webpackConfigId,
-                () async* {
+            () async* {
               yield "module.exports={\n";
               yield " polymerize_loader: {\n";
 
@@ -463,7 +533,16 @@ define('patched_sdk', ['./dart_sdk'], function(dart_sdk) {
               for (String libKey in runInit.keys) {
                 yield "  '${libKey}' : [${runInit[libKey]}],\n";
               }
-              yield " }};\n";
+              yield " }\n";
+              yield ", modules: [\n";
+              yield primaryInputIds
+                  .map((a) => "'web__${p.basenameWithoutExtension(a.path)}',")
+                  .join('\n');
+              if (mainBooter!=null) {
+                yield "'${mainBooter}'\n";
+              }
+              yield "] \n";
+              yield "};\n";
             }()
                 .transform(UTF8.encoder));
 
@@ -473,7 +552,10 @@ define('patched_sdk', ['./dart_sdk'], function(dart_sdk) {
   }
 
   @override
-  classifyPrimary(AssetId id) => id.path.endsWith(GatheringTransformer.EXTENSION) ? 'polymerize_summary' : null;
+  classifyPrimary(AssetId id) =>
+      id.path.endsWith(GatheringTransformer.EXTENSION)
+          ? 'polymerize_summary'
+          : null;
 }
 
 class BowerInstallTransformer extends Transformer {
@@ -489,14 +571,15 @@ class BowerInstallTransformer extends Transformer {
     Directory dir = await Directory.systemTemp.createTemp('bower_import');
 
     try {
-      Asset rc = await transform.getInput(new AssetId(transform.primaryInput.id.package, '.bowerrc'));
-      await new File(p.join(dir.path,'.bowerrc')).writeAsString(await rc.readAsString());
-    } on AssetNotFoundException catch (e) {
-    }
-
+      Asset rc = await transform
+          .getInput(new AssetId(transform.primaryInput.id.package, '.bowerrc'));
+      await new File(p.join(dir.path, '.bowerrc'))
+          .writeAsString(await rc.readAsString());
+    } on AssetNotFoundException catch (e) {}
 
     List<String> opts = ['-v'];
-    if (settings.configuration['bower']?.containsKey('offline')??false||Platform.environment.containsKey('POLYMERIZE_BOWER_OFFLINE')) {
+    if (settings.configuration['bower']?.containsKey('offline') ??
+        false || Platform.environment.containsKey('POLYMERIZE_BOWER_OFFLINE')) {
       opts.add('-o');
       transform.logger.info("Using Bower OFFLINE mode");
     }
@@ -504,12 +587,14 @@ class BowerInstallTransformer extends Transformer {
     String bowerCmd = Platform.isWindows ? 'bower.cmd' : 'bower';
 
     try {
-      ProcessResult res = await Process.run(bowerCmd, ['-v'], workingDirectory: dir.path);
+      ProcessResult res =
+          await Process.run(bowerCmd, ['-v'], workingDirectory: dir.path);
       if (res.exitCode != 0) {
         throw "Bower execution failed : ${res.stderr} , ${res.stdout}";
       }
     } catch (error) {
-      transform.logger.warning('Could not find bower, skipping bower install phase: ${error}');
+      transform.logger.warning(
+          'Could not find bower, skipping bower install phase: ${error}');
       return;
     }
 
@@ -520,7 +605,8 @@ class BowerInstallTransformer extends Transformer {
     transform.logger.fine('Created ${bowerJson.path}');
     transform.logger.info("Downloading bower dependencies ...");
 
-    ProcessResult res = await Process.run(bowerCmd, ['install'], workingDirectory: dir.path);
+    ProcessResult res =
+        await Process.run(bowerCmd, ['install'], workingDirectory: dir.path);
     if (res.exitCode != 0) {
       transform.logger.error("BOWER ERROR : ${res.stdout} / ${res.stderr}");
       transform.logger.error("BOWER:\n${await bowerJson.readAsString()}");
@@ -528,11 +614,15 @@ class BowerInstallTransformer extends Transformer {
     }
     transform.logger.info("Downloading bower dependencies ... DONE");
 
-    Directory bowerComponents = new Directory(p.join(dir.path, 'bower_components'));
+    Directory bowerComponents =
+        new Directory(p.join(dir.path, 'bower_components'));
 
     await for (FileSystemEntity e in bowerComponents.list(recursive: true)) {
       if (e is File) {
-        transform.addOutput(new Asset.fromFile(new AssetId(transform.primaryInput.id.package, "${basePath}/${p.relative(e.path,from:dir.path)}"), e));
+        transform.addOutput(new Asset.fromFile(
+            new AssetId(transform.primaryInput.id.package,
+                "${basePath}/${p.relative(e.path,from:dir.path)}"),
+            e));
       }
     }
   }
@@ -543,7 +633,8 @@ class BowerInstallTransformer extends Transformer {
 
 class TestTransfomer extends Transformer with ResolverTransformer {
   @override
-  Future<bool> isPrimary(AssetId id) async => id.path.startsWith('test/') && id.path.endsWith('.dart');
+  Future<bool> isPrimary(AssetId id) async =>
+      id.path.startsWith('test/') && id.path.endsWith('.dart');
 
   BarbackSettings settings;
 
@@ -552,7 +643,8 @@ class TestTransfomer extends Transformer with ResolverTransformer {
   }
 
   @override
-  Future<bool> shouldApplyResolver(Asset asset) async => asset.id.path.endsWith('.dart');
+  Future<bool> shouldApplyResolver(Asset asset) async =>
+      asset.id.path.endsWith('.dart');
 
   @override
   applyResolver(Transform transform, Resolver resolver) async {
@@ -561,27 +653,33 @@ class TestTransfomer extends Transformer with ResolverTransformer {
     }
 
     LibraryElement origLib = resolver.getLibrary(transform.primaryInput.id);
-    FunctionElement mainFunction = origLib.definingCompilationUnit.functions.firstWhere((fe) => fe.name == 'main', orElse: () => null);
+    FunctionElement mainFunction = origLib.definingCompilationUnit.functions
+        .firstWhere((fe) => fe.name == 'main', orElse: () => null);
     if (mainFunction == null) {
       return;
     }
 
-    AssetId newLibId = transform.primaryInput.id.addExtension('.browser_test.dart');
+    AssetId newLibId =
+        transform.primaryInput.id.addExtension('.browser_test.dart');
 
     // Generate the output
     Scope scope = new Scope.dedupe();
 
     LibraryBuilder libraryBuilder = new LibraryBuilder.scope(scope: scope);
-    libraryBuilder.addDirective(new ImportBuilder(resolver.getImportUri(origLib, from: newLibId).toString(), prefix: 'orig'));
+    libraryBuilder.addDirective(new ImportBuilder(
+        resolver.getImportUri(origLib, from: newLibId).toString(),
+        prefix: 'orig'));
     MethodBuilder mainBuilder = new MethodBuilder.returnVoid('main')
       ..addStatements(() sync* {
         ExpressionBuilder origMain = reference('orig.main');
-        ExpressionBuilder runTest = reference('runTest','package:polymerize/test_support.dart');
+        ExpressionBuilder runTest =
+            reference('runTest', 'package:polymerize/test_support.dart');
         yield runTest.call([origMain]);
       }());
     libraryBuilder.addMember(mainBuilder);
 
-    transform.addOutput(new Asset.fromString(newLibId, prettyToSource(libraryBuilder.buildAst(scope))));
+    transform.addOutput(new Asset.fromString(
+        newLibId, prettyToSource(libraryBuilder.buildAst(scope))));
 
     // If the user has their own HTML file for the test, let that take
     // precedence. Otherwise, create our own basic file.
@@ -610,6 +708,8 @@ class TestTransfomer extends Transformer with ResolverTransformer {
 
 Iterable<X> _dedupe<X>(Iterable<X> from) => new Set()..addAll(from);
 
-bool _needsHtmlImport(LibraryElement importedLib) => hasAnyFirstLevelAnnotation(importedLib.units.map((u) => u.unit), anyOf([isInit, isPolymerRegister]));
+bool _needsHtmlImport(LibraryElement importedLib) => hasAnyFirstLevelAnnotation(
+    importedLib.units.map((u) => u.unit), anyOf([isInit, isPolymerRegister]));
 
-String _packageUriToModuleName(Uri packageUri) => "packages/${packageUri.pathSegments[0]}/${p.withoutExtension(p.joinAll(packageUri.pathSegments.sublist(1)))}.mod.html";
+String _packageUriToModuleName(Uri packageUri) =>
+    "packages/${packageUri.pathSegments[0]}/${p.withoutExtension(p.joinAll(packageUri.pathSegments.sublist(1)))}.mod.html";
