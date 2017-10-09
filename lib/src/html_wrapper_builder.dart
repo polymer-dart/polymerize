@@ -103,21 +103,21 @@ class HtmlWrapperBuilder extends buildy.Builder {
     div.append(doc.createElement('div')
       ..innerHtml = '''
 <script src="common.js"></script>
-<!--
-    <script src="index.js"></script>
--->
 <script>
-
-
-  // TODO : MOVE THIS INTO WEBPACK
-  
-    
-  require(['patched_sdk','web__${mainEntryPointName}'], function(sdk,mainModule) {
-      mainModule.${mainEntryPointName}.main();
+  require(['${mainEntryPointName}.booter'], function(_booter) {
+      _booter();
   });
-
 </script>
 ''');
+
+    // emit the booter too
+    await buildStep.writeAsString(buildStep.inputId.changeExtension('.booter.js'), '''
+  define(['patched_sdk','web__${mainEntryPointName}'], function(sdk,mainModule) {
+    return function() {
+      mainModule.${mainEntryPointName}.main();
+    };
+  });  
+    ''');
 
     // Finally remove polymerize script
     Element polyScript = doc.querySelector('script[src="polymerize_require/start.js"]');
@@ -255,7 +255,7 @@ class HtmlWrapperBuilder extends buildy.Builder {
   // TODO: implement buildExtensions
   @override
   Map<String, List<String>> get buildExtensions => {
-        '.html': ['.webpack.html']
+        '.html': ['.webpack.html','.booter.js']
       };
 }
 
