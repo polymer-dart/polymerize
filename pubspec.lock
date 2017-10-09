@@ -48,7 +48,7 @@ packages:
       name: build
       url: "http://pub.drafintech.it:5001"
     source: hosted
-    version: "0.10.0+1"
+    version: "0.10.2+1"
   build_barback:
     description:
       name: build_barback

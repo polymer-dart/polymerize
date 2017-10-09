@@ -8,11 +8,12 @@ environment:
    sdk: ">=1.8.0 <2.0.0"
 
 dependencies:
- build: ^0.10.0
+ build: ^0.10.2
  build_runner: ^0.4.0
  source_gen: ^0.7.0
  bazel_worker: "^0.1.4"
  code_builder: ^1.0.2
+ html: ^0.13.2
 # dev_compiler:
 #  hosted:
 #   name: dev_compiler

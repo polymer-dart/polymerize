@@ -372,6 +372,9 @@ class FinalizeTransformer extends AggregateTransformer {
       // Write require config map
       if (extraDeps.isNotEmpty || runInit.isNotEmpty) {
         AssetId bowerId = new AssetId(t.package, '${basePath}/require.map.js');
+        AssetId webpackConfigId = new AssetId(t.package, '${basePath}/webpack.config.js');
+        AssetId patched_sdkId = new AssetId(t.package, '${basePath}/patched_sdk.js');
+
         AssetId dart_test = new AssetId(t.package, '${basePath}/polymerize_require/dart_test.js');
         AssetId polymer_htmlimport = new AssetId(t.package, '${basePath}/polymerize_require/htmlimport.js');
         t.addOutput(new Asset.fromString(dart_test, await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/dart_test.js'))));
@@ -383,6 +386,35 @@ class FinalizeTransformer extends AggregateTransformer {
 
         t.addOutput(new Asset.fromString(
             new AssetId(t.package, '${basePath}/polymerize_require/require.js'), await t.readInputAsString(new AssetId('polymerize', 'lib/src/polymerize_require/require.js'))));
+
+        t.addOutput(new Asset.fromString(patched_sdkId,'''
+define('patched_sdk', ['./dart_sdk'], function(dart_sdk) {
+
+
+    function patch_dart_sdk(sdk) {
+        // PATCH LAZY CHECK AS ETC.
+        // Why should ever this be needed if we're already in strong & sound mode ?
+        //sdk.dart.LazyJSType.prototype.is = function is_T(object) {
+        //    return true;
+        //};
+        sdk.dart.LazyJSType.prototype.as = function as_T(object) {
+            return object;
+        };
+        sdk.dart.LazyJSType.prototype._check = function check_T(object) {
+            return object;
+        };
+    }
+
+
+
+
+    patch_dart_sdk(dart_sdk);
+
+    dart_sdk._isolate_helper.startRootIsolate(() => {}, []);
+    dart_sdk._isolate_helper.startRootIsolate = function() {};
+    return dart_sdk;
+});        
+        '''));
         Asset bowerJson = new Asset.fromStream(
             bowerId,
             () async* {
@@ -412,6 +444,30 @@ class FinalizeTransformer extends AggregateTransformer {
             }()
                 .transform(UTF8.encoder));
         t.addOutput(bowerJson);
+
+        Asset webpackConfig = new Asset.fromStream(
+            webpackConfigId,
+                () async* {
+              yield "module.exports={\n";
+              yield " polymerize_loader: {\n";
+
+              for (String libKey in extraDeps.keys) {
+                if (extraDeps[libKey].isEmpty) {
+                  continue;
+                }
+                yield "  '${libKey}' : [${extraDeps[libKey].map((x)=> "'${x}'").join(',')}],\n";
+              }
+
+              yield " },\n";
+              yield " polymerize_init : {\n";
+              for (String libKey in runInit.keys) {
+                yield "  '${libKey}' : [${runInit[libKey]}],\n";
+              }
+              yield " }};\n";
+            }()
+                .transform(UTF8.encoder));
+
+        t.addOutput(webpackConfig);
       }
     }));
   }
