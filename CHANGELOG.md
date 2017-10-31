@@ -1,3 +1,6 @@
+# 0.9.7
+ - added a builder for webpack release build
+
 # 0.9.6
  - fixes for https://github.com/polymer-dart/todo_ddc/issues/12
  - introducing [build](https://pub.dartlang.org/packages/build) support
