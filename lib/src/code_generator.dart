@@ -264,18 +264,32 @@ code_builder.ExpressionBuilder collectConfig(GeneratorContext genctx, ClassEleme
     bool notify;
     String statePath;
     notify = not != null;
+    String jsType;
     String computed;
     DartObject prop = getAnnotation(fe.metadata, isProperty);
     if (prop != null) {
       notify = prop.getField('notify').toBoolValue();
       computed = prop.getField('computed').toStringValue();
+      jsType = prop.getField('type')?.toStringValue();
       statePath = prop.getField('statePath').toStringValue();
+    }
+
+    if(jsType==null) {
+      if (fe.type == fe.context.typeProvider.boolType) {
+        jsType="boolean";
+      } else if (fe.type == fe.context.typeProvider.stringType) {
+        jsType="string";
+      } else if (isListType(fe.type)) {
+        jsType ="Array";
+      } else if (fe.type.isObject) {
+        jsType="object";
+      }
     }
 
     if (statePath != null) {
       properties[fe.name] = reduxPropertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'statePath': code_builder.literal(statePath)});
     } else {
-      properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'computed': code_builder.literal(computed)});
+      properties[fe.name] = propertyType.newInstance([], named: {'notify': code_builder.literal(notify), 'computed': code_builder.literal(computed),'type':code_builder.literal(jsType)});
     }
   });
 

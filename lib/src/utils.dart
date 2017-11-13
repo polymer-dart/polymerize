@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:analyzer/analyzer.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 
 final Uri _POLYMER_REGISTER_URI = Uri.parse('package:polymer_element/annotations.dart');
 final Uri _POLYMER_REGISTER_ASSET_URI = Uri.parse('asset:polymer_element/lib/annotations.dart');
@@ -136,3 +137,15 @@ bool notNull(x) => x != null;
 
 bool needsProcessing(LibraryElement le) => hasAnyFirstLevelAnnotation(le.units.map((u)=>u.unit), anyOf([isJsMap,isBowerImport,isPolymerRegister,isInit,isInitModule,isHtmlImport,isPolymerBehavior,isEntryPoint]));
 
+
+bool isListType(DartType type) =>
+    isTypeInstanceOf(type?.element?.context?.typeProvider?.listType, type);
+
+bool isIterableType(DartType type) =>
+    isTypeInstanceOf(type?.element?.context?.typeProvider?.iterableType, type);
+
+bool isTypeInstanceOf(ParameterizedType base, DartType type) =>
+    type != null &&
+        (type is ParameterizedType) &&
+        type.typeArguments.length == 1 &&
+        type.isSubtypeOf(base.instantiate([type.typeArguments.single]));
