@@ -1,3 +1,7 @@
+# 0.9.8
+ - better handling of behaviors
+ - minor fixes 
+
 # 0.9.7
  - added a builder for webpack release build
 
