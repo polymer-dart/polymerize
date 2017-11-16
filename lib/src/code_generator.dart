@@ -171,6 +171,31 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
 
   // lookup for annotation
 
+  // First treat behaviors
+  for (CompilationUnit cu in ctx.cu.element.library.units
+      .map((CompilationUnitElement ce) => ce.unit)) {
+    for (CompilationUnitMember m in cu.declarations) {
+      if (m.element?.kind == ElementKind.CLASS) {
+        ClassElement classElement = m.element;
+
+        DartObject behavior =
+            getAnnotation(m.element.metadata, isPolymerBehavior);
+        if (behavior != null) {
+          String name = _behaviorName(m.element, behavior);
+          code_builder.ReferenceBuilder cls =
+              code_builder.reference(classElement.name, ctx.inputUri);
+
+          code_builder.ExpressionBuilder configExpressionBuilder =
+              collectConfig(ctx, classElement);
+
+          ctx.addInitStatement(defBehavior.call(
+              [code_builder.literal(name), cls, configExpressionBuilder]));
+        }
+      }
+    }
+  }
+
+  // Then classes (because behaviors could be used by classes in the same file and they need to be already known)
   for (CompilationUnit cu in ctx.cu.element.library.units
       .map((CompilationUnitElement ce) => ce.unit)) {
     for (CompilationUnitMember m in cu.declarations) {
@@ -230,20 +255,6 @@ Future _generatePolymerRegister(GeneratorContext ctx) async {
           }
           continue;
         }
-
-        DartObject behavior =
-            getAnnotation(m.element.metadata, isPolymerBehavior);
-        if (behavior != null) {
-          String name = _behaviorName(m.element, behavior);
-          code_builder.ReferenceBuilder cls =
-              code_builder.reference(classElement.name, ctx.inputUri);
-
-          code_builder.ExpressionBuilder configExpressionBuilder =
-              collectConfig(ctx, classElement);
-
-          ctx.addInitStatement(defBehavior.call(
-              [code_builder.literal(name), cls, configExpressionBuilder]));
-        }
       }
     }
   }
@@ -272,21 +283,17 @@ code_builder.ExpressionBuilder collectConfig(
       "PolymerProperty",
       importFrom: POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder JS_BOOLEAN = new code_builder.TypeBuilder(
-      "JSBoolean",
-      importFrom: POLYMERIZE_JS);
+  code_builder.ReferenceBuilder JS_BOOLEAN =
+      new code_builder.TypeBuilder("JSBoolean", importFrom: POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder JS_STRING = new code_builder.TypeBuilder(
-      "JSString",
-      importFrom: POLYMERIZE_JS);
+  code_builder.ReferenceBuilder JS_STRING =
+      new code_builder.TypeBuilder("JSString", importFrom: POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder JS_ARRAY = new code_builder.TypeBuilder(
-      "JSArray",
-      importFrom: POLYMERIZE_JS);
+  code_builder.ReferenceBuilder JS_ARRAY =
+      new code_builder.TypeBuilder("JSArray", importFrom: POLYMERIZE_JS);
 
-  code_builder.ReferenceBuilder JS_OBJECT = new code_builder.TypeBuilder(
-      "JSObject",
-      importFrom: POLYMERIZE_JS);
+  code_builder.ReferenceBuilder JS_OBJECT =
+      new code_builder.TypeBuilder("JSObject", importFrom: POLYMERIZE_JS);
 
   code_builder.TypeBuilder reduxPropertyType =
       new code_builder.TypeBuilder("ReduxProperty", importFrom: POLYMERIZE_JS);
@@ -348,7 +355,7 @@ code_builder.ExpressionBuilder collectConfig(
       properties[fe.name] = propertyType.newInstance([], named: {
         'notify': code_builder.literal(notify),
         'computed': code_builder.literal(computed),
-        'type': jsType  ?? code_builder.literal(null)
+        'type': jsType ?? code_builder.literal(null)
       });
     }
   });
